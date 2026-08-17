@@ -91,7 +91,11 @@ GrelhaHub/
 
 ```bash
 # 1. Banco — uma vez só
-psql -h localhost -U postgres -f scripts/preparar-banco.sql
+docker run -d --name grelhahub-db -p 5433:5432 \
+  -e POSTGRES_DB=grelhahub -e POSTGRES_USER=grelhahub -e POSTGRES_PASSWORD=grelhahub \
+  postgres:16-alpine
+
+# A porta é 5433 de propósito: 5432 costuma estar ocupada por um Postgres local.
 
 # 2. Backend  →  http://localhost:5000  (as migrations aplicam sozinhas em Development)
 cd backend
