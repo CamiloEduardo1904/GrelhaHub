@@ -7,7 +7,9 @@ WORKDIR /src
 
 # Copia primeiro os arquivos de restore para aproveitar o cache de camada:
 # mudança de código não invalida o restore de pacotes.
-COPY Directory.Build.props Directory.Packages.props ./
+# O .editorconfig entra junto: ele carrega a supressão de análise nas migrations.
+# Sem ele o publish falha aqui e passa na máquina do desenvolvedor.
+COPY Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/GrelhaHub.Domain/*.csproj          src/GrelhaHub.Domain/
 COPY src/GrelhaHub.Application/*.csproj     src/GrelhaHub.Application/
 COPY src/GrelhaHub.Infrastructure/*.csproj  src/GrelhaHub.Infrastructure/

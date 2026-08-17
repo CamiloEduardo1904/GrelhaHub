@@ -1,0 +1,18 @@
+# Regras de análise que precisam existir DENTRO do contexto do build Docker.
+#
+# O .editorconfig da raiz do repositório não entra na imagem: o contexto é
+# `backend/`, e o Docker não copia nada de fora dele. Sem este arquivo, o
+# `dotnet publish` no container falha com CA1861 nas migrations, enquanto o
+# build local passa — o pior tipo de divergência, porque só aparece no pipeline.
+#
+# Sem `root = true` de propósito: localmente este arquivo COMPLEMENTA o da raiz;
+# no container, onde não há pai, ele vale sozinho.
+
+# Migrations são geradas pelo `dotnet ef` — não seguem o estilo do projeto e não
+# devem ser editadas a mão. Analisar código gerado só produz ruído.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none

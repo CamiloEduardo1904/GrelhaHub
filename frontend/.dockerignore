@@ -1,0 +1,12 @@
+# node_modules da máquina local não serve no container: pode ter binário
+# compilado para outra plataforma (esbuild, rollup). O `npm ci` reinstala
+# tudo lá dentro, para o alvo certo.
+node_modules/
+dist/
+.vite/
+
+**/.git
+**/.gitignore
+Dockerfile
+.dockerignore
+*.log

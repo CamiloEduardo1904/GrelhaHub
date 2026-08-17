@@ -11,10 +11,11 @@ Checklist para o primeiro deploy. Depois disso, `git push` na `main` publica soz
 | `DOCKER_REGISTRY=docker.io/dextter` | ✔ feito |
 | Chave dedicada do pipeline instalada e testada | ✔ feito |
 | Service Connection `grelhahub-registry` | ✔ feito |
-| Service Connection `grelhahub-vps` | ✖ **pendente** |
-| Environment `producao` | ✖ **pendente** |
+| Service Connection `grelhahub-vps` | ✔ feito |
+| Environment `producao` | ✔ feito |
 | DNS de `grelhahub.com` → VPS | ✔ feito e propagado |
-| Pipeline criado e executado | ✖ pendente |
+| Imagens validadas localmente (build + execução) | ✔ feito |
+| Pipeline criado e executado | ✖ **último passo** |
 
 ---
 

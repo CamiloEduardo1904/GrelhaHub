@@ -1,0 +1,18 @@
+# Sem este arquivo, o `COPY src/ src/` leva os obj/ e bin/ da máquina de quem
+# builda para dentro do container. O project.assets.json gerado no Windows tem
+# caminhos absolutos do Windows, e o restore dentro do Linux quebra com um
+# stack trace do MSBuild que não diz nada sobre a causa real.
+
+**/bin/
+**/obj/
+**/.vs/
+**/TestResults/
+
+# Testes não vão para a imagem de produção: a publicação é só do Api.
+tests/
+
+**/*.user
+**/.git
+**/.gitignore
+Dockerfile
+.dockerignore
