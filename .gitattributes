@@ -1,0 +1,17 @@
+# Normaliza o fim de linha no repositório: LF sempre, independente de quem commitou.
+# Sem isto, um diff no Windows aparece como "arquivo inteiro alterado" e a revisão vira ruído.
+* text=auto eol=lf
+
+# Scripts que só rodam no Windows precisam de CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binários — nunca converter.
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.zip  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary

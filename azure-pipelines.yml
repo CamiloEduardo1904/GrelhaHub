@@ -1,0 +1,188 @@
+# GrelhaHub — CI/CD (ADR-0006)
+#
+# Fluxo: push na main → build e testes → imagem Docker → registry → SSH na VPS →
+#        migrations → docker compose pull && up -d
+#
+# Segredos vivem em Variable Group, nunca no repositório (RNF-008):
+#   DOCKER_REGISTRY, VPS_HOST, VPS_USER, POSTGRES_*, JWT_CHAVE
+# Service Connections necessárias: Docker Registry e SSH.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - docs/**
+      - assets/**
+      - '**/*.md'
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  - group: grelhahub-producao
+  - name: imageTag
+    value: '$(Build.BuildId)'
+  - name: dotnetVersion
+    value: '10.0.x'
+
+stages:
+
+  # ---------------------------------------------------------------- CI
+  - stage: Build
+    displayName: Build e testes
+    jobs:
+
+      - job: Backend
+        displayName: Backend (.NET)
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UseDotNet@2
+            displayName: Instalar SDK .NET
+            inputs:
+              version: $(dotnetVersion)
+              includePreviewVersions: true
+
+          - script: dotnet restore
+            workingDirectory: backend
+            displayName: Restore
+
+          # Release ativa TreatWarningsAsErrors (Directory.Build.props).
+          - script: dotnet build -c Release --no-restore
+            workingDirectory: backend
+            displayName: Build (Release)
+
+          # Os testes de integração sobem PostgreSQL via Testcontainers — o agente
+          # hospedado do Azure já tem Docker disponível (ADR-0009).
+          - script: dotnet test -c Release --no-build --logger trx --results-directory $(Agent.TempDirectory)/testes
+            workingDirectory: backend
+            displayName: Testes
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '**/*.trx'
+              searchFolder: $(Agent.TempDirectory)/testes
+
+          # O projeto é avaliado em banca: pacote com CVE conhecido não passa.
+          - script: |
+              dotnet list package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt
+              if grep -qiE '>\s+\S+\s+\S+\s+\S+\s+(Critical|High)' /tmp/vuln.txt; then
+                echo "##vso[task.logissue type=error]Dependência com vulnerabilidade alta ou crítica."
+                exit 1
+              fi
+            workingDirectory: backend
+            displayName: Auditoria de dependências
+
+      - job: Frontend
+        displayName: Frontend (React)
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '22.x'
+          - script: npm ci
+            workingDirectory: frontend
+            displayName: Instalar dependências
+          - script: npm run lint
+            workingDirectory: frontend
+            displayName: Lint
+          - script: npm run build
+            workingDirectory: frontend
+            displayName: Build
+
+  # ---------------------------------------------------------------- Imagens
+  - stage: Imagens
+    displayName: Publicar imagens
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Docker
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: Docker@2
+            displayName: API
+            inputs:
+              containerRegistry: 'grelhahub-registry'
+              repository: 'grelhahub-api'
+              command: buildAndPush
+              Dockerfile: backend/Dockerfile
+              buildContext: backend
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Web
+            inputs:
+              containerRegistry: 'grelhahub-registry'
+              repository: 'grelhahub-web'
+              command: buildAndPush
+              Dockerfile: frontend/Dockerfile
+              buildContext: frontend
+              tags: |
+                $(imageTag)
+                latest
+
+  # ---------------------------------------------------------------- Deploy
+  - stage: Deploy
+    displayName: Deploy na VPS
+    dependsOn: Imagens
+    condition: succeeded()
+    jobs:
+      - deployment: VPS
+        environment: producao
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # ADR-0006 — migrations como STEP DO PIPELINE, não no startup da API.
+                # Migration no startup falha em silêncio ou trava o boot quando dá
+                # conflito, e a falha aparece como "a API não sobe".
+                - task: SSH@0
+                  displayName: Migrations EF Core
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    runOptions: commands
+                    commands: |
+                      cd /opt/grelhahub
+                      docker compose pull api
+                      docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
+
+                - task: SSH@0
+                  displayName: Subir serviços
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    runOptions: commands
+                    commands: |
+                      cd /opt/grelhahub
+                      export IMAGE_TAG=$(imageTag)
+                      docker compose pull
+                      docker compose up -d --remove-orphans
+                      docker image prune -f
+
+                - task: SSH@0
+                  displayName: Verificar saúde
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    runOptions: commands
+                    commands: |
+                      for i in $(seq 1 20); do
+                        if curl -fsS http://localhost/api/health > /dev/null; then
+                          echo "API respondendo."
+                          exit 0
+                        fi
+                        sleep 3
+                      done
+                      echo "API não respondeu após 60s."
+                      cd /opt/grelhahub && docker compose logs --tail=50 api
+                      exit 1

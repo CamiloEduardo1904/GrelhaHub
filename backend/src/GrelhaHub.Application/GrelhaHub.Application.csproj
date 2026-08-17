@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <!--
+      EF Core aqui é apenas para IApplicationDbContext (DbSet<T>) e projeção de queries.
+      Nenhuma referência a Npgsql: o provider é detalhe da Infrastructure.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GrelhaHub.Domain\GrelhaHub.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

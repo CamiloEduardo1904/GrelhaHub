@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GrelhaHub.Api/GrelhaHub.Api.csproj" />
+    <Project Path="src/GrelhaHub.Application/GrelhaHub.Application.csproj" />
+    <Project Path="src/GrelhaHub.Domain/GrelhaHub.Domain.csproj" />
+    <Project Path="src/GrelhaHub.Infrastructure/GrelhaHub.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GrelhaHub.Application.Tests/GrelhaHub.Application.Tests.csproj" />
+    <Project Path="tests/GrelhaHub.Domain.Tests/GrelhaHub.Domain.Tests.csproj" />
+    <Project Path="tests/GrelhaHub.Integration.Tests/GrelhaHub.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

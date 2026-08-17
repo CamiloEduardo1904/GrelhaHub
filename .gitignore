@@ -1,0 +1,51 @@
+# ---------- Segredos (RNF-008) ----------
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+*.pem
+appsettings.Production.json
+appsettings.Local.json
+
+# ---------- .NET ----------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+.vs/
+TestResults/
+*.trx
+*.coverage
+coverage*.xml
+BenchmarkDotNet.Artifacts/
+
+# ---------- Node / frontend ----------
+node_modules/
+dist/
+build/
+.vite/
+.next/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---------- Ferramentas e SO ----------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Local ----------
+.claude/settings.local.json
+*.local
+scratch/
+tmp/

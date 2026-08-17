@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ADR-0002 — Clean Architecture.
+    Domain NÃO referencia nada. Nenhum pacote, nenhum projeto.
+    Se um dia precisar de EF Core, MediatR ou qualquer infraestrutura aqui,
+    a modelagem do domínio está errada, não o csproj.
+  -->
+
+</Project>

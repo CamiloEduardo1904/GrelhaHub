@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ADR-0009 — os testes de integração rodam contra PostgreSQL REAL (Testcontainers).
+    O provider in-memory do EF Core não executa CHECK, EXCLUDE, trigger nem coluna
+    gerada; como grande parte das regras vive nesses mecanismos, testar contra
+    in-memory daria falsa confianca justamente onde mais importa.
+  -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\GrelhaHub.Api\GrelhaHub.Api.csproj" />
+    <ProjectReference Include="..\..\src\GrelhaHub.Infrastructure\GrelhaHub.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

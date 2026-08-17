@@ -1,0 +1,654 @@
+/*
+  Paleta oficial do GrelhaHub — ver assets/brand/README.md.
+  Regra fixa da marca: a barra da ligadura sempre em cor de destaque diferente das demais.
+*/
+:root {
+  --laranja-brasa: #ff6b2c;
+  --ambar-chama: #ffb020;
+  --creme: #ffe3d3;
+  --carvao: #14100c;
+  --texto-escuro: #1d1812;
+  --cinza-quente: #9c8e7e;
+  --borda-clara: #e5e0d8;
+
+  --fundo: #faf8f5;
+  --superficie: #ffffff;
+  --texto: var(--texto-escuro);
+  --borda: var(--borda-clara);
+  --sucesso: #2e7d32;
+  --perigo: #c62828;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: var(--carvao);
+    --superficie: #1e1813;
+    --texto: var(--creme);
+    --borda: #332a22;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--fundo);
+  color: var(--texto);
+  line-height: 1.5;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+a {
+  color: var(--laranja-brasa);
+}
+
+.destaque {
+  color: var(--laranja-brasa);
+}
+
+.secundario {
+  color: var(--cinza-quente);
+  font-size: 0.875rem;
+  margin: 0.15rem 0;
+}
+
+.tagline {
+  text-transform: uppercase;
+  letter-spacing: 5px;
+  font-size: 0.7rem;
+  color: var(--cinza-quente);
+  margin: 0 0 1rem;
+}
+
+/* ---------- RNF-010: o atendente usa tablet. Alvo de toque mínimo de 44px. ---------- */
+button,
+.botao-link,
+input,
+select,
+textarea {
+  min-height: 44px;
+  font: inherit;
+}
+
+button,
+.botao-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 1.1rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--laranja-brasa);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s;
+}
+
+button:hover:not(:disabled),
+.botao-link:hover {
+  filter: brightness(1.08);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.secundario-btn {
+  background: transparent;
+  color: var(--cinza-quente);
+  border: 1px solid var(--borda);
+}
+
+button.perigo {
+  background: transparent;
+  color: var(--perigo);
+  border: 1px solid var(--perigo);
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--superficie);
+  color: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--laranja-brasa);
+  outline-offset: 2px;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+label input,
+label textarea {
+  margin-top: 0.3rem;
+  font-weight: 400;
+}
+
+fieldset {
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0 0 1rem;
+}
+
+legend {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--cinza-quente);
+  padding: 0 0.4rem;
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.erro {
+  color: var(--perigo);
+  font-size: 0.875rem;
+  background: color-mix(in srgb, var(--perigo) 10%, transparent);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+}
+
+.erro.faixa {
+  margin: 0 1.5rem;
+}
+
+.nota {
+  font-size: 0.8rem;
+  color: var(--cinza-quente);
+  background: color-mix(in srgb, var(--ambar-chama) 12%, transparent);
+  border-left: 3px solid var(--ambar-chama);
+  border-radius: 0 8px 8px 0;
+  padding: 0.6rem 0.8rem;
+}
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.cartao.centro {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.tela-centro {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.form {
+  width: 100%;
+  max-width: 400px;
+}
+
+.form.largo {
+  max-width: 560px;
+}
+
+.marca {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.marca h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.rodape-form {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--cinza-quente);
+  margin: 1rem 0 0;
+}
+
+/* ---------- Painel do restaurante ---------- */
+.painel {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+}
+
+.marca-compacta {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.5px;
+}
+
+.barra-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.abas {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--borda);
+  background: var(--superficie);
+  overflow-x: auto;
+}
+
+.aba {
+  background: transparent;
+  color: var(--cinza-quente);
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 1rem;
+  white-space: nowrap;
+}
+
+.aba.ativa {
+  color: var(--laranja-brasa);
+  border-bottom-color: var(--laranja-brasa);
+}
+
+.conteudo {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+.resumo-dia {
+  margin-bottom: 1rem;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.lista {
+  display: grid;
+  gap: 1rem;
+}
+
+.vazio {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--cinza-quente);
+}
+
+.pedido header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.numero {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.etiqueta {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--borda);
+  color: var(--texto);
+}
+
+.etiqueta.Aberto {
+  background: var(--ambar-chama);
+  color: var(--carvao);
+}
+.etiqueta.Confirmado,
+.etiqueta.EmProducao {
+  background: var(--laranja-brasa);
+  color: #fff;
+}
+.etiqueta.Pronto,
+.etiqueta.Entregue,
+.etiqueta.Finalizado {
+  background: var(--sucesso);
+  color: #fff;
+}
+.etiqueta.Cancelado {
+  background: var(--perigo);
+  color: #fff;
+}
+
+.cliente {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.itens {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  font-size: 0.875rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.itens li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.observacao {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--cinza-quente);
+  margin: 0.5rem 0;
+}
+
+.pedido footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--borda);
+}
+
+.acoes {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.acoes button {
+  font-size: 0.85rem;
+  padding: 0 0.8rem;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabela th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cinza-quente);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--borda);
+}
+
+.tabela td {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--borda);
+  vertical-align: top;
+}
+
+.tabela tr.apagado {
+  opacity: 0.5;
+}
+
+.alternador {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 400;
+}
+
+.alternador input {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--laranja-brasa);
+}
+
+.link-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: var(--fundo);
+  border: 1px dashed var(--borda);
+  border-radius: 12px;
+  padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+}
+
+.link-box code {
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.dados {
+  display: flex;
+  gap: 2rem;
+  margin: 0;
+}
+
+.dados dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cinza-quente);
+}
+
+.dados dd {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* ---------- Cardápio público ---------- */
+.publico .capa {
+  text-align: center;
+  padding: 2.5rem 1.5rem 1.5rem;
+  background: var(--carvao);
+  color: var(--creme);
+}
+
+.publico .capa h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.publico-conteudo {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+@media (max-width: 860px) {
+  .publico-conteudo {
+    grid-template-columns: 1fr;
+  }
+
+  .linha {
+    grid-template-columns: 1fr;
+  }
+}
+
+.itens-cardapio section {
+  margin-bottom: 1.75rem;
+}
+
+.produtos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.produto {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.preco {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-weight: 700;
+  color: var(--laranja-brasa);
+}
+
+.contador {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.contador button {
+  width: 44px;
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+.contador span {
+  min-width: 1.5rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.carrinho {
+  position: sticky;
+  top: 1.5rem;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.carrinho button[type='button'] {
+  width: 100%;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  margin: 0.5rem 0 1rem;
+  border-top: 1px solid var(--borda);
+  font-size: 1.1rem;
+}
+
+.link-discreto {
+  display: block;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--cinza-quente);
+  margin-top: 1rem;
+}
+
+.numero-grande {
+  font-size: 3rem;
+  color: var(--laranja-brasa);
+  margin: 0;
+}
+
+.acompanhamento {
+  width: 100%;
+  margin-top: 1.5rem;
+}
+
+.regua {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.regua li {
+  position: relative;
+  padding-left: 1.75rem;
+  font-size: 0.9rem;
+  color: var(--cinza-quente);
+}
+
+.regua li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--borda);
+  background: var(--superficie);
+}
+
+.regua li.feito::before {
+  background: var(--sucesso);
+  border-color: var(--sucesso);
+}
+
+.regua li.atual {
+  color: var(--texto);
+  font-weight: 700;
+}
+
+.regua li.atual::before {
+  background: var(--laranja-brasa);
+  border-color: var(--laranja-brasa);
+}

@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- Herda o Directory.Build.props da raiz do backend. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Analisadores nos projetos de teste">
+    <!--
+      CA1707 proíbe sublinhado em nome de membro. Em teste, `Metodo_Cenario_Resultado`
+      é a convenção estabelecida e é o que torna a saída do runner legível.
+      A regra é desativada apenas aqui, nunca no código de produção.
+    -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+</Project>
