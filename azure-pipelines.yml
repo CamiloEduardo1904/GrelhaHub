@@ -40,6 +40,16 @@ pr:
 # pipeline não precisa deles — ele constrói a imagem e manda subir. Declarar um
 # grupo que nada usa só criaria mais um passo de configuração para falhar.
 variables:
+  # O Docker@2 NAO insere o Docker ID sozinho: o `repository:` vai literal para
+  # o `docker build -t`. Sem o namespace, a imagem sai como `grelhahub-api` e o
+  # push mira `library/grelhahub-api` — o espaco das imagens oficiais, onde
+  # ninguem tem permissao. O erro que aparece e `insufficient_scope`, que parece
+  # problema de token e nao e.
+  #
+  # Precisa casar com DOCKER_REGISTRY no .env da VPS (docker.io/dextter).
+  - name: dockerNamespace
+    value: dextter
+
   - name: imageTag
     value: '$(Build.BuildId)'
   - name: dotnetVersion
@@ -127,7 +137,7 @@ stages:
             displayName: API
             inputs:
               containerRegistry: 'grelhahub-registry'
-              repository: 'grelhahub-api'
+              repository: '$(dockerNamespace)/grelhahub-api'
               command: buildAndPush
               Dockerfile: backend/Dockerfile
               buildContext: backend
@@ -139,7 +149,7 @@ stages:
             displayName: Web
             inputs:
               containerRegistry: 'grelhahub-registry'
-              repository: 'grelhahub-web'
+              repository: '$(dockerNamespace)/grelhahub-web'
               command: buildAndPush
               Dockerfile: frontend/Dockerfile
               buildContext: frontend
