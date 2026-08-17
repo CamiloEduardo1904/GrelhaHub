@@ -185,7 +185,10 @@ stages:
 
                       docker compose pull
                       docker compose up -d --remove-orphans
-                      docker image prune -f
+                      # `docker image prune -f` sem filtro apaga imagem dangling de
+                      # QUALQUER projeto que rode nesta VPS, inclusive de outro
+                      # time no meio de um build. Limitado às nossas.
+                      docker image ls "${DOCKER_REGISTRY}/grelhahub-*"                         --filter "dangling=true" -q | xargs -r docker rmi || true
 
                 - task: SSH@0
                   displayName: Verificar saúde

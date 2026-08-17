@@ -80,8 +80,12 @@ services:
       - api
       - web
     ports:
-      - "80:80"
-      - "443:443"
+      # Padrão ALTO de propósito: numa VPS compartilhada, subir a pilha não pode
+      # tomar a 80 de quem já está servindo nela. Só mude para 80/443 depois de
+      # confirmar que estão livres — ou deixe o nginx que já existe fazer proxy
+      # para estas portas.
+      - "${PORTA_HTTP:-8080}:80"
+      - "${PORTA_HTTPS:-8443}:443"
     environment:
       DOMINIO: ${DOMINIO}
     # A imagem roda envsubst sobre /etc/nginx/templates/*.template na partida.

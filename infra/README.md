@@ -70,11 +70,25 @@ gunzip -c backup-2026-08-17.sql.gz | docker compose exec -T db psql -U grelhahub
 A pilha se isola pelo `name: grelhahub` no compose — rede, volumes e containers
 ficam todos sob esse prefixo, sem colidir com o que já existe.
 
-**O que colide é a porta.** O nginx da borda ocupa 80 e 443. Se outro container
-já as usa, você tem duas saídas:
+**O que colide é a porta**, e por isso o padrão é alto: `PORTA_HTTP=8080` e
+`PORTA_HTTPS=8443`. Subir a pilha não toma a 80 de ninguém.
 
-1. Passar o GrelhaHub para portas altas (`8080:80`) e deixar o nginx que já
-   existe fazer o proxy para ele
-2. Colocar o GrelhaHub como o nginx da borda e mover o outro serviço para trás
+A partir daí, dois caminhos:
 
-A primeira é menos invasiva. Diga qual é o outro serviço que eu ajusto o compose.
+| Situação | O que fazer |
+|----------|-------------|
+| 80 e 443 **livres** | `PORTA_HTTP=80`, `PORTA_HTTPS=443` no `.env`. O GrelhaHub vira a borda |
+| Já há um nginx/traefik na borda | Deixe 8080/8443 e configure o que já existe para fazer proxy de `grelhahub.seudominio` para `127.0.0.1:8080` |
+
+No segundo caso, o `ativar-https.sh` **não** se aplica: quem termina o TLS é o
+proxy da borda, e o GrelhaHub fica em HTTP atrás dele. Me diga qual é o proxy
+que eu escrevo o trecho de configuração.
+
+### O que a pilha nunca toca
+
+- **Containers e volumes de outros projetos** — tudo aqui vive sob o prefixo `grelhahub`
+- **Imagens de terceiros** — o `prune` do pipeline é filtrado para as nossas.
+  Um `docker image prune -f` sem filtro apagaria imagem dangling de qualquer
+  projeto do servidor, inclusive de outro build em andamento
+- **O Docker daemon e a rede do host** — só a rede `grelhahub_interna`, criada e
+  removida com a pilha
