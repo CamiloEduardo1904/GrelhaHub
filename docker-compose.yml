@@ -74,6 +74,14 @@ services:
     restart: unless-stopped
     networks:
       - interna
+    # Sobrescreve o healthcheck da imagem, que usa "localhost" e cai no mesmo
+    # problema de IPv6. O Dockerfile ja foi corrigido; isto cobre imagens antigas.
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -93,7 +101,6 @@ services:
       # O Traefik do servidor roda com `exposedbydefault=false`: sem esta linha
       # o container é ignorado, e é assim que os outros projetos ficam isolados.
       traefik.enable: "true"
-      traefik.docker.network: grelhahub_interna
       # Os dois nomes: existe CNAME www -> apex no DNS, e sem incluir aqui o
       # www daria 404 do Traefik. O Let's Encrypt emite um certificado com os
       # dois SANs automaticamente.
@@ -103,7 +110,9 @@ services:
       # A porta é a do container, não a do host — nada é publicado.
       traefik.http.services.grelhahub.loadbalancer.server.port: "80"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/health"]
+      # 127.0.0.1 explicito: com "localhost" o BusyBox tenta ::1 primeiro e o
+      # nginx escuta so em IPv4 — o healthcheck falha com o servico no ar.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
