@@ -154,8 +154,19 @@ stages:
                     sshEndpoint: 'grelhahub-vps'
                     runOptions: commands
                     commands: |
+                      set -e
                       cd /opt/grelhahub
+
+                      # IMAGE_TAG precisa estar setado JÁ AQUI: sem isso o compose
+                      # puxa `latest` e a migration roda a partir da imagem antiga,
+                      # aplicando um schema que não corresponde ao código que vai subir.
+                      export IMAGE_TAG=$(imageTag)
+
                       docker compose pull api
+
+                      # ADR-0006 — migration é step do pipeline, nunca no startup.
+                      # O modo --migrate aplica e SAI; se falhar, sai com código 1 e
+                      # o `set -e` interrompe o deploy antes do `up -d`.
                       docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
 
                 - task: SSH@0
@@ -164,8 +175,14 @@ stages:
                     sshEndpoint: 'grelhahub-vps'
                     runOptions: commands
                     commands: |
+                      set -e
                       cd /opt/grelhahub
                       export IMAGE_TAG=$(imageTag)
+
+                      # Grava a tag no .env para que um `docker compose up` manual na
+                      # VPS não volte silenciosamente para `latest`.
+                      sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$(imageTag)|" .env
+
                       docker compose pull
                       docker compose up -d --remove-orphans
                       docker image prune -f

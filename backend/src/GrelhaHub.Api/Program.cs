@@ -64,6 +64,48 @@ builder.Services.AddCors(options => options.AddPolicy(
 
 var app = builder.Build();
 
+// ADR-0006 — em produção as migrations rodam como STEP DO PIPELINE, e este é o
+// modo que o step usa: aplica e SAI, sem subir o servidor.
+//
+// Sem isto, `docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate`
+// subiria a API e ficaria escutando — o deploy travaria para sempre esperando
+// um processo que nunca termina.
+if (args.Contains("--migrate"))
+{
+    try
+    {
+        using var escopoMigracao = app.Services.CreateScope();
+        var banco = escopoMigracao.ServiceProvider.GetRequiredService<GrelhaHubDbContext>();
+
+        var pendentes = (await banco.Database.GetPendingMigrationsAsync()).ToList();
+
+        if (pendentes.Count == 0)
+        {
+            Log.Information("Nenhuma migration pendente.");
+        }
+        else
+        {
+            Log.Information("Aplicando {Total} migration(s): {Nomes}",
+                pendentes.Count, string.Join(", ", pendentes));
+            await banco.Database.MigrateAsync();
+            Log.Information("Migrations aplicadas.");
+        }
+
+        return 0;
+    }
+    catch (Exception excecao)
+    {
+        // Falha ruidosa: o pipeline precisa parar aqui, não seguir para o
+        // `up -d` e subir uma API contra um schema desatualizado.
+        Log.Fatal(excecao, "Falha ao aplicar migrations.");
+        return 1;
+    }
+    finally
+    {
+        await Log.CloseAndFlushAsync();
+    }
+}
+
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging();
 
@@ -93,6 +135,8 @@ if (app.Environment.IsDevelopment())
 }
 
 await app.RunAsync();
+
+return 0;
 
 /// <summary>Exposto para os testes de integração (<c>WebApplicationFactory&lt;Program&gt;</c>).</summary>
 public partial class Program;
