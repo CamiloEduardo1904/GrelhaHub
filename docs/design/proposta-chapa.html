@@ -813,6 +813,131 @@
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
   }
+
+  /* Só aparece no PDF: substitui o que na tela é interativo. */
+  .so-impressao { display: none; }
+
+  /* ============================================================
+     IMPRESSÃO — o PDF de apresentação
+     A paleta é fixada no tema claro de propósito: o PDF não pode
+     depender do tema do sistema de quem gerou. Os componentes que
+     SÃO escuros por desenho (barra do app, capa do cardápio,
+     bloco de código) continuam escuros — é o caráter da direção.
+     ============================================================ */
+
+  @media print {
+    :root,
+    :root[data-theme="dark"],
+    :root[data-theme="light"] {
+      --ground:    #ffffff;
+      --surface:   #ffffff;
+      --surface-2: #efe7db;
+      --text:      #14100c;
+      --muted:     #5f5447;
+      --rule:      #14100c;
+      --shadow:    #14100c;
+      --ok:        #235730;
+      --alerta:    #8a5100;
+      --erro:      #8f221b;
+    }
+
+    @page {
+      size: A4;
+      margin: 14mm 13mm;
+    }
+
+    html, body {
+      background: #fff;
+      font-size: 10.5pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .envelope {
+      max-width: none;
+      padding: 0;
+      gap: 9mm;
+    }
+
+    /* Uma seção não começa com o título órfão no pé da página. */
+    .titulo-secao { break-after: avoid; }
+
+    section { break-inside: auto; }
+
+    .comanda,
+    .regra,
+    .amostra,
+    .escala-linha,
+    .prato,
+    .lado,
+    .moldura,
+    .ciclo-impresso,
+    .ciclo-passo,
+    .duelo,
+    pre,
+    .tese { break-inside: avoid; }
+
+    /* Quebras onde o documento tem juntas naturais. */
+    .quebra-antes { break-before: page; }
+
+    /* Legenda pertence ao elemento acima; nunca abre página sozinha. */
+    .legenda { break-before: avoid; }
+
+    .capa { padding-top: 0; min-height: auto; }
+    .capa h1 { font-size: 46pt; }
+    .capa h1 em { font-size: 11pt; color: #5f5447; }
+
+    /* Sem interação no papel. */
+    .demo-dica,
+    #reiniciar { display: none !important; }
+
+    #avancar { flex: 0 0 auto; }
+
+    .so-impressao { display: block; }
+
+    /* A grade do painel vira duas colunas: três comandas por linha
+       cortam no meio em A4. */
+    .grade-comandas { grid-template-columns: repeat(2, 1fr); }
+
+    .btn { box-shadow: 2px 2px 0 var(--shadow); }
+
+    a { color: #14100c; text-decoration: none; }
+
+    /* O picote em cinza claro para não virar borrão de tinta. */
+    .picote {
+      background:
+        radial-gradient(circle at 6px 6px, #fff 2.5px, transparent 2.6px)
+        0 0 / 14px 12px repeat-x,
+        #efe7db;
+    }
+  }
+
+  /* Régua estática do ciclo — a versão de papel da demo. */
+  .ciclo-impresso {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-top: var(--rule-w) solid var(--rule);
+    padding-top: 0.8rem;
+  }
+
+  .ciclo-passo {
+    display: grid;
+    grid-template-columns: auto 8.5rem 1fr;
+    gap: 0.75rem;
+    align-items: baseline;
+    font-size: 0.82rem;
+  }
+
+  .ciclo-passo .nome {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .ciclo-passo .nota { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -922,7 +1047,7 @@
   </section>
 
   <!-- ═══════════════════════ COMANDA VIVA ═══════════════════════ -->
-  <section>
+  <section class="quebra-antes">
     <div class="titulo-secao">
       <span class="grelha" aria-hidden="true"><i></i><i class="ativa"></i><i></i></span>
       <h2>A comanda, viva</h2>
@@ -977,12 +1102,47 @@
           A confirmação é o único ponto do ciclo que dispara baixa de estoque e ordem de
           produção. Por isso ela é o botão cheio; o resto é continuidade.
         </p>
+
+        <div class="so-impressao">
+          <div class="ciclo-impresso">
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="ativa"></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="nome">Aberto</span>
+              <span class="nota">chegou, ainda não é compromisso</span>
+            </div>
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="ativa"></i><i></i><i></i><i></i><i></i></span>
+              <span class="nome">Confirmado</span>
+              <span class="nota">dispara baixa de estoque e ordem de produção</span>
+            </div>
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="ativa"></i><i></i><i></i><i></i></span>
+              <span class="nome">Em produção</span>
+              <span class="nota">a cozinha começou — entre os dois pode haver fila</span>
+            </div>
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="ativa"></i><i></i><i></i></span>
+              <span class="nome">Pronto</span>
+              <span class="nota">saiu da chapa; cancelar daqui gera perda</span>
+            </div>
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="ativa"></i><i></i></span>
+              <span class="nome">Entregue</span>
+              <span class="nota">chegou ao cliente</span>
+            </div>
+            <div class="ciclo-passo">
+              <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="ativa"></i></span>
+              <span class="nome">Finalizado</span>
+              <span class="nota">não retorna a estado anterior</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ═══════════════════════ PAINEL ═════════════════════════════ -->
-  <section>
+  <section class="quebra-antes">
     <div class="titulo-secao">
       <span class="grelha" aria-hidden="true"><i></i><i></i><i class="ativa"></i></span>
       <h2>Painel do restaurante</h2>
@@ -1186,7 +1346,7 @@
   </section>
 
   <!-- ═══════════════════════ TOKENS ═════════════════════════════ -->
-  <section>
+  <section class="quebra-antes">
     <div class="titulo-secao">
       <span class="grelha" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i class="ativa"></i></span>
       <h2>Tokens</h2>
@@ -1250,7 +1410,7 @@
   </section>
 
   <!-- ═══════════════════════ REGRAS ═════════════════════════════ -->
-  <section>
+  <section class="quebra-antes">
     <div class="titulo-secao">
       <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="ativa"></i></span>
       <h2>Regras para revisão de código</h2>

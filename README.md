@@ -41,7 +41,8 @@ Se durante a implementação aparecer um comportamento necessário que não est�
 |-----------|---------|
 | [Catálogo de Regras](docs/03-catalogo-de-regras-de-negocio.md) ★ | **Fonte de verdade** — 138 regras de negócio |
 | [Guia de Specs](docs/06-guia-de-specs.md) | Como a regra vira spec e a spec vira código |
-| [ADRs](docs/adr/) | As 11 decisões de arquitetura, com alternativas e custos |
+| [ADRs](docs/adr/) | As 12 decisões de arquitetura, com alternativas e custos |
+| [Design System Chapa](docs/08-design-system.md) | Identidade da interface — tokens, componentes e as 8 regras `CHAPA-*` |
 | [Fila de Validação](docs/05-fila-de-validacao-com-cliente.md) | Roteiro da entrevista com o cliente |
 
 ---

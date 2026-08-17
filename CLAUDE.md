@@ -37,6 +37,7 @@ Não implemente "provisoriamente".
 | `docs/adr/README.md` | 11 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
+| `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
 
 **Nunca responda de memória sobre uma regra** — `grep` pelo ID. As regras mudam de estado a
 cada entrevista.
@@ -88,6 +89,26 @@ backend/src/
   nunca `float`
 - Versões de pacote **só** em `backend/Directory.Packages.props` (CPM)
 - Release ativa `TreatWarningsAsErrors` — build de Release limpo é obrigatório
+
+### Frontend — direção Chapa
+
+Base visual oficial desde 17/08/2026 (ADR-0012). Detalhe em `docs/08-design-system.md`.
+
+**A regra central:** o kit de marca diz que *"a barra da ligadura sempre em cor de destaque
+diferente das demais"*. Na interface isso vira: **em qualquer grupo, exatamente uma barra é
+âmbar — a ativa**. Estado do pedido, aba, etapa, seleção.
+
+**Cartoon por fora, sem graça por dentro.** Personalidade na moldura; dentro do dado, nada.
+
+- Sombra **sólida deslocada** (`5px 5px 0` em carvão). Raio de desfoque é plástico
+- Dado em **mono** com `tabular-nums`; prosa em sans; peso só no número do pedido e no total
+- Alvo de toque **48 px** na operação (acima dos 44 do `RNF-010`)
+- Sem webfont, sem Inter/Geist, sem gradiente decorativo, sem glassmorphism
+- Emoji não é ícone nem estado — status é selo com borda e cor
+- **Sem cadeado em campo que a API não devolve** (`RN-GER-012`, `CHAPA-05`): se o perfil não
+  vê o custo, não há blur nem "desbloqueie" — o campo não existe
+
+Componente novo entra no design system **antes** de entrar no código, mesma regra do catálogo.
 
 ### Testes
 

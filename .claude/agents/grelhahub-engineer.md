@@ -64,6 +64,7 @@ Sempre, antes de qualquer implementação ou resposta de contexto:
 | `docs/adr/README.md` | As 11 decisões e as 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
+| `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de tocar em qualquer tela |
 
 **Não responda de memória sobre uma regra.** `grep` pelo ID. As regras mudam de estado a cada entrevista, e uma
 resposta baseada em versão antiga do catálogo é pior que não responder.
@@ -230,6 +231,37 @@ retrabalho custa uma sprint.
 | **FIS é o último módulo** (onda 11) | Não escreva spec fiscal antes de tudo o mais estar entregue. As regras seguem catalogadas e a modelagem reserva o espaço — em especial `RN-FIS-006` |
 | **RH permanece no MVP**, nível Modelo | Colaborador, cargo, escala e apontamento existem. Sem folha de pagamento. `RN-LOG-005` depende disso |
 | **`RN-VEN-035`** (`DEC`) | Falta de insumo **sempre** gera alerta na tela. `PAR-VEN-003` decide a fricção — recusar, exigir confirmação ou informar — **nunca se o operador é avisado**. Não implemente caminho silencioso |
+
+---
+
+## 7.1 Frontend — direção Chapa
+
+Base visual oficial desde 17/08/2026 (ADR-0012). Detalhe em `docs/08-design-system.md`.
+
+**A regra central** vem do kit de marca — *"a barra da ligadura sempre em cor de destaque diferente das
+demais"* — e na interface significa: **em qualquer grupo, exatamente uma barra é âmbar, a ativa**.
+Estado do pedido, aba, etapa de preparo, seleção. Não invente outro indicador de progresso.
+
+**Cartoon por fora, sem graça por dentro.** Personalidade mora na moldura — bordas, cabeçalhos, estados
+vazios, cardápio público. Dentro do dado, nada: tabela é tabulação, contraste e nenhuma surpresa.
+
+As oito regras que você aplica sem precisar perguntar:
+
+| ID | Regra |
+|----|-------|
+| CHAPA-01 | Sombra sólida deslocada (`5px 5px 0`). Raio de desfoque é plástico |
+| CHAPA-02 | Uma barra âmbar por grupo — nunca duas |
+| CHAPA-03 | Dado em mono com `tabular-nums`, prosa em sans, peso só no número e no total |
+| CHAPA-04 | Alvo de toque de 48 px na operação |
+| CHAPA-05 | Sem cadeado em campo que a API não devolve (`RN-GER-012`) |
+| CHAPA-06 | Emoji não é ícone nem estado |
+| CHAPA-07 | Comemoração só no fechamento de caixa batendo certo |
+| CHAPA-08 | Movimento tem massa; nada de fade de 200 ms |
+
+**Nunca use:** gradiente decorativo, glassmorphism, sombra borrada, `border-radius` uniforme, Inter,
+Geist, Space Grotesk, chip pastel de status, webfont de CDN.
+
+Componente visual novo entra no design system **antes** de entrar no código — mesma regra do catálogo.
 
 ---
 

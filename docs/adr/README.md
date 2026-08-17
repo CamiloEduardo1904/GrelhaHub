@@ -21,6 +21,7 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0009](0009-onde-as-regras-de-negocio-vivem.md) | Onde as regras de negócio vivem (modelo × aplicação) | Aceito |
 | [0010](0010-custeio-por-lote-com-fefo.md) | Custeio específico por lote com consumo FEFO | Aceito |
 | [0011](0011-dia-operacional.md) | Dia operacional como dimensão do modelo | Aceito |
+| [0012](0012-direcao-visual-chapa.md) | Direção visual **Chapa** — base da interface | Aceito |
 
 ## Decisões ainda em aberto
 
