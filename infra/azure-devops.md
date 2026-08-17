@@ -15,8 +15,8 @@ Checklist para o primeiro deploy. Depois disso, `git push` na `main` publica soz
 | Environment `producao` | ✔ feito |
 | DNS de `grelhahub.com` → VPS | ✔ feito e propagado |
 | Imagens validadas localmente (build + execução) | ✔ feito |
-| Agente self-hosted na VPS (extraído, pool `Default`) | ✔ feito |
-| Registrar o agente com um PAT | ✖ **pendente** |
+| Agente self-hosted na VPS, pool `grelhahub` | ✔ feito |
+| Pool `grelhahub` criado e autorizado no projeto | ✔ feito |
 | Pipeline executado | ✖ pendente |
 
 ---
@@ -150,6 +150,20 @@ The pool does not exist or has not been authorized for use.
 
 **Vale pedir mesmo assim** — https://aka.ms/azpipelines-parallelism-request — mas o agente
 próprio é gratuito, sem fila e sem limite de minutos.
+
+### Pool dedicado, não o `Default`
+
+O `Default` existe no nível da **organização**, e um pipeline só o usa se o **projeto**
+tiver o pool vinculado e autorizado. Registrar o agente lá não basta — o sintoma é:
+
+```
+Could not find a pool with name Default.
+The pool does not exist or has not been authorized for use.
+```
+
+Um pool criado pelo próprio projeto (**Project settings → Agent pools → Add pool → New →
+Self-hosted**) nasce autorizado, e ainda isola este agente de qualquer outro que a
+organização venha a ter. Por isso o pool é `grelhahub`.
 
 O agente vive em `/opt/azagent`, roda como o usuário `azagent` (o `config.sh` recusa
 root, e com razão: um agente de CI executa código do repositório) e está no grupo `docker`

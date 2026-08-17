@@ -3,7 +3,11 @@
 # Fluxo: push na main → build e testes → imagem Docker → registry → SSH na VPS →
 #        migrations → docker compose pull && up -d
 #
-# AGENTE: self-hosted, na propria VPS (pool "Default"). A organizacao nao tem
+# AGENTE: self-hosted, na propria VPS (pool "grelhahub").
+#
+# Pool dedicado em vez do "Default": nasce autorizado no projeto e isola este
+# agente de qualquer outro que a organizacao venha a ter. O "Default" existe no
+# nivel da organizacao e exigia autorizacao manual no projeto. A organizacao nao tem
 # paralelismo hospedado concedido — a Microsoft nao libera automaticamente desde
 # 2021, e o pedido leva dias. O agente proprio e gratuito e sem fila.
 #
@@ -51,7 +55,7 @@ stages:
       - job: Backend
         displayName: Backend (.NET)
         pool:
-          name: Default
+          name: grelhahub
         steps:
           - task: UseDotNet@2
             displayName: Instalar SDK .NET
@@ -94,7 +98,7 @@ stages:
       - job: Frontend
         displayName: Frontend (React)
         pool:
-          name: Default
+          name: grelhahub
         steps:
           - task: NodeTool@0
             inputs:
@@ -117,7 +121,7 @@ stages:
     jobs:
       - job: Docker
         pool:
-          name: Default
+          name: grelhahub
         steps:
           - task: Docker@2
             displayName: API
@@ -152,7 +156,7 @@ stages:
       - deployment: VPS
         environment: producao
         pool:
-          name: Default
+          name: grelhahub
         strategy:
           runOnce:
             deploy:
