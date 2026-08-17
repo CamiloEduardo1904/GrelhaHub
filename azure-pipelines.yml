@@ -3,9 +3,11 @@
 # Fluxo: push na main → build e testes → imagem Docker → registry → SSH na VPS →
 #        migrations → docker compose pull && up -d
 #
-# Segredos vivem em Variable Group, nunca no repositório (RNF-008):
-#   DOCKER_REGISTRY, VPS_HOST, VPS_USER, POSTGRES_*, JWT_CHAVE
-# Service Connections necessárias: Docker Registry e SSH.
+# Segredos NUNCA passam por aqui (RNF-008): vivem no /opt/grelhahub/.env da VPS,
+# criado uma vez e com permissão 600. O pipeline só precisa de duas Service
+# Connections — ver infra/azure-devops.md:
+#   grelhahub-registry  (Docker Registry)
+#   grelhahub-vps       (SSH)
 
 trigger:
   branches:
@@ -22,8 +24,10 @@ pr:
     include:
       - main
 
+# Nenhum Variable Group: os segredos vivem no .env da VPS (RNF-008), e o
+# pipeline não precisa deles — ele constrói a imagem e manda subir. Declarar um
+# grupo que nada usa só criaria mais um passo de configuração para falhar.
 variables:
-  - group: grelhahub-producao
   - name: imageTag
     value: '$(Build.BuildId)'
   - name: dotnetVersion
