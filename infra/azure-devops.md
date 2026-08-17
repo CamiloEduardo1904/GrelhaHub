@@ -15,7 +15,9 @@ Checklist para o primeiro deploy. Depois disso, `git push` na `main` publica soz
 | Environment `producao` | ✔ feito |
 | DNS de `grelhahub.com` → VPS | ✔ feito e propagado |
 | Imagens validadas localmente (build + execução) | ✔ feito |
-| Pipeline criado e executado | ✖ **último passo** |
+| Agente self-hosted na VPS (extraído, pool `Default`) | ✔ feito |
+| Registrar o agente com um PAT | ✖ **pendente** |
+| Pipeline executado | ✖ pendente |
 
 ---
 
@@ -132,6 +134,44 @@ há certificado e o site não abre.** Confira antes de estranhar:
 ```bash
 dig +short A grelhahub.com     # deve responder 177.7.42.204
 ```
+
+---
+
+## 5.1 Agente self-hosted — por que
+
+A organização **não tem paralelismo hospedado concedido**. Desde 2021 a Microsoft não
+libera os agentes gratuitos automaticamente para organizações novas; é preciso pedir por
+formulário e leva dias. O sintoma é exatamente:
+
+```
+Could not find a pool with name Azure Pipelines.
+The pool does not exist or has not been authorized for use.
+```
+
+**Vale pedir mesmo assim** — https://aka.ms/azpipelines-parallelism-request — mas o agente
+próprio é gratuito, sem fila e sem limite de minutos.
+
+O agente vive em `/opt/azagent`, roda como o usuário `azagent` (o `config.sh` recusa
+root, e com razão: um agente de CI executa código do repositório) e está no grupo `docker`
+para o passo de build de imagem.
+
+**Custo assumido:** o build passa a rodar no mesmo servidor que serve produção, o que
+contraria a premissa do ADR-0006. A VPS tem 8 GB e 2 vCPU, e o pico dura poucos minutos por
+deploy — aceitável aqui, não seria numa VPS de 2 GB.
+
+### Registrar
+
+O PAT precisa de **um escopo só**: *Agent Pools → Read & manage*. Não use "Full access":
+o token fica guardado na VPS.
+
+```
+User settings → Personal access tokens → New Token
+  Name: agente-vps-grelhahub
+  Scopes: Custom defined → Agent Pools (Read & manage)
+```
+
+O registro é interativo, com o token digitado dentro da sessão SSH — nunca em linha de
+comando, nunca no histórico do shell.
 
 ---
 

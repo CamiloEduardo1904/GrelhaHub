@@ -3,6 +3,14 @@
 # Fluxo: push na main → build e testes → imagem Docker → registry → SSH na VPS →
 #        migrations → docker compose pull && up -d
 #
+# AGENTE: self-hosted, na propria VPS (pool "Default"). A organizacao nao tem
+# paralelismo hospedado concedido — a Microsoft nao libera automaticamente desde
+# 2021, e o pedido leva dias. O agente proprio e gratuito e sem fila.
+#
+# Consequencia assumida: o build roda no mesmo servidor que serve producao,
+# contrariando a premissa do ADR-0006. A VPS tem 8 GB e 2 vCPU, e o pico dura
+# poucos minutos por deploy.
+#
 # Segredos NUNCA passam por aqui (RNF-008): vivem no /opt/grelhahub/.env da VPS,
 # criado uma vez e com permissão 600. O pipeline só precisa de duas Service
 # Connections — ver infra/azure-devops.md:
@@ -43,7 +51,7 @@ stages:
       - job: Backend
         displayName: Backend (.NET)
         pool:
-          vmImage: ubuntu-latest
+          name: Default
         steps:
           - task: UseDotNet@2
             displayName: Instalar SDK .NET
@@ -86,7 +94,7 @@ stages:
       - job: Frontend
         displayName: Frontend (React)
         pool:
-          vmImage: ubuntu-latest
+          name: Default
         steps:
           - task: NodeTool@0
             inputs:
@@ -109,7 +117,7 @@ stages:
     jobs:
       - job: Docker
         pool:
-          vmImage: ubuntu-latest
+          name: Default
         steps:
           - task: Docker@2
             displayName: API
@@ -144,7 +152,7 @@ stages:
       - deployment: VPS
         environment: producao
         pool:
-          vmImage: ubuntu-latest
+          name: Default
         strategy:
           runOnce:
             deploy:
