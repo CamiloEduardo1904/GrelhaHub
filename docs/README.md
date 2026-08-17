@@ -50,6 +50,7 @@
 | Diretório | O que contém |
 |-----------|--------------|
 | [`adr/`](adr/) | 11 Architecture Decision Records + decisões em aberto |
+| [`design/`](design/) | Propostas de design navegáveis. Abra o HTML direto no navegador |
 | [`specs/`](specs/) | Specs de implementação. [Template](specs/_template.md) |
 
 ---

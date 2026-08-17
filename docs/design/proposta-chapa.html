@@ -1,0 +1,1418 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direção CHAPA</title>
+
+<style>
+  /* ============================================================
+     TOKENS
+     A paleta não é escolha minha: vem de assets/brand/README.md.
+     O que é escolha é o TRATAMENTO — carvão dominante, sombra
+     sólida, listra estrutural.
+     ============================================================ */
+
+  :root {
+    /* Marca (fixa) */
+    --laranja-brasa: #ff6b2c;
+    --ambar-chama:   #ffb020;
+    --creme:         #ffe3d3;
+    --carvao:        #14100c;
+    --cinza-quente:  #9c8e7e;
+
+    /* Neutros derivados — viés quente, nunca cinza puro */
+    --papel:       #ebe2d6;
+    --papel-alto:  #f8f3ec;
+    --tinta:       #14100c;
+    --tinta-fraca: #6b5f52;
+
+    /* Semântico — separado do acento de marca */
+    --ok:     #2f6b3a;
+    --alerta: #9a5b00;
+    --erro:   #a3271f;
+
+    /* Papéis */
+    --ground:   var(--papel);
+    --surface:  var(--papel-alto);
+    --surface-2:#e2d7c8;
+    --text:     var(--tinta);
+    --muted:    var(--tinta-fraca);
+    --rule:     var(--carvao);
+    --shadow:   var(--carvao);
+    --rule-w:   2px;
+
+    /* Tipos — sem webfont: o CSP do artifact bloqueia CDN, e
+       fallback silencioso é pior que uma stack honesta. */
+    --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --peso: "Arial Black", "Helvetica Neue", system-ui, sans-serif;
+
+    --passo: clamp(0.9rem, 0.5vw + 0.75rem, 1rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0b0907;
+      --surface:   #191410;
+      --surface-2: #241c16;
+      --text:      var(--creme);
+      --muted:     #a0917f;
+      --rule:      #493a2d;
+      --shadow:    #000;
+      --ok:        #6ec27f;
+      --alerta:    var(--ambar-chama);
+      --erro:      #ef6a5e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:    #0b0907;
+    --surface:   #191410;
+    --surface-2: #241c16;
+    --text:      var(--creme);
+    --muted:     #a0917f;
+    --rule:      #493a2d;
+    --shadow:    #000;
+    --ok:        #6ec27f;
+    --alerta:    var(--ambar-chama);
+    --erro:      #ef6a5e;
+  }
+
+  /* ============================================================
+     BASE
+     ============================================================ */
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: var(--passo);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .envelope {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem) 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(3rem, 7vw, 5rem);
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  p { margin: 0; max-width: 68ch; }
+
+  a { color: var(--laranja-brasa); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+  :focus-visible {
+    outline: 3px solid var(--laranja-brasa);
+    outline-offset: 3px;
+  }
+
+  code, .mono, .dado { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .rotulo {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .fraco { color: var(--muted); }
+
+  /* ============================================================
+     A LISTRA — o elemento estrutural
+     Regra da marca aplicada à UI: em qualquer grupo, exatamente
+     UMA barra é âmbar. É a ativa.
+     ============================================================ */
+
+  .grelha {
+    display: inline-flex;
+    gap: 3px;
+    flex: none;
+  }
+
+  .grelha i {
+    display: block;
+    width: 5px;
+    height: 20px;
+    background: var(--text);
+    opacity: 0.28;
+  }
+
+  .grelha i.feita { opacity: 1; background: var(--laranja-brasa); }
+  .grelha i.ativa { opacity: 1; background: var(--ambar-chama); }
+
+  .grelha.alta i { height: 30px; }
+
+  /* ============================================================
+     ELEVAÇÃO — sombra sólida, jamais borrão
+     ============================================================ */
+
+  .placa {
+    background: var(--surface);
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 5px 5px 0 var(--shadow);
+  }
+
+  .placa.rasa { box-shadow: 3px 3px 0 var(--shadow); }
+
+  /* ============================================================
+     CABEÇALHO
+     ============================================================ */
+
+  .capa {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .capa-marca {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .wordmark {
+    font-family: var(--peso);
+    font-size: 1.5rem;
+    letter-spacing: -0.04em;
+  }
+
+  .wordmark span { color: var(--laranja-brasa); }
+
+  .capa h1 {
+    font-family: var(--peso);
+    font-size: clamp(3rem, 12vw, 6.5rem);
+    line-height: 0.86;
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+  }
+
+  .capa h1 em {
+    font-style: normal;
+    display: block;
+    color: var(--muted);
+    font-size: 0.32em;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    margin-top: 0.6rem;
+    max-width: 24ch;
+  }
+
+  .tese {
+    border-left: 5px solid var(--ambar-chama);
+    padding-left: 1.1rem;
+    font-size: 1.15rem;
+  }
+
+  /* ============================================================
+     SEÇÃO
+     ============================================================ */
+
+  section { display: flex; flex-direction: column; gap: 1.75rem; }
+
+  .titulo-secao {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    border-bottom: var(--rule-w) solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .titulo-secao h2 {
+    font-family: var(--peso);
+    font-size: clamp(1.35rem, 3.5vw, 2rem);
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .intro { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  /* ============================================================
+     COMPARAÇÃO plástico × chapa
+     ============================================================ */
+
+  .duelo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .lado { display: flex; flex-direction: column; gap: 0.85rem; }
+
+  .lado-titulo {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .lado-titulo .erro-txt { color: var(--erro); }
+  .lado-titulo .ok-txt { color: var(--ok); }
+
+  .notas {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  /* O anti-exemplo. Cores literais de propósito: é a demonstração
+     do que NÃO entra no sistema, então não usa token nenhum. */
+  .plastico {
+    border-radius: 16px;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #7c5cff 0%, #4a7dff 100%);
+    box-shadow: 0 12px 32px rgba(80, 70, 200, 0.35);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .plastico .p-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.9rem;
+  }
+
+  .plastico .p-chip {
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.72rem;
+  }
+
+  .plastico .p-num { font-size: 1.5rem; font-weight: 600; }
+
+  .plastico ul {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    font-size: 0.85rem;
+    opacity: 0.92;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .plastico li { display: flex; justify-content: space-between; }
+
+  .plastico button {
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    padding: 0.65rem;
+    background: rgba(255, 255, 255, 0.92);
+    color: #4a4aff;
+    font: inherit;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  }
+
+  /* ============================================================
+     A COMANDA — o objeto central do sistema
+     ============================================================ */
+
+  .comanda {
+    background: var(--surface);
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 5px 5px 0 var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Furos de tracionador: lê como "impresso" em 100ms. */
+  .picote {
+    height: 12px;
+    border-bottom: var(--rule-w) solid var(--rule);
+    background:
+      radial-gradient(circle at 6px 6px, var(--ground) 2.5px, transparent 2.6px)
+      0 0 / 14px 12px repeat-x;
+  }
+
+  .comanda-cab {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: var(--rule-w) solid var(--rule);
+    background: var(--surface-2);
+  }
+
+  .comanda-corpo {
+    padding: 1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .comanda-id {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .numero-pedido {
+    font-family: var(--peso);
+    font-size: 3.25rem;
+    line-height: 0.8;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .numero-pedido::before {
+    content: "#";
+    color: var(--muted);
+    font-size: 0.45em;
+    vertical-align: super;
+    letter-spacing: 0;
+  }
+
+  .selo {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.6rem;
+    border: var(--rule-w) solid var(--rule);
+    background: var(--ambar-chama);
+    color: var(--carvao);
+    white-space: nowrap;
+  }
+
+  .selo[data-fase="andamento"] { background: var(--laranja-brasa); color: #fff; }
+  .selo[data-fase="fim"] { background: var(--ok); color: #fff; }
+
+  .cliente { font-size: 0.86rem; }
+
+  .linhas {
+    list-style: none;
+    margin: 0;
+    padding: 0.7rem 0;
+    border-top: var(--rule-w) dashed var(--rule);
+    border-bottom: var(--rule-w) dashed var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+  }
+
+  .linhas li { display: flex; justify-content: space-between; gap: 1rem; }
+  .linhas .qtd { color: var(--muted); }
+
+  .soma {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-weight: 700;
+  }
+
+  .soma .valor { font-size: 1.15rem; }
+
+  .botoes { display: flex; gap: 0.5rem; }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0 1rem;
+    min-height: 48px;
+    border: var(--rule-w) solid var(--rule);
+    background: var(--laranja-brasa);
+    color: #fff;
+    box-shadow: 3px 3px 0 var(--shadow);
+    cursor: pointer;
+    transition: transform 0.06s, box-shadow 0.06s;
+    flex: 1;
+  }
+
+  .btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--shadow); }
+
+  .btn.calada {
+    background: transparent;
+    color: var(--text);
+    flex: 0 0 auto;
+  }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ============================================================
+     PAINEL DE PEDIDOS
+     ============================================================ */
+
+  .moldura {
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 5px 5px 0 var(--shadow);
+    background: var(--ground);
+    overflow: hidden;
+  }
+
+  .barra-app {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.65rem 0.9rem;
+    background: var(--carvao);
+    color: var(--creme);
+    border-bottom: var(--rule-w) solid var(--rule);
+  }
+
+  .barra-app .wordmark { font-size: 1rem; }
+
+  .barra-app .quem {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--cinza-quente);
+  }
+
+  .abas {
+    display: flex;
+    background: var(--surface-2);
+    border-bottom: var(--rule-w) solid var(--rule);
+    overflow-x: auto;
+  }
+
+  .aba {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: none;
+    border-right: var(--rule-w) solid var(--rule);
+    background: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .aba[aria-selected="true"] { color: var(--text); background: var(--surface); }
+
+  .grade-comandas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  /* ============================================================
+     CARDÁPIO PÚBLICO
+     ============================================================ */
+
+  .vitrine-capa {
+    background: var(--carvao);
+    color: var(--creme);
+    padding: 1.75rem 1.1rem 1.5rem;
+    text-align: center;
+    border-bottom: var(--rule-w) solid var(--rule);
+  }
+
+  .vitrine-capa h3 {
+    font-family: var(--peso);
+    font-size: clamp(1.5rem, 5vw, 2.25rem);
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+  }
+
+  .vitrine-capa .grelha { margin-bottom: 0.8rem; }
+
+  .vitrine-corpo { padding: 1.1rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+  .grupo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .grupo-titulo::after {
+    content: "";
+    flex: 1;
+    height: 0;
+    border-top: var(--rule-w) solid var(--rule);
+    opacity: 0.35;
+  }
+
+  .prato {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem;
+    background: var(--surface);
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 3px 3px 0 var(--shadow);
+  }
+
+  .prato + .prato { margin-top: 0.6rem; }
+
+  .prato-info { flex: 1; min-width: 0; }
+
+  .prato-info strong { display: block; }
+
+  .prato-info p { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+
+  .prato-preco {
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--laranja-brasa);
+    display: block;
+    margin-top: 0.3rem;
+  }
+
+  .contador { display: flex; align-items: center; gap: 0.35rem; flex: none; }
+
+  .contador button {
+    width: 48px;
+    height: 48px;
+    border: var(--rule-w) solid var(--rule);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    box-shadow: 2px 2px 0 var(--shadow);
+    cursor: pointer;
+  }
+
+  .contador .n { font-family: var(--mono); font-weight: 700; min-width: 1.4rem; text-align: center; }
+
+  .esgotado { opacity: 0.45; }
+
+  .esgotado .prato-preco { color: var(--muted); text-decoration: line-through; }
+
+  .faixa-esgotado {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border: var(--rule-w) solid var(--rule);
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* ============================================================
+     TABELA DENSA
+     ============================================================ */
+
+  .rolagem { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    min-width: 520px;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--muted);
+    padding: 0.55rem 0.8rem;
+    border-bottom: var(--rule-w) solid var(--rule);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+  .chave {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .chave::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    background: currentColor;
+  }
+
+  /* ============================================================
+     TOKENS EM EXIBIÇÃO
+     ============================================================ */
+
+  .amostras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 0.9rem;
+  }
+
+  .amostra { display: flex; flex-direction: column; }
+
+  .amostra .chapa-cor {
+    height: 76px;
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 3px 3px 0 var(--shadow);
+  }
+
+  .amostra dt {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 0.7rem;
+  }
+
+  .amostra dd {
+    margin: 0.1rem 0 0;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .escala { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .escala-linha {
+    display: flex;
+    align-items: baseline;
+    gap: 1.1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.9rem;
+    flex-wrap: wrap;
+  }
+
+  .escala-linha .rotulo { flex: 0 0 9rem; }
+
+  .exp-peso { font-family: var(--peso); font-size: 2.5rem; letter-spacing: -0.04em; line-height: 1; }
+  .exp-mono { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.05em; }
+  .exp-sans { font-family: var(--sans); font-size: 1.05rem; }
+
+  /* ============================================================
+     LISTA DE REGRAS
+     ============================================================ */
+
+  .regras { display: flex; flex-direction: column; gap: 0; }
+
+  .regra {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+    align-items: start;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .regra:first-child { border-top: var(--rule-w) solid var(--rule); }
+
+  .regra-id {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--laranja-brasa);
+    padding-top: 0.2rem;
+    white-space: nowrap;
+  }
+
+  .regra strong { display: block; }
+
+  .regra p { font-size: 0.88rem; color: var(--muted); margin-top: 0.2rem; }
+
+  .veto { color: var(--erro); }
+
+  /* ============================================================
+     CÓDIGO
+     ============================================================ */
+
+  pre {
+    margin: 0;
+    padding: 1rem;
+    background: var(--carvao);
+    color: var(--creme);
+    border: var(--rule-w) solid var(--rule);
+    box-shadow: 5px 5px 0 var(--shadow);
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.65;
+  }
+
+  pre .c { color: var(--cinza-quente); }
+  pre .v { color: var(--ambar-chama); }
+
+  .legenda {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .demo-dica {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .rodape {
+    border-top: var(--rule-w) solid var(--rule);
+    padding-top: 1.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="envelope">
+
+  <!-- ═══════════════════════════ CAPA ═══════════════════════════ -->
+  <header class="capa">
+    <div class="capa-marca">
+      <span class="grelha alta" aria-hidden="true"><i></i><i></i><i class="ativa"></i><i></i><i></i></span>
+      <span class="wordmark">Grelha<span>Hub</span></span>
+    </div>
+
+    <h1>
+      Chapa
+      <em>Direção visual para o painel do restaurante e o cardápio público</em>
+    </h1>
+
+    <p class="tese">
+      A marca já é cartunesca-séria e ninguém usou: o monograma é um GH feito
+      inteiramente de listras de grelha, com <strong>uma</strong> barra âmbar de destaque.
+      Existe até uma regra escrita — <em>“a barra da ligadura sempre em cor de destaque
+      diferente das demais”</em>. Isso não é enfeite de logo. É o sistema de design
+      esperando para acontecer.
+    </p>
+
+    <p>
+      A regra da marca vira a regra da interface: <strong>em qualquer grupo, exatamente uma
+      barra é âmbar — a ativa.</strong> Estado do pedido, aba, etapa de preparo, item
+      selecionado. Um único mecanismo, repetido em toda tela, e o usuário aprende a lê-lo
+      uma vez só.
+    </p>
+  </header>
+
+  <!-- ═══════════════════════ ANTI-PADRÃO ════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i class="ativa"></i><i></i><i></i></span>
+      <h2>O plástico, nomeado</h2>
+    </div>
+
+    <div class="intro">
+      <p>
+        “Parece feito por IA” é um estilo reconhecível, e ele é reconhecível justamente por
+        <strong>não decidir nada</strong>. Vale nomear os componentes para poder recusá-los
+        em revisão de código.
+      </p>
+    </div>
+
+    <div class="duelo">
+      <div class="lado">
+        <div class="lado-titulo"><span class="erro-txt">✕ Plástico</span></div>
+
+        <div class="plastico">
+          <div class="p-topo">
+            <span class="p-num">Pedido #12</span>
+            <span class="p-chip">✨ Aberto</span>
+          </div>
+          <ul>
+            <li><span>🍔 X-Bacon ×2</span><span>R$ 68,00</span></li>
+            <li><span>🍟 Batata frita ×1</span><span>R$ 18,00</span></li>
+          </ul>
+          <button type="button">Confirmar pedido</button>
+        </div>
+
+        <ul class="notas">
+          <li>Gradiente violeta→azul que não tem relação nenhuma com brasa</li>
+          <li>Sombra cinza borrada: o cartão flutua, não pesa</li>
+          <li>Cantos 16px em tudo, sem hierarquia de forma</li>
+          <li>Emoji no lugar de ícone — e no lugar de estado</li>
+          <li>O número do pedido tem o mesmo peso do resto</li>
+        </ul>
+      </div>
+
+      <div class="lado">
+        <div class="lado-titulo"><span class="ok-txt">✓ Chapa</span></div>
+
+        <article class="comanda">
+          <div class="picote" aria-hidden="true"></div>
+          <div class="comanda-cab">
+            <span class="grelha" aria-hidden="true"><i class="ativa"></i><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="rotulo">Delivery próprio</span>
+          </div>
+          <div class="comanda-corpo">
+            <div class="comanda-id">
+              <span class="numero-pedido">12</span>
+              <span class="selo">Aberto</span>
+            </div>
+            <p class="cliente">Camilo Eduardo <span class="fraco dado">· 11 98765-4321</span></p>
+            <ul class="linhas">
+              <li><span><span class="qtd">2×</span> X-Bacon</span><span>68,00</span></li>
+              <li><span><span class="qtd">1×</span> Batata frita</span><span>18,00</span></li>
+            </ul>
+            <div class="soma"><span class="rotulo">Total</span><span class="valor">R$ 86,00</span></div>
+          </div>
+        </article>
+
+        <ul class="notas">
+          <li>Sombra sólida deslocada: carimbado, com peso e lugar</li>
+          <li>Furo de tracionador — lê como comanda impressa na hora</li>
+          <li>O número domina: precisa ser lido do outro lado da cozinha</li>
+          <li>Dado em mono, prosa em sans: a tabulação alinha sozinha</li>
+          <li>A listra diz a fase; o âmbar diz onde você está</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ COMANDA VIVA ═══════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i></i><i class="ativa"></i><i></i></span>
+      <h2>A comanda, viva</h2>
+    </div>
+
+    <div class="intro">
+      <p>
+        O ciclo de <code>RN-VEN-018</code> tem seis estados. A listra é a régua: barras
+        laranjas para trás, âmbar no agora, apagadas à frente. O operador vê onde está sem
+        ler uma palavra.
+      </p>
+      <p class="demo-dica">
+        <span class="grelha" aria-hidden="true"><i class="ativa"></i></span>
+        Clique em avançar — a régua anda
+      </p>
+    </div>
+
+    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start;">
+      <article class="comanda" style="flex:1 1 300px; max-width:360px;">
+        <div class="picote" aria-hidden="true"></div>
+        <div class="comanda-cab">
+          <span class="grelha" id="regua" aria-hidden="true">
+            <i class="ativa"></i><i></i><i></i><i></i><i></i><i></i>
+          </span>
+          <span class="rotulo">Delivery próprio</span>
+        </div>
+        <div class="comanda-corpo">
+          <div class="comanda-id">
+            <span class="numero-pedido">12</span>
+            <span class="selo" id="selo">Aberto</span>
+          </div>
+          <p class="cliente">Camilo Eduardo <span class="fraco dado">· 11 98765-4321</span></p>
+          <ul class="linhas">
+            <li><span><span class="qtd">2×</span> X-Bacon</span><span>68,00</span></li>
+            <li><span><span class="qtd">1×</span> Batata frita</span><span>18,00</span></li>
+            <li><span><span class="qtd">2×</span> Refrigerante lata</span><span>14,00</span></li>
+          </ul>
+          <div class="soma"><span class="rotulo">Total</span><span class="valor">R$ 100,00</span></div>
+          <div class="botoes">
+            <button class="btn" id="avancar" type="button">Confirmar</button>
+            <button class="btn calada" id="reiniciar" type="button" title="Voltar ao início">↺</button>
+          </div>
+        </div>
+      </article>
+
+      <div style="flex:1 1 260px; display:flex; flex-direction:column; gap:0.9rem;">
+        <p class="legenda" id="explicacao">
+          Aberto — o pedido chegou pelo cardápio público e ainda não é compromisso.
+          Nenhum insumo foi comprometido.
+        </p>
+        <p class="legenda fraco">
+          A confirmação é o único ponto do ciclo que dispara baixa de estoque e ordem de
+          produção. Por isso ela é o botão cheio; o resto é continuidade.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ PAINEL ═════════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i></i><i></i><i class="ativa"></i></span>
+      <h2>Painel do restaurante</h2>
+    </div>
+
+    <p>
+      Tela de operação: fica aberta o serviço inteiro, olhada de relance, tocada com o dorso
+      do dedo. Alvo de <strong>48&nbsp;px</strong> — acima dos 44 do <code>RNF-010</code>,
+      porque cozinha não é escritório.
+    </p>
+
+    <div class="moldura">
+      <div class="barra-app">
+        <span class="wordmark">Grelha<span>Hub</span></span>
+        <span class="quem">Brasa &amp; Fogo · Administrador</span>
+      </div>
+
+      <div class="abas" role="tablist">
+        <button class="aba" role="tab" aria-selected="true" type="button">
+          <span class="grelha" aria-hidden="true"><i class="ativa"></i></span> Pedidos · 4
+        </button>
+        <button class="aba" role="tab" aria-selected="false" type="button">Cardápio</button>
+        <button class="aba" role="tab" aria-selected="false" type="button">Link público</button>
+      </div>
+
+      <div class="grade-comandas">
+        <article class="comanda">
+          <div class="picote" aria-hidden="true"></div>
+          <div class="comanda-cab">
+            <span class="grelha" aria-hidden="true"><i class="ativa"></i><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="rotulo">Balcão</span>
+          </div>
+          <div class="comanda-corpo">
+            <div class="comanda-id">
+              <span class="numero-pedido">15</span>
+              <span class="selo">Aberto</span>
+            </div>
+            <ul class="linhas">
+              <li><span><span class="qtd">1×</span> Duplo Smash</span><span>39,90</span></li>
+            </ul>
+            <div class="soma"><span class="rotulo">Total</span><span class="valor">R$ 39,90</span></div>
+          </div>
+        </article>
+
+        <article class="comanda">
+          <div class="picote" aria-hidden="true"></div>
+          <div class="comanda-cab">
+            <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="ativa"></i><i></i><i></i><i></i></span>
+            <span class="rotulo">Delivery</span>
+          </div>
+          <div class="comanda-corpo">
+            <div class="comanda-id">
+              <span class="numero-pedido">14</span>
+              <span class="selo" data-fase="andamento">Em produção</span>
+            </div>
+            <ul class="linhas">
+              <li><span><span class="qtd">2×</span> X-Burger</span><span>56,00</span></li>
+              <li><span><span class="qtd">1×</span> Onion rings</span><span>22,00</span></li>
+            </ul>
+            <div class="soma"><span class="rotulo">Total</span><span class="valor">R$ 78,00</span></div>
+          </div>
+        </article>
+
+        <article class="comanda">
+          <div class="picote" aria-hidden="true"></div>
+          <div class="comanda-cab">
+            <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="ativa"></i><i></i></span>
+            <span class="rotulo">Delivery</span>
+          </div>
+          <div class="comanda-corpo">
+            <div class="comanda-id">
+              <span class="numero-pedido">13</span>
+              <span class="selo" data-fase="fim">Entregue</span>
+            </div>
+            <ul class="linhas">
+              <li><span><span class="qtd">1×</span> X-Bacon</span><span>34,00</span></li>
+            </ul>
+            <div class="soma"><span class="rotulo">Total</span><span class="valor">R$ 34,00</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <p class="legenda">
+      Dia operacional 2026-08-16 — das 04h00 às 03h59. O pedido da 01h30 de domingo aparece
+      aqui, no sábado. <code>RN-GER-006</code>
+    </p>
+  </section>
+
+  <!-- ═══════════════════════ CARDÁPIO ═══════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i></i><i></i><i></i><i class="ativa"></i></span>
+      <h2>Cardápio público</h2>
+    </div>
+
+    <p>
+      A superfície do cliente, onde a personalidade pode subir um pouco. Continua sem
+      custo, CMV ou margem — <code>RN-GER-012</code> diz que a API não devolve o campo, então
+      aqui não existe cadeado, blur nem “desbloqueie”. O campo simplesmente não está.
+    </p>
+
+    <div class="moldura" style="max-width:460px;">
+      <div class="vitrine-capa">
+        <div><span class="grelha" aria-hidden="true"><i></i><i></i><i class="ativa"></i><i></i><i></i></span></div>
+        <h3>Brasa &amp; Fogo</h3>
+        <p class="rotulo" style="color:var(--cinza-quente); margin-top:0.35rem;">Do pedido à brasa</p>
+      </div>
+
+      <div class="vitrine-corpo">
+        <div>
+          <p class="grupo-titulo">Lanches</p>
+          <div class="prato">
+            <div class="prato-info">
+              <strong>X-Bacon</strong>
+              <p>Pão brioche, hambúrguer 150 g, cheddar e bacon crocante</p>
+              <span class="prato-preco">R$ 34,00</span>
+            </div>
+            <div class="contador">
+              <button type="button" aria-label="Remover">−</button>
+              <span class="n">2</span>
+              <button type="button" aria-label="Adicionar">+</button>
+            </div>
+          </div>
+
+          <div class="prato esgotado">
+            <div class="prato-info">
+              <strong>Duplo Smash</strong>
+              <p>Dois hambúrgueres smash 90 g, cheddar e molho da casa</p>
+              <span class="prato-preco">R$ 39,90</span>
+            </div>
+            <span class="faixa-esgotado">Acabou</span>
+          </div>
+        </div>
+
+        <div>
+          <p class="grupo-titulo">Acompanhamentos</p>
+          <div class="prato">
+            <div class="prato-info">
+              <strong>Batata frita</strong>
+              <p>Porção individual com sal e alecrim</p>
+              <span class="prato-preco">R$ 18,00</span>
+            </div>
+            <div class="contador">
+              <button type="button" aria-label="Adicionar">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ DENSO ══════════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i></i><i></i><i></i><i></i><i class="ativa"></i></span>
+      <h2>Onde o cartoon para</h2>
+    </div>
+
+    <p>
+      <strong>Cartoon por fora, sem graça por dentro.</strong> Personalidade mora na moldura:
+      bordas, cabeçalhos, estados vazios, o cardápio. Dentro do dado, nada. Uma tabela de
+      produtos não precisa de charme — precisa de tabulação, contraste e nenhuma surpresa.
+    </p>
+
+    <div class="moldura rolagem">
+      <table>
+        <caption class="rotulo" style="padding:0.7rem 0.8rem; text-align:left; background:var(--surface);">
+          Cardápio · Lanches
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Produto</th>
+            <th scope="col" style="text-align:right;">Preço</th>
+            <th scope="col">No cardápio</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>X-Burger</strong><br><span class="fraco" style="font-size:0.8rem;">Pão brioche, 150 g, queijo prato</span></td>
+            <td class="num">28,00</td>
+            <td><span class="chave" style="color:var(--ok);">Sim</span></td>
+          </tr>
+          <tr>
+            <td><strong>X-Bacon</strong><br><span class="fraco" style="font-size:0.8rem;">Cheddar e bacon crocante</span></td>
+            <td class="num">34,00</td>
+            <td><span class="chave" style="color:var(--ok);">Sim</span></td>
+          </tr>
+          <tr>
+            <td><strong>Duplo Smash</strong><br><span class="fraco" style="font-size:0.8rem;">Dois smash 90 g, molho da casa</span></td>
+            <td class="num">39,90</td>
+            <td><span class="chave" style="color:var(--erro);">Acabou</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="legenda">
+      Sem coluna de custo. Não porque foi escondida — porque o Atendente não a recebe.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════ TOKENS ═════════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i class="ativa"></i></span>
+      <h2>Tokens</h2>
+    </div>
+
+    <p>
+      A paleta não é escolha de design — vem do kit de marca. O que é escolha é o
+      <strong>tratamento</strong>: carvão dominante em vez de creme dominante, para não cair
+      no bege editorial que toda ferramenta produz.
+    </p>
+
+    <dl class="amostras">
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#ff6b2c;"></div>
+        <dt>Laranja brasa</dt><dd>#FF6B2C · ação</dd>
+      </div>
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#ffb020;"></div>
+        <dt>Âmbar chama</dt><dd>#FFB020 · a barra ativa</dd>
+      </div>
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#14100c;"></div>
+        <dt>Carvão</dt><dd>#14100C · chão e traço</dd>
+      </div>
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#ffe3d3;"></div>
+        <dt>Creme</dt><dd>#FFE3D3 · texto no escuro</dd>
+      </div>
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#ebe2d6;"></div>
+        <dt>Papel</dt><dd>#EBE2D6 · neutro quente</dd>
+      </div>
+      <div class="amostra">
+        <div class="chapa-cor" style="background:#9c8e7e;"></div>
+        <dt>Cinza quente</dt><dd>#9C8E7E · secundário</dd>
+      </div>
+    </dl>
+
+    <div class="escala">
+      <div class="escala-linha">
+        <span class="rotulo">Peso · números</span>
+        <span class="exp-peso">#12 · R$ 86,00</span>
+        <span class="legenda">Só para número de pedido e total. Uma ocorrência por cartão.</span>
+      </div>
+      <div class="escala-linha">
+        <span class="rotulo">Mono · dado</span>
+        <span class="exp-mono">RN-VEN-018 · 11 98765-4321</span>
+        <span class="legenda">Preço, telefone, ID de regra, status. Alinha em coluna sozinho.</span>
+      </div>
+      <div class="escala-linha">
+        <span class="rotulo">Sans · prosa</span>
+        <span class="exp-sans">Pão brioche, hambúrguer 150 g</span>
+        <span class="legenda">Descrição, ajuda, mensagem de erro. Só onde há frase.</span>
+      </div>
+    </div>
+
+    <p class="legenda">
+      Sem Inter, sem Geist. Stack de sistema por decisão, não por preguiça: o painel roda em
+      tablet de cozinha e não pode depender de webfont baixando.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════ REGRAS ═════════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="ativa"></i></span>
+      <h2>Regras para revisão de código</h2>
+    </div>
+
+    <div class="regras">
+      <div class="regra">
+        <span class="regra-id">CHAPA-01</span>
+        <div>
+          <strong>Sombra é sólida e deslocada. Nunca borrada.</strong>
+          <p>3&nbsp;px em elemento interno, 5&nbsp;px em cartão. <code>box-shadow: 5px 5px 0</code>. Se aparecer um raio de desfoque, é plástico.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-02</span>
+        <div>
+          <strong>Uma barra âmbar por grupo — nunca duas.</strong>
+          <p>É a regra da marca virando regra de interface. Duas âmbares em tela significam dois “agora”, e o operador perde a referência.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-03</span>
+        <div>
+          <strong>Dado em mono, prosa em sans.</strong>
+          <p>Preço, telefone, ID e status são mono com <code>tabular-nums</code>. Descrição é sans. A escolha da fonte já diz que tipo de coisa é aquilo.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-04</span>
+        <div>
+          <strong>Alvo de toque mínimo de 48&nbsp;px na operação.</strong>
+          <p>Acima dos 44 do <code>RNF-010</code>. Quem opera está de pé, com pressa, e às vezes com luva.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-05</span>
+        <div>
+          <strong class="veto">Sem cadeado em campo que a API não devolve.</strong>
+          <p><code>RN-GER-012</code> — se o perfil não pode ver o custo, não há blur, cadeado nem “desbloqueie”. Fingir que o dado existe é mentir sobre o modelo.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-06</span>
+        <div>
+          <strong class="veto">Emoji não é ícone, e muito menos estado.</strong>
+          <p>Status é selo com borda e cor. Emoji renderiza diferente em cada sistema e não tem contraste garantido.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-07</span>
+        <div>
+          <strong>Comemoração tem hora marcada.</strong>
+          <p>Confete existe em exatamente um lugar: o fechamento de caixa batendo certo. Uma vez por dia. Em cada pedido salvo, vira brinquedo.</p>
+        </div>
+      </div>
+      <div class="regra">
+        <span class="regra-id">CHAPA-08</span>
+        <div>
+          <strong>Movimento tem massa.</strong>
+          <p>Botão afunda 3&nbsp;px e a sombra some — apertar é físico. Nada de <em>fade</em> de 200&nbsp;ms. E tudo cede a <code>prefers-reduced-motion</code>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ CÓDIGO ═════════════════════════════ -->
+  <section>
+    <div class="titulo-secao">
+      <span class="grelha" aria-hidden="true"><i class="feita"></i><i class="feita"></i><i class="feita"></i><i class="ativa"></i></span>
+      <h2>O que muda no código</h2>
+    </div>
+
+    <p>
+      Quase tudo cabe em tokens e três componentes. <code>estilos-globais.css</code> já tem a
+      paleta; o que entra é a elevação sólida, a listra e a comanda.
+    </p>
+
+<pre><code><span class="c">/* elevação — o coração da direção */</span>
+--elev-1: <span class="v">3px 3px 0 var(--carvao)</span>;
+--elev-2: <span class="v">5px 5px 0 var(--carvao)</span>;
+--traco:  <span class="v">2px solid var(--carvao)</span>;
+
+<span class="c">/* a listra: uma barra âmbar por grupo */</span>
+.grelha i        { width: 5px; height: 20px; opacity: .28 }
+.grelha i.feita  { opacity: 1; background: var(--laranja-brasa) }
+.grelha i.ativa  { opacity: 1; background: var(--ambar-chama) }
+
+<span class="c">/* botão com massa */</span>
+.btn:active { transform: translate(3px,3px); box-shadow: none }</code></pre>
+
+    <p class="legenda">
+      Três componentes novos: <code>&lt;Grelha etapa={n} de={6} /&gt;</code>,
+      <code>&lt;Comanda /&gt;</code> e <code>&lt;Selo /&gt;</code>. O resto é token.
+    </p>
+  </section>
+
+  <footer class="rodape">
+    <p>
+      GrelhaHub · direção <strong>Chapa</strong> · proposta para o painel do restaurante e o
+      cardápio público. Paleta e regra da ligadura vêm de <code>assets/brand/README.md</code>;
+      os IDs citados vêm do catálogo de regras.
+    </p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    // RN-VEN-018 — o ciclo real, com o que cada estado significa.
+    var CICLO = [
+      { nome: 'Aberto', fase: 'inicio', acao: 'Confirmar',
+        texto: 'Aberto — o pedido chegou pelo cardápio público e ainda não é compromisso. Nenhum insumo foi comprometido.' },
+      { nome: 'Confirmado', fase: 'andamento', acao: 'Iniciar produção',
+        texto: 'Confirmado — é aqui, e só aqui, que a baixa de estoque e a ordem de produção disparam. O pedido virou compromisso.' },
+      { nome: 'Em produção', fase: 'andamento', acao: 'Marcar pronto',
+        texto: 'Em produção — a cozinha começou. Entre confirmar e produzir pode haver fila, por isso são dois estados e não um.' },
+      { nome: 'Pronto', fase: 'andamento', acao: 'Marcar entregue',
+        texto: 'Pronto — saiu da chapa, aguarda o entregador. Cancelar a partir daqui gera perda, não devolução ao estoque.' },
+      { nome: 'Entregue', fase: 'fim', acao: 'Finalizar',
+        texto: 'Entregue — chegou ao cliente. O pagamento é dimensão própria e não é estado do pedido.' },
+      { nome: 'Finalizado', fase: 'fim', acao: 'Finalizado',
+        texto: 'Finalizado — o pedido não retorna a nenhum estado anterior. Correção, a partir daqui, só por estorno.' }
+    ];
+
+    var regua = document.getElementById('regua');
+    var selo = document.getElementById('selo');
+    var avancar = document.getElementById('avancar');
+    var reiniciar = document.getElementById('reiniciar');
+    var explicacao = document.getElementById('explicacao');
+    var barras = regua.querySelectorAll('i');
+    var atual = 0;
+
+    function desenhar() {
+      var estado = CICLO[atual];
+
+      barras.forEach(function (barra, i) {
+        barra.className = i < atual ? 'feita' : i === atual ? 'ativa' : '';
+      });
+
+      selo.textContent = estado.nome;
+      if (estado.fase === 'inicio') {
+        selo.removeAttribute('data-fase');
+      } else {
+        selo.setAttribute('data-fase', estado.fase);
+      }
+
+      explicacao.textContent = estado.texto;
+      avancar.textContent = estado.acao;
+      avancar.disabled = atual === CICLO.length - 1;
+    }
+
+    avancar.addEventListener('click', function () {
+      if (atual < CICLO.length - 1) { atual++; desenhar(); }
+    });
+
+    reiniciar.addEventListener('click', function () {
+      atual = 0;
+      desenhar();
+    });
+
+    desenhar();
+  })();
+</script>
+
+</body>
+</html>
