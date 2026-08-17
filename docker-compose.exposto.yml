@@ -1,0 +1,25 @@
+# Override para VPS SEM proxy na borda — aí o GrelhaHub publica as portas e o
+# seu próprio nginx vira a borda.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.exposto.yml up -d
+#
+# Nesta VPS NÃO se usa este arquivo: o Traefik já ocupa 80 e 443, e a pilha entra
+# atrás dele por label (ver docker-compose.yml).
+#
+# Neste modo o TLS é por conta própria — ver infra/borda-propria/.
+
+services:
+  nginx:
+    # Sem Traefik, os labels não fazem sentido e virariam ruído no `docker inspect`.
+    labels:
+      traefik.enable: "false"
+    ports:
+      - "${PORTA_HTTP:-8080}:80"
+      - "${PORTA_HTTPS:-8443}:443"
+    volumes:
+      - ./infra/borda-propria/tls-ativo:/etc/nginx/tls-ativo:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot
+
+volumes:
+  certbot-www:

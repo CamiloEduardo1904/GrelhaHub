@@ -4,10 +4,19 @@
 # Rollback = trocar IMAGE_TAG e subir de novo.
 #
 # Segredos vêm do .env, que existe apenas na VPS e nunca é versionado (RNF-008).
-# Template em .env.example.
 #
-# `name:` isola esta pilha das outras que já rodem no mesmo Docker: rede, volumes
-# e containers ficam todos sob o prefixo `grelhahub`.
+# ────────────────────────────────────────────────────────────────────────────
+# ESTA PILHA NÃO PUBLICA NENHUMA PORTA.
+#
+# A VPS já tem um Traefik na borda servindo outros projetos. Publicar porta aqui
+# seria disputar com ele. Em vez disso o nginx interno recebe labels e o Traefik
+# o descobre pelo socket do Docker, roteando por domínio e emitindo o certificado.
+#
+# Sem Traefik no servidor, use o override que publica portas:
+#   docker compose -f docker-compose.yml -f docker-compose.exposto.yml up -d
+# ────────────────────────────────────────────────────────────────────────────
+#
+# `name:` isola tudo sob o prefixo `grelhahub`: containers, rede e volumes.
 
 name: grelhahub
 
@@ -26,9 +35,8 @@ services:
       - pgdata:/var/lib/postgresql/data
     networks:
       - interna
-    # RNF-007 — SEM `ports:`. O banco nunca é exposto publicamente.
-    # Acesso administrativo apenas por túnel SSH:
-    #   ssh -L 5433:localhost:5432 deploy@vps
+    # RNF-007 — o banco nunca é exposto. Acesso administrativo por túnel SSH:
+    #   ssh -L 5433:localhost:5432 root@vps
     #   docker compose exec db psql -U grelhahub -d grelhahub
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -39,7 +47,6 @@ services:
     deploy:
       resources:
         limits:
-          # Risco RS3 — a VPS é pequena; sem limite, o Postgres sufoca a API.
           memory: 512M
 
   api:
@@ -57,7 +64,6 @@ services:
       TZ: America/Sao_Paulo
     networks:
       - interna
-    # Sem `ports:` — quem publica é o nginx.
     deploy:
       resources:
         limits:
@@ -79,40 +85,30 @@ services:
     depends_on:
       - api
       - web
-    ports:
-      # Padrão ALTO de propósito: numa VPS compartilhada, subir a pilha não pode
-      # tomar a 80 de quem já está servindo nela. Só mude para 80/443 depois de
-      # confirmar que estão livres — ou deixe o nginx que já existe fazer proxy
-      # para estas portas.
-      - "${PORTA_HTTP:-8080}:80"
-      - "${PORTA_HTTPS:-8443}:443"
-    environment:
-      DOMINIO: ${DOMINIO}
-    # A imagem roda envsubst sobre /etc/nginx/templates/*.template na partida.
-    # Sem a lista explícita, ela substituiria também $host e $uri do próprio
-    # nginx — que viram string vazia e derrubam o proxy.
-    command: >
-      /bin/sh -c "envsubst '$$DOMINIO'
-      < /etc/nginx/templates/default.conf.template
-      > /etc/nginx/conf.d/default.conf
-      && nginx -g 'daemon off;'"
     volumes:
-      - ./infra/nginx/templates:/etc/nginx/templates:ro
-      # Começa vazio: a pilha sobe em HTTP puro. `infra/ativar-https.sh` escreve
-      # aqui depois de o certbot emitir o certificado.
-      - ./infra/nginx/tls-ativo:/etc/nginx/tls-ativo:ro
-      # Certificados emitidos pelo certbot no host.
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      # Gravável: é aqui que o certbot deposita o desafio ACME.
-      - certbot-www:/var/www/certbot
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - interna
+    labels:
+      # O Traefik do servidor roda com `exposedbydefault=false`: sem esta linha
+      # o container é ignorado, e é assim que os outros projetos ficam isolados.
+      traefik.enable: "true"
+      traefik.docker.network: grelhahub_interna
+      traefik.http.routers.grelhahub.rule: Host(`${DOMINIO}`)
+      traefik.http.routers.grelhahub.entrypoints: websecure
+      traefik.http.routers.grelhahub.tls.certresolver: letsencrypt
+      # A porta é a do container, não a do host — nada é publicado.
+      traefik.http.services.grelhahub.loadbalancer.server.port: "80"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 networks:
   interna:
@@ -120,6 +116,5 @@ networks:
 
 volumes:
   pgdata:
-    # RNF-017 — backup diário deste volume, e sempre antes de apresentação:
+    # RNF-017 — backup antes de qualquer apresentação:
     #   docker compose exec -T db pg_dump -U grelhahub grelhahub | gzip > backup-$(date +%F).sql.gz
-  certbot-www:

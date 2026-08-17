@@ -1,6 +1,33 @@
 # ADR-0006 — Deploy em VPS única com Docker e Nginx
 
-**Status:** Aceito · **Data:** Agosto/2026
+**Status:** Aceito · **Data:** Agosto/2026 · **Revisado:** 17/08/2026, ao inspecionar a VPS real
+
+> ## Revisão — o Nginx não é a borda
+>
+> O ADR foi escrito assumindo VPS vazia. A VPS real (`srv1626893.hstgr.cloud`, Ubuntu 24.04,
+> 2 vCPU, 8 GB) **já roda um Traefik na borda há três meses**, servindo um `evolution-api`,
+> com Let's Encrypt e redirecionamento HTTP→HTTPS automáticos.
+>
+> Colocar nosso Nginx em 80/443 significaria disputar a porta com um serviço em produção.
+> **Decisão revisada:** a pilha do GrelhaHub **não publica porta nenhuma**. O Nginx interno
+> recebe labels e o Traefik o descobre pelo socket do Docker.
+>
+> | Antes | Agora |
+> |-------|-------|
+> | Nginx em 80/443 | Nenhuma porta publicada |
+> | Certbot próprio (`ativar-https.sh`) | Traefik emite o certificado |
+> | Domínio no `nginx.conf` | Domínio no label; Nginx aceita qualquer Host |
+>
+> **O Nginx permanece**, e não é redundância: é ele que mantém front e API na mesma origem
+> (`/` e `/api/*`), que é o que elimina CORS (ADR-0003). Sem ele seriam dois roteadores
+> Traefik e duas origens.
+>
+> O caminho antigo continua versionado em `infra/borda-propria/` e no override
+> `docker-compose.exposto.yml`, para o caso de uma VPS sem proxy na borda.
+>
+> **Consequência para o firewall:** o ADR previa `ufw` com 22, 80 e 443. Ligar isso na VPS
+> real derrubaria o `evolution-api`, que publica em 32769. O script de preparação **não
+> mexe mais no firewall** — virou decisão consciente, com a lista de portas em uso na mão.
 
 ## Contexto
 

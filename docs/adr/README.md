@@ -15,7 +15,7 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0003](0003-frontend-e-backend-desacoplados.md) | Frontend e backend desacoplados (REST + JWT) | Aceito |
 | [0004](0004-postgresql-como-sgbd.md) | PostgreSQL como SGBD | Aceito |
 | [0005](0005-multi-estabelecimento-por-coluna-discriminadora.md) | Multi-unidade por coluna discriminadora | Aceito |
-| [0006](0006-deploy-em-vps-unica-com-docker.md) | Deploy em VPS única com Docker e Nginx | Aceito |
+| [0006](0006-deploy-em-vps-unica-com-docker.md) | Deploy em VPS única com Docker | Aceito — revisado: Traefik é a borda |
 | [0007](0007-core-generico-com-nicho-por-configuracao.md) | Core genérico com nicho por configuração | Aceito |
 | [0008](0008-estoque-como-livro-razao.md) | Estoque como livro-razão de movimentos | Aceito — revisado na consolidação |
 | [0009](0009-onde-as-regras-de-negocio-vivem.md) | Onde as regras de negócio vivem (modelo × aplicação) | Aceito |

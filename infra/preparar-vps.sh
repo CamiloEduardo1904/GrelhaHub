@@ -15,7 +15,7 @@ DESTINO="/opt/grelhahub"
 
 echo "==> Pacotes"
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl ufw
+apt-get install -y -qq ca-certificates curl
 
 echo "==> Docker"
 if ! command -v docker >/dev/null; then
@@ -35,13 +35,17 @@ echo "==> Diretório ${DESTINO}"
 mkdir -p "${DESTINO}"
 chown -R "${USUARIO_DEPLOY}:${USUARIO_DEPLOY}" "${DESTINO}"
 
-echo "==> Firewall"
-# RNF-007 — só 22, 80 e 443. O PostgreSQL nunca é exposto.
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
-ufw status verbose
+echo "==> Firewall — NÃO alterado de propósito"
+# Este script já rodou em servidor com outros serviços no ar. Ligar o ufw aqui
+# derrubaria qualquer porta publicada que não estivesse na lista — foi o caso
+# do evolution-api, que serve em 32769 nesta VPS.
+#
+# Firewall é decisão consciente, com a lista de portas em uso na mão:
+#   ss -lntp                      # o que está escutando hoje
+#   ufw allow 22,80,443/tcp       # mais o que mais for necessário
+#   ufw enable
+echo "    estado atual: $(ufw status 2>/dev/null | head -1)"
+echo "    para revisar: ss -lntp"
 
 echo "==> Swap"
 # Risco RS3 — .NET + PostgreSQL + Nginx numa VPS pequena. Sem swap, o kernel

@@ -65,30 +65,51 @@ Restaurar:
 gunzip -c backup-2026-08-17.sql.gz | docker compose exec -T db psql -U grelhahub -d grelhahub
 ```
 
-## Se já roda outra coisa nesta VPS
+## Esta VPS — srv1626893.hstgr.cloud
 
-A pilha se isola pelo `name: grelhahub` no compose — rede, volumes e containers
-ficam todos sob esse prefixo, sem colidir com o que já existe.
+Ubuntu 24.04, 2 vCPU, 8 GB RAM, 96 GB de disco. **Não está vazia.**
 
-**O que colide é a porta**, e por isso o padrão é alto: `PORTA_HTTP=8080` e
-`PORTA_HTTPS=8443`. Subir a pilha não toma a 80 de ninguém.
+| Já roda | Portas |
+|---------|--------|
+| `traefik` (borda, Let's Encrypt) | 80, 443 — rede `host` |
+| `evolution-api` + Postgres 15 + Redis | 32769 |
 
-A partir daí, dois caminhos:
-
-| Situação | O que fazer |
-|----------|-------------|
-| 80 e 443 **livres** | `PORTA_HTTP=80`, `PORTA_HTTPS=443` no `.env`. O GrelhaHub vira a borda |
-| Já há um nginx/traefik na borda | Deixe 8080/8443 e configure o que já existe para fazer proxy de `grelhahub.seudominio` para `127.0.0.1:8080` |
-
-No segundo caso, o `ativar-https.sh` **não** se aplica: quem termina o TLS é o
-proxy da borda, e o GrelhaHub fica em HTTP atrás dele. Me diga qual é o proxy
-que eu escrevo o trecho de configuração.
+Por isso o GrelhaHub **não publica porta nenhuma**. O Traefik roda com
+`providers.docker.exposedbydefault=false`, então descobre nosso nginx pelos
+labels e roteia por domínio, emitindo o certificado sozinho.
 
 ### O que a pilha nunca toca
 
-- **Containers e volumes de outros projetos** — tudo aqui vive sob o prefixo `grelhahub`
-- **Imagens de terceiros** — o `prune` do pipeline é filtrado para as nossas.
-  Um `docker image prune -f` sem filtro apagaria imagem dangling de qualquer
-  projeto do servidor, inclusive de outro build em andamento
-- **O Docker daemon e a rede do host** — só a rede `grelhahub_interna`, criada e
-  removida com a pilha
+- **Containers, redes e volumes alheios** — tudo aqui vive sob o prefixo `grelhahub`
+- **As portas 80 e 443** — nada é publicado; quem recebe é o Traefik
+- **O firewall** — o `ufw` está inativo nesta VPS, e ligá-lo derrubaria o
+  `evolution-api` na 32769. `preparar-vps.sh` **não mexe** nele
+- **Imagens de terceiros** — o `prune` do pipeline é filtrado para as nossas
+
+### Domínio
+
+`grelhahub.com` ainda aponta para o parking da Hostinger. Enquanto o DNS não
+muda, o wildcard `*.srv1626893.hstgr.cloud` funciona e o Traefik já emite
+certificado nele — dá para subir e ver funcionando antes de mexer no DNS.
+
+Para apontar o domínio, no hPanel → **Domínios → DNS**:
+
+| Tipo | Nome | Valor | TTL |
+|------|------|-------|-----|
+| A | `@` | `177.7.42.204` | 300 |
+| A | `www` | `177.7.42.204` | 300 |
+| AAAA | `@` | `2a02:4780:75:b4d9::1` | 300 |
+
+Remova os registros A que apontam para `2.57.91.91` (parking). Depois de
+propagar, troque `DOMINIO` no `.env` e rode `docker compose up -d nginx`:
+o Traefik emite o certificado novo sozinho.
+
+### Sem Traefik na borda
+
+Noutra VPS, use o override que publica portas:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.exposto.yml up -d
+```
+
+Aí o TLS é por conta própria — ver `infra/borda-propria/`.
