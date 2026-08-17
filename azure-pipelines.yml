@@ -171,64 +171,104 @@ stages:
           runOnce:
             deploy:
               steps:
-                # ADR-0006 — migrations como STEP DO PIPELINE, não no startup da API.
-                # Migration no startup falha em silêncio ou trava o boot quando dá
-                # conflito, e a falha aparece como "a API não sobe".
+                # Job de deployment NAO faz checkout sozinho. Sem isto, o passo
+                # de sincronizacao nao teria o que copiar.
+                - checkout: self
+
+                # O compose e o infra/ precisam vir do repositorio a cada deploy.
+                # Antes eram colocados na VPS a mao: qualquer mudanca versionada
+                # ficava so no git, o servidor seguia com a copia velha, e a
+                # divergencia apareceria como comportamento inexplicavel.
+                #
+                # O .env NUNCA e enviado daqui: vive so na VPS (RNF-008).
+                - task: CopyFilesOverSSH@0
+                  displayName: Sincronizar compose e infra
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    sourceFolder: '$(Build.SourcesDirectory)'
+                    contents: |
+                      docker-compose.yml
+                      docker-compose.exposto.yml
+                      infra/**
+                    targetFolder: '/opt/grelhahub'
+                    overwrite: true
+
+                # ADR-0006 — migrations como STEP DO PIPELINE, nao no startup da
+                # API: migration no startup falha em silencio ou trava o boot
+                # quando da conflito, e a falha aparece como "a API nao sobe".
+                #
+                # runOptions: inline, e nao commands. Com "commands" a task roda
+                # CADA LINHA como um comando separado — o cd morre com o
+                # processo e o comando seguinte executa em /root.
                 - task: SSH@0
                   displayName: Migrations EF Core
                   inputs:
                     sshEndpoint: 'grelhahub-vps'
-                    runOptions: commands
-                    commands: |
+                    runOptions: inline
+                    failOnStdErr: false
+                    inline: |
                       set -e
                       cd /opt/grelhahub
 
-                      # IMAGE_TAG precisa estar setado JÁ AQUI: sem isso o compose
-                      # puxa `latest` e a migration roda a partir da imagem antiga,
-                      # aplicando um schema que não corresponde ao código que vai subir.
+                      # IMAGE_TAG setado JA AQUI: sem isso o compose puxa a tag
+                      # latest e a migration roda a partir da imagem antiga,
+                      # aplicando um schema que nao corresponde ao codigo.
                       export IMAGE_TAG=$(imageTag)
 
                       docker compose pull api
 
-                      # ADR-0006 — migration é step do pipeline, nunca no startup.
-                      # O modo --migrate aplica e SAI; se falhar, sai com código 1 e
-                      # o `set -e` interrompe o deploy antes do `up -d`.
+                      # O modo --migrate aplica e SAI. Se falhar, sai com codigo
+                      # 1 e o "set -e" interrompe o deploy antes do up -d.
                       docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
 
                 - task: SSH@0
-                  displayName: Subir serviços
+                  displayName: Subir servicos
                   inputs:
                     sshEndpoint: 'grelhahub-vps'
-                    runOptions: commands
-                    commands: |
+                    runOptions: inline
+                    failOnStdErr: false
+                    inline: |
                       set -e
                       cd /opt/grelhahub
                       export IMAGE_TAG=$(imageTag)
 
-                      # Grava a tag no .env para que um `docker compose up` manual na
-                      # VPS não volte silenciosamente para `latest`.
+                      # Grava a tag no .env para que um "docker compose up"
+                      # manual na VPS nao volte silenciosamente para latest.
                       sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$(imageTag)|" .env
 
                       docker compose pull
                       docker compose up -d --remove-orphans
-                      # `docker image prune -f` sem filtro apaga imagem dangling de
-                      # QUALQUER projeto que rode nesta VPS, inclusive de outro
-                      # time no meio de um build. Limitado às nossas.
-                      docker image ls "${DOCKER_REGISTRY}/grelhahub-*"                         --filter "dangling=true" -q | xargs -r docker rmi || true
+
+                      # Limpeza restrita as NOSSAS imagens antigas. Um
+                      # "docker image prune -f" sem filtro apagaria imagem
+                      # dangling de qualquer projeto que rode nesta VPS.
+                      docker image ls --format "{{.Repository}}:{{.Tag}}" \
+                        | grep "grelhahub-" \
+                        | grep -v ":$(imageTag)$" \
+                        | grep -v ":latest$" \
+                        | xargs -r docker rmi 2>/dev/null || true
 
                 - task: SSH@0
-                  displayName: Verificar saúde
+                  displayName: Verificar saude
                   inputs:
                     sshEndpoint: 'grelhahub-vps'
-                    runOptions: commands
-                    commands: |
+                    runOptions: inline
+                    failOnStdErr: false
+                    inline: |
+                      cd /opt/grelhahub
+
+                      # A API nao publica porta: o teste sai de dentro do nginx,
+                      # que e quem alcanca a rede interna da pilha.
                       for i in $(seq 1 20); do
-                        if curl -fsS http://localhost/api/health > /dev/null; then
+                        if docker compose exec -T nginx wget -q -O- http://localhost/api/health > /dev/null 2>&1; then
                           echo "API respondendo."
+                          docker compose ps
                           exit 0
                         fi
                         sleep 3
                       done
-                      echo "API não respondeu após 60s."
-                      cd /opt/grelhahub && docker compose logs --tail=50 api
+
+                      echo "API nao respondeu apos 60s."
+                      docker compose ps
+                      docker compose logs --tail=50 api
                       exit 1

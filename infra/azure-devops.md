@@ -225,6 +225,10 @@ docker logs traefik-traefik-1 --tail=40 | grep -i grelhahub
 
 | Sintoma | Causa provável |
 |---------|----------------|
+| `Could not find a pool with name X` | Pool não vinculado/autorizado **no projeto**. Pool criado pelo projeto nasce autorizado |
+| `insufficient_scope` no push | Falta o namespace no `repository:` — sem ele o push mira `library/`, o espaço das imagens oficiais. Parece erro de token e não é |
+| `Cannot parse privateKey: Unsupported key format` | O `ssh2` da task não lê `OPENSSH PRIVATE KEY` com ed25519. Use RSA em PEM: `ssh-keygen -t rsa -b 4096 -m PEM` |
+| `no configuration file provided: not found` | `runOptions: commands` roda **cada linha como um comando separado** — o `cd` morre com o processo. Use `runOptions: inline` |
 | `pull access denied` | `DOCKER_REGISTRY` no `.env` ainda em `PREENCHER`, ou repositório privado sem login na VPS |
 | Certificado não emite | DNS ainda não propagou, ou a 80 não chega no Traefik |
 | API sobe e morre | Connection string ou `Jwt__Chave` ausente — confira o `.env` |
