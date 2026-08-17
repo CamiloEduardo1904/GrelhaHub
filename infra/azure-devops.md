@@ -2,8 +2,19 @@
 
 Checklist para o primeiro deploy. Depois disso, `git push` na `main` publica sozinho.
 
-O que **já está pronto**: a VPS tem `/opt/grelhahub` com o compose, o `infra/` e o `.env`
-com os segredos gerados no próprio servidor (permissão 600). Falta ligar o pipeline.
+### Estado
+
+| Passo | Situação |
+|-------|----------|
+| VPS preparada (`/opt/grelhahub`, compose, `infra/`) | ✔ feito |
+| `.env` com segredos gerados na própria VPS, 600 | ✔ feito |
+| `DOCKER_REGISTRY=docker.io/dextter` | ✔ feito |
+| Chave dedicada do pipeline instalada e testada | ✔ feito |
+| Service Connection `grelhahub-registry` | ✔ feito |
+| Service Connection `grelhahub-vps` | ✖ **pendente** |
+| Environment `producao` | ✖ **pendente** |
+| DNS de `grelhahub.com` → VPS | ✖ **pendente** |
+| Pipeline criado e executado | ✖ pendente |
 
 ---
 
@@ -39,7 +50,7 @@ Os nomes precisam ser **exatamente** estes — o `azure-pipelines.yml` os refere
 |-------|-------|
 | Tipo | Docker Registry |
 | Registry type | Docker Hub *(ou Others, para ACR/ghcr)* |
-| Docker ID | seu usuário |
+| Docker ID | `dextter` |
 | Password | **Access Token**, não a senha da conta |
 | Service connection name | `grelhahub-registry` |
 
@@ -79,16 +90,22 @@ aprovação manual antes do deploy, se um dia você quiser.
 
 ---
 
-## 4. Preencher o registry no `.env` da VPS
+## 4. Registry no `.env` da VPS — FEITO
 
 ```bash
 ssh root@srv1626893.hstgr.cloud
 cd /opt/grelhahub
-sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=docker.io/SEU_USUARIO|' .env
-grep DOCKER_REGISTRY .env
+grep DOCKER_REGISTRY .env    # já preenchido: docker.io/dextter
 ```
 
-Sem isso o `docker compose pull` procura `PREENCHER/grelhahub-api` e falha.
+Já preenchido com `docker.io/dextter`. As imagens serão:
+
+```
+docker.io/dextter/grelhahub-api:<build>
+docker.io/dextter/grelhahub-web:<build>
+```
+
+Os repositórios nascem no primeiro push — não precisa criá-los antes.
 
 ---
 
