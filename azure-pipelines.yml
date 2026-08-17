@@ -215,7 +215,7 @@ stages:
                       # aplicando um schema que nao corresponde ao codigo.
                       export IMAGE_TAG=$(imageTag)
 
-                      docker compose pull api
+                      docker compose pull --quiet api
 
                       # O modo --migrate aplica e SAI. Se falhar, sai com codigo
                       # 1 e o "set -e" interrompe o deploy antes do up -d.
@@ -236,7 +236,7 @@ stages:
                       # manual na VPS nao volte silenciosamente para latest.
                       sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$(imageTag)|" .env
 
-                      docker compose pull
+                      docker compose pull --quiet
                       docker compose up -d --remove-orphans
 
                       # Limpeza restrita as NOSSAS imagens antigas. Um
@@ -260,7 +260,7 @@ stages:
                       # A API nao publica porta: o teste sai de dentro do nginx,
                       # que e quem alcanca a rede interna da pilha.
                       for i in $(seq 1 20); do
-                        if docker compose exec -T nginx wget -q -O- http://localhost/api/health > /dev/null 2>&1; then
+                        if docker compose exec -T nginx wget -q -O- http://127.0.0.1/api/health > /dev/null 2>&1; then
                           echo "API respondendo."
                           docker compose ps
                           exit 0
