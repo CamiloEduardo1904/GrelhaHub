@@ -94,7 +94,10 @@ services:
       # o container é ignorado, e é assim que os outros projetos ficam isolados.
       traefik.enable: "true"
       traefik.docker.network: grelhahub_interna
-      traefik.http.routers.grelhahub.rule: Host(`${DOMINIO}`)
+      # Os dois nomes: existe CNAME www -> apex no DNS, e sem incluir aqui o
+      # www daria 404 do Traefik. O Let's Encrypt emite um certificado com os
+      # dois SANs automaticamente.
+      traefik.http.routers.grelhahub.rule: Host(`${DOMINIO}`) || Host(`www.${DOMINIO}`)
       traefik.http.routers.grelhahub.entrypoints: websecure
       traefik.http.routers.grelhahub.tls.certresolver: letsencrypt
       # A porta é a do container, não a do host — nada é publicado.

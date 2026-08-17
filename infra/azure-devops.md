@@ -13,7 +13,7 @@ Checklist para o primeiro deploy. Depois disso, `git push` na `main` publica soz
 | Service Connection `grelhahub-registry` | ✔ feito |
 | Service Connection `grelhahub-vps` | ✖ **pendente** |
 | Environment `producao` | ✖ **pendente** |
-| DNS de `grelhahub.com` → VPS | ✖ **pendente** |
+| DNS de `grelhahub.com` → VPS | ✔ feito e propagado |
 | Pipeline criado e executado | ✖ pendente |
 
 ---
@@ -111,16 +111,19 @@ Os repositórios nascem no primeiro push — não precisa criá-los antes.
 
 ## 5. Apontar o domínio
 
-`grelhahub.com` ainda está no parking da Hostinger (`2.57.91.91`). No hPanel →
-**Domínios → DNS**:
+**Feito.** Registros em produção:
 
 | Tipo | Nome | Valor | TTL |
 |------|------|-------|-----|
-| A | `@` | `177.7.42.204` | 300 |
-| A | `www` | `177.7.42.204` | 300 |
-| AAAA | `@` | `2a02:4780:75:b4d9::1` | 300 |
+| A | `@` | `177.7.42.204` | 60 |
+| AAAA | `@` | `2a02:4780:75:b4d9::1` | 14400 |
+| CNAME | `www` | `grelhahub.com` | 300 |
 
-Remova os A que apontam para `2.57.91.91`.
+O `CNAME` no `www` é melhor que um segundo `A`: acompanha o apex sozinho se o IP mudar.
+
+Verificado: `http://grelhahub.com` devolve **301** (o Traefik redirecionando para HTTPS) e
+`https://grelhahub.com` devolve **404** — que é o certo enquanto nenhum serviço reivindica
+esse Host. O domínio já chega no Traefik; falta a pilha subir.
 
 O Traefik emite o certificado por desafio HTTP: **enquanto o DNS não apontar para cá, não
 há certificado e o site não abre.** Confira antes de estranhar:
