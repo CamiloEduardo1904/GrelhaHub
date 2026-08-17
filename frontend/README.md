@@ -27,11 +27,30 @@ Use sempre caminhos relativos (`/api/pedidos`), nunca URL absoluta.
 
 ```
 src/
-├── app/          casca, rotas, estilos globais, providers
-├── components/   componentes reutilizáveis de UI
-├── features/     uma pasta por módulo do domínio (vendas, estoque, ...)
-└── services/     camada de acesso à API (axios)
+├── app/          casca, rotas, estilos globais (tokens da direção Chapa)
+├── components/   Grelha, Selo, Comanda — os três componentes do design system
+├── features/     admin (painel do restaurante) e publico (cardápio e pedido)
+└── services/     acesso à API (axios), tipos e helpers do ciclo do pedido
 ```
+
+## Direção visual — Chapa
+
+Base oficial desde 17/08/2026: [ADR-0012](../docs/adr/0012-direcao-visual-chapa.md) e
+[docs/08-design-system.md](../docs/08-design-system.md).
+
+**A regra central** vem do kit de marca — *"a barra da ligadura sempre em cor de
+destaque diferente das demais"*. Na interface: **em qualquer grupo, exatamente uma
+barra é âmbar, a ativa**. Estado do pedido, aba, etapa, seleção. Use `<Grelha>`;
+não invente outro indicador de progresso.
+
+**Cartoon por fora, sem graça por dentro.** Personalidade na moldura — bordas,
+cabeçalhos, estados vazios, cardápio. Dentro do dado, nada: a tabela de produtos é
+tabulação, contraste e nenhuma surpresa.
+
+Antes de abrir PR, passe o checklist `CHAPA-01` a `CHAPA-08` do design system.
+O que **nunca** entra: gradiente decorativo, glassmorphism, sombra borrada,
+`border-radius` uniforme, Inter/Geist, emoji como ícone ou estado, chip pastel de
+status, webfont de CDN.
 
 ## Regras que valem aqui
 

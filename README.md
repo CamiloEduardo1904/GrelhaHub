@@ -129,7 +129,7 @@ cd frontend && npm run lint && npm run build
 | Regras catalogadas | **138** — 134 em `HIP`, 4 em `DEC` |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco |
 | Specs | **6** — 5 da onda 0 (`PRONTA`) + `SPEC-VEN-001` (`EM IMPLEMENTAÇÃO`) |
-| Código | **Fatia vertical funcionando:** cadastro → cardápio público → pedido → painel. 26 testes de domínio |
+| Código | **Fatia vertical funcionando** na direção Chapa: cadastro → cardápio público → pedido → painel. 26 testes de domínio |
 
 ### O que já funciona
 

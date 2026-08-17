@@ -1,35 +1,90 @@
-/*
-  Paleta oficial do GrelhaHub — ver assets/brand/README.md.
-  Regra fixa da marca: a barra da ligadura sempre em cor de destaque diferente das demais.
-*/
+/* ============================================================================
+   GrelhaHub — direção CHAPA
+   ADR-0012 · docs/08-design-system.md
+
+   A paleta vem do kit de marca e não se altera. O que é escolha é o
+   tratamento: sombra sólida, listra estrutural, carvão dominante na operação.
+
+   Regra central: em qualquer grupo, exatamente UMA barra é âmbar — a ativa.
+   ============================================================================ */
+
 :root {
+  /* --- Marca (fixa: assets/brand/README.md) --- */
   --laranja-brasa: #ff6b2c;
   --ambar-chama: #ffb020;
   --creme: #ffe3d3;
   --carvao: #14100c;
-  --texto-escuro: #1d1812;
   --cinza-quente: #9c8e7e;
-  --borda-clara: #e5e0d8;
 
-  --fundo: #faf8f5;
-  --superficie: #ffffff;
-  --texto: var(--texto-escuro);
-  --borda: var(--borda-clara);
-  --sucesso: #2e7d32;
-  --perigo: #c62828;
+  /* --- Neutros derivados: viés quente, nunca cinza puro --- */
+  --papel: #ebe2d6;
+  --papel-alto: #f8f3ec;
+  --tinta: #14100c;
+  --tinta-fraca: #6b5f52;
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: light dark;
+  /* --- Papéis --- */
+  --ground: var(--papel);
+  --surface: var(--papel-alto);
+  --surface-2: #e2d7c8;
+  --text: var(--tinta);
+  --muted: var(--tinta-fraca);
+  --rule: var(--carvao);
+  --shadow: var(--carvao);
+
+  /* --- Semântico: separado do acento. Laranja é ação, não sucesso. --- */
+  --ok: #2f6b3a;
+  --alerta: #9a5b00;
+  --erro: #a3271f;
+
+  /* --- Elevação: sólida e deslocada. Nunca borrada. CHAPA-01 --- */
+  --traco: 2px solid var(--rule);
+  --elev-1: 3px 3px 0 var(--shadow);
+  --elev-2: 5px 5px 0 var(--shadow);
+
+  /* --- Tipos: sem webfont. O painel roda em tablet de cozinha e não pode
+         depender de fonte baixando no meio do serviço. CHAPA-03 --- */
+  --peso: "Arial Black", "Helvetica Neue", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* --- Toque: 48px na operação, acima dos 44 do RNF-010. CHAPA-04 --- */
+  --toque: 48px;
+  --toque-admin: 44px;
 }
 
+/* Escuro = cozinha. Claro = administrativo. Não é enfeite: são os dois
+   ambientes reais do produto. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --fundo: var(--carvao);
-    --superficie: #1e1813;
-    --texto: var(--creme);
-    --borda: #332a22;
+  :root:not([data-theme="light"]) {
+    --ground: #0b0907;
+    --surface: #191410;
+    --surface-2: #241c16;
+    --text: var(--creme);
+    --muted: #a0917f;
+    --rule: #493a2d;
+    --shadow: #000;
+    --ok: #6ec27f;
+    --alerta: var(--ambar-chama);
+    --erro: #ef6a5e;
   }
 }
+
+:root[data-theme="dark"] {
+  --ground: #0b0907;
+  --surface: #191410;
+  --surface-2: #241c16;
+  --text: var(--creme);
+  --muted: #a0917f;
+  --rule: #493a2d;
+  --shadow: #000;
+  --ok: #6ec27f;
+  --alerta: var(--ambar-chama);
+  --erro: #ef6a5e;
+}
+
+/* ============================================================================
+   BASE
+   ============================================================================ */
 
 * {
   box-sizing: border-box;
@@ -38,131 +93,232 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--fundo);
-  color: var(--texto);
-  line-height: 1.5;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
-h2 {
-  margin: 0 0 0.5rem;
-  letter-spacing: -0.5px;
+h2,
+h3 {
+  margin: 0;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
 }
 
 a {
   color: var(--laranja-brasa);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
-.destaque {
-  color: var(--laranja-brasa);
+/* Foco sempre visível — a acessibilidade é por nossa conta (ADR-0012). */
+:focus-visible {
+  outline: 3px solid var(--laranja-brasa);
+  outline-offset: 3px;
+}
+
+code,
+.dado {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rotulo {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fraco {
+  color: var(--muted);
 }
 
 .secundario {
-  color: var(--cinza-quente);
+  color: var(--muted);
   font-size: 0.875rem;
-  margin: 0.15rem 0;
 }
 
 .tagline {
+  font-family: var(--mono);
   text-transform: uppercase;
-  letter-spacing: 5px;
-  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  font-size: 0.65rem;
   color: var(--cinza-quente);
-  margin: 0 0 1rem;
 }
 
-/* ---------- RNF-010: o atendente usa tablet. Alvo de toque mínimo de 44px. ---------- */
+/* ============================================================================
+   A LISTRA — elemento estrutural, não ornamento. CHAPA-02
+   ============================================================================ */
+
+.grelha {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+
+.grelha i {
+  display: block;
+  width: 5px;
+  height: 20px;
+  background: var(--text);
+  opacity: 0.28;
+}
+
+.grelha i.feita {
+  opacity: 1;
+  background: var(--laranja-brasa);
+}
+
+.grelha i.ativa {
+  opacity: 1;
+  background: var(--ambar-chama);
+}
+
+.grelha i.morta {
+  opacity: 1;
+  background: var(--erro);
+}
+
+.grelha.alta i {
+  height: 30px;
+}
+
+/* ============================================================================
+   MARCA
+   ============================================================================ */
+
+.wordmark {
+  font-family: var(--peso);
+  font-size: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.wordmark span {
+  color: var(--laranja-brasa);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ============================================================================
+   CONTROLES
+   ============================================================================ */
+
 button,
-.botao-link,
 input,
 select,
 textarea {
-  min-height: 44px;
   font: inherit;
+  color: inherit;
 }
 
-button,
-.botao-link {
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+  min-height: var(--toque);
   padding: 0 1.1rem;
-  border: none;
-  border-radius: 10px;
+  border: var(--traco);
   background: var(--laranja-brasa);
   color: #fff;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: var(--elev-1);
   cursor: pointer;
   text-decoration: none;
-  transition: filter 0.15s;
+  /* CHAPA-08 — movimento tem massa: apertar afunda e a sombra some. */
+  transition: transform 0.06s, box-shadow 0.06s;
 }
 
-button:hover:not(:disabled),
-.botao-link:hover {
-  filter: brightness(1.08);
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--shadow);
 }
 
-button:disabled {
-  opacity: 0.5;
+.btn:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-button.secundario-btn {
-  background: transparent;
-  color: var(--cinza-quente);
-  border: 1px solid var(--borda);
+.btn.calada {
+  background: var(--surface);
+  color: var(--text);
 }
 
-button.perigo {
-  background: transparent;
-  color: var(--perigo);
-  border: 1px solid var(--perigo);
+.btn.perigo {
+  background: var(--surface);
+  color: var(--erro);
+  border-color: var(--erro);
 }
 
-input,
-textarea,
-select {
+.btn.bloco {
   width: 100%;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--borda);
-  border-radius: 10px;
-  background: var(--superficie);
-  color: inherit;
-}
-
-input:focus-visible,
-textarea:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--laranja-brasa);
-  outline-offset: 2px;
 }
 
 label {
   display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 label input,
-label textarea {
-  margin-top: 0.3rem;
+label textarea,
+label select {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  min-height: var(--toque-admin);
+  padding: 0.55rem 0.7rem;
+  border: var(--traco);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 1rem;
   font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+
+label textarea {
+  resize: vertical;
 }
 
 fieldset {
-  border: 1px solid var(--borda);
-  border-radius: 12px;
+  border: var(--traco);
   padding: 1rem;
-  margin: 0 0 1rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
 }
 
 legend {
-  font-size: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--cinza-quente);
+  color: var(--muted);
   padding: 0 0.4rem;
 }
 
@@ -172,42 +328,34 @@ legend {
   gap: 0.75rem;
 }
 
-.erro {
-  color: var(--perigo);
-  font-size: 0.875rem;
-  background: color-mix(in srgb, var(--perigo) 10%, transparent);
-  border-radius: 8px;
-  padding: 0.6rem 0.8rem;
-  margin: 0.5rem 0;
-}
+/* ============================================================================
+   MENSAGENS — a mensagem vem sempre do servidor (ADR-0009)
+   ============================================================================ */
 
-.erro.faixa {
-  margin: 0 1.5rem;
+.erro {
+  border: 2px solid var(--erro);
+  border-left-width: 6px;
+  background: var(--surface);
+  color: var(--erro);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.875rem;
 }
 
 .nota {
-  font-size: 0.8rem;
-  color: var(--cinza-quente);
-  background: color-mix(in srgb, var(--ambar-chama) 12%, transparent);
-  border-left: 3px solid var(--ambar-chama);
-  border-radius: 0 8px 8px 0;
-  padding: 0.6rem 0.8rem;
+  border-left: 5px solid var(--ambar-chama);
+  padding-left: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
-.cartao {
-  background: var(--superficie);
-  border: 1px solid var(--borda);
-  border-radius: 16px;
-  padding: 1.5rem;
-}
+/* ============================================================================
+   SUPERFÍCIES
+   ============================================================================ */
 
-.cartao.centro {
-  text-align: center;
-  max-width: 520px;
-  margin: 0 auto;
-  display: grid;
-  gap: 1rem;
-  justify-items: center;
+.placa {
+  background: var(--surface);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
 }
 
 .tela-centro {
@@ -220,251 +368,416 @@ legend {
 .form {
   width: 100%;
   max-width: 400px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .form.largo {
   max-width: 560px;
 }
 
-.marca {
+.form header {
   text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.marca h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .rodape-form {
   text-align: center;
   font-size: 0.85rem;
-  color: var(--cinza-quente);
-  margin: 1rem 0 0;
+  color: var(--muted);
 }
 
-/* ---------- Painel do restaurante ---------- */
+/* ============================================================================
+   COMANDA — o objeto central. Desenhada como comanda impressa.
+   ============================================================================ */
+
+.comanda {
+  background: var(--surface);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Furo de tracionador: lê como "impresso" antes de o usuário ler qualquer texto. */
+.comanda-picote {
+  height: 12px;
+  border-bottom: var(--traco);
+  background: radial-gradient(circle at 6px 6px, var(--ground) 2.5px, transparent 2.6px) 0 0 / 14px 12px repeat-x;
+}
+
+.comanda-cab {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: var(--traco);
+  background: var(--surface-2);
+}
+
+.comanda-corpo {
+  padding: 0.9rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.comanda-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.numero-pedido {
+  font-family: var(--peso);
+  font-size: 3rem;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.numero-pedido::before {
+  content: "#";
+  color: var(--muted);
+  font-size: 0.45em;
+  vertical-align: super;
+  letter-spacing: 0;
+}
+
+.comanda-itens {
+  list-style: none;
+  margin: 0;
+  padding: 0.65rem 0;
+  border-top: 2px dashed var(--rule);
+  border-bottom: 2px dashed var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.83rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.comanda-itens li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.comanda-itens .qtd {
+  color: var(--muted);
+}
+
+.comanda-itens .obs {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.comanda-soma {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.comanda-soma .valor {
+  font-size: 1.15rem;
+}
+
+.comanda-acoes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.comanda-acoes .btn {
+  flex: 1;
+}
+
+.comanda-acoes .btn.calada {
+  flex: 0 0 auto;
+}
+
+/* ============================================================================
+   SELO — o status. CHAPA-06: nunca emoji.
+   ============================================================================ */
+
+.selo {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.55rem;
+  border: var(--traco);
+  white-space: nowrap;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.selo[data-fase="aberto"] {
+  background: var(--ambar-chama);
+  color: var(--carvao);
+  border-color: var(--carvao);
+}
+
+.selo[data-fase="andamento"] {
+  background: var(--laranja-brasa);
+  color: #fff;
+  border-color: var(--carvao);
+}
+
+.selo[data-fase="fim"] {
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--carvao);
+}
+
+.selo[data-fase="morto"] {
+  background: var(--erro);
+  color: #fff;
+  border-color: var(--carvao);
+}
+
+/* ============================================================================
+   PAINEL DO RESTAURANTE
+   ============================================================================ */
+
 .painel {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.barra {
+.barra-app {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: var(--superficie);
-  border-bottom: 1px solid var(--borda);
+  padding: 0.65rem 1.1rem;
+  background: var(--carvao);
+  color: var(--creme);
+  border-bottom: var(--traco);
 }
 
-.marca-compacta {
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: -0.5px;
+.barra-app .wordmark {
+  font-size: 1.05rem;
 }
 
-.barra-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+.barra-app .quem {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--cinza-quente);
+  text-align: right;
+  line-height: 1.3;
+}
+
+.barra-app .quem strong {
+  display: block;
+  color: var(--creme);
+}
+
+.barra-app .btn {
+  background: transparent;
+  color: var(--creme);
+  border-color: var(--cinza-quente);
+  box-shadow: none;
+  min-height: var(--toque-admin);
 }
 
 .abas {
   display: flex;
-  gap: 0.25rem;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid var(--borda);
-  background: var(--superficie);
+  background: var(--surface-2);
+  border-bottom: var(--traco);
   overflow-x: auto;
 }
 
 .aba {
-  background: transparent;
-  color: var(--cinza-quente);
-  border-radius: 0;
-  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--toque);
   padding: 0 1rem;
+  border: none;
+  border-right: var(--traco);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.aba.ativa {
-  color: var(--laranja-brasa);
-  border-bottom-color: var(--laranja-brasa);
+.aba[aria-selected="true"] {
+  color: var(--text);
+  background: var(--surface);
 }
 
 .conteudo {
   flex: 1;
-  padding: 1.5rem;
-}
-
-.resumo-dia {
-  margin-bottom: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
 }
 
 .grade {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
-}
-
-.lista {
-  display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  gap: 1.1rem;
+  align-items: start;
 }
 
 .vazio {
   text-align: center;
   padding: 3rem 1rem;
-  color: var(--cinza-quente);
-}
-
-.pedido header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: 0.6rem;
 }
 
-.numero {
-  font-size: 1.35rem;
-  font-weight: 700;
+/* ============================================================================
+   CARDÁPIO — visão da gestão. Cartoon para aqui: só tabulação e contraste.
+   ============================================================================ */
+
+.rolagem {
+  overflow-x: auto;
 }
 
-.etiqueta {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  background: var(--borda);
-  color: var(--texto);
-}
-
-.etiqueta.Aberto {
-  background: var(--ambar-chama);
-  color: var(--carvao);
-}
-.etiqueta.Confirmado,
-.etiqueta.EmProducao {
-  background: var(--laranja-brasa);
-  color: #fff;
-}
-.etiqueta.Pronto,
-.etiqueta.Entregue,
-.etiqueta.Finalizado {
-  background: var(--sucesso);
-  color: #fff;
-}
-.etiqueta.Cancelado {
-  background: var(--perigo);
-  color: #fff;
-}
-
-.cliente {
-  margin: 0 0 0.5rem;
-  font-size: 0.9rem;
-}
-
-.itens {
-  list-style: none;
-  margin: 0.5rem 0;
-  padding: 0;
-  font-size: 0.875rem;
-  display: grid;
-  gap: 0.25rem;
-}
-
-.itens li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.observacao {
-  font-size: 0.85rem;
-  font-style: italic;
-  color: var(--cinza-quente);
-  margin: 0.5rem 0;
-}
-
-.pedido footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--borda);
-}
-
-.acoes {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.acoes button {
-  font-size: 0.85rem;
-  padding: 0 0.8rem;
-}
-
-.tabela {
+table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+  min-width: 480px;
 }
 
-.tabela th {
-  text-align: left;
-  font-size: 0.75rem;
+caption {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--cinza-quente);
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--borda);
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface);
+  border-bottom: var(--traco);
 }
 
-.tabela td {
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--borda);
-  vertical-align: top;
+th {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--muted);
+  padding: 0.55rem 0.85rem;
+  background: var(--surface-2);
+  border-bottom: var(--traco);
+  white-space: nowrap;
 }
 
-.tabela tr.apagado {
-  opacity: 0.5;
+td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.chave {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chave::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  background: currentColor;
 }
 
 .alternador {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  font-weight: 400;
+  gap: 0.5rem;
+  min-height: var(--toque-admin);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .alternador input {
-  width: auto;
-  min-height: auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  min-height: 0;
   accent-color: var(--laranja-brasa);
+}
+
+tr.apagado td {
+  color: var(--muted);
+}
+
+/* ============================================================================
+   LINK PÚBLICO
+   ============================================================================ */
+
+.painel-cartao {
+  background: var(--surface);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 560px;
 }
 
 .link-box {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0.5rem;
-  width: 100%;
-  background: var(--fundo);
-  border: 1px dashed var(--borda);
-  border-radius: 12px;
-  padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+  border: 2px dashed var(--rule);
+  padding: 0.4rem 0.4rem 0.4rem 0.8rem;
 }
 
 .link-box code {
   flex: 1;
+  align-self: center;
   overflow-x: auto;
   white-space: nowrap;
   font-size: 0.85rem;
@@ -474,46 +787,278 @@ legend {
   display: flex;
   gap: 2rem;
   margin: 0;
+  flex-wrap: wrap;
 }
 
 .dados dt {
-  font-size: 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--cinza-quente);
+  color: var(--muted);
 }
 
 .dados dd {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-family: var(--peso);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Cardápio público ---------- */
-.publico .capa {
-  text-align: center;
-  padding: 2.5rem 1.5rem 1.5rem;
+/* ============================================================================
+   CARDÁPIO PÚBLICO — a superfície do cliente
+   ============================================================================ */
+
+.publico {
+  min-height: 100vh;
+}
+
+.vitrine-capa {
   background: var(--carvao);
   color: var(--creme);
+  padding: 2rem 1.25rem 1.5rem;
+  text-align: center;
+  border-bottom: var(--traco);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
 }
 
-.publico .capa h1 {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
+.vitrine-capa h1 {
+  font-family: var(--peso);
+  font-size: clamp(1.75rem, 6vw, 2.75rem);
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
 }
 
-.publico-conteudo {
+.vitrine {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr 330px;
   gap: 1.5rem;
   align-items: start;
-  max-width: 1100px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.5rem 1.25rem 3rem;
 }
 
+.grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 0.7rem;
+}
+
+.grupo-titulo::after {
+  content: "";
+  flex: 1;
+  border-top: var(--traco);
+  opacity: 0.35;
+}
+
+.grupo + .grupo {
+  margin-top: 1.5rem;
+}
+
+.pratos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.prato {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem;
+  background: var(--surface);
+  border: var(--traco);
+  box-shadow: var(--elev-1);
+}
+
+.prato-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.prato-info strong {
+  display: block;
+}
+
+.prato-preco {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--laranja-brasa);
+}
+
+.contador {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+}
+
+.contador button {
+  width: var(--toque);
+  height: var(--toque);
+  padding: 0;
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.contador button:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--shadow);
+}
+
+.contador .n {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.prato.esgotado {
+  opacity: 0.55;
+}
+
+.prato.esgotado .prato-preco {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.carrinho {
+  position: sticky;
+  top: 1.5rem;
+  background: var(--surface);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.carrinho h2 {
+  font-family: var(--peso);
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.carrinho-itens {
+  list-style: none;
+  margin: 0;
+  padding: 0.65rem 0;
+  border-top: 2px dashed var(--rule);
+  border-bottom: 2px dashed var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.83rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.carrinho-itens li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.total .valor {
+  font-size: 1.25rem;
+}
+
+.link-discreto {
+  display: block;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ============================================================================
+   ACOMPANHAMENTO
+   ============================================================================ */
+
+.numero-grande {
+  font-family: var(--peso);
+  font-size: 4rem;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  color: var(--laranja-brasa);
+  font-variant-numeric: tabular-nums;
+}
+
+.regua {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.regua li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.regua li.atual {
+  color: var(--text);
+}
+
+/* ============================================================================
+   RESPONSIVO — RNF-012: tablet 1024×768 e desktop
+   ============================================================================ */
+
 @media (max-width: 860px) {
-  .publico-conteudo {
+  .vitrine {
     grid-template-columns: 1fr;
+  }
+
+  .carrinho {
+    position: static;
   }
 
   .linha {
@@ -521,134 +1066,11 @@ legend {
   }
 }
 
-.itens-cardapio section {
-  margin-bottom: 1.75rem;
-}
-
-.produtos {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.produto {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  background: var(--superficie);
-  border: 1px solid var(--borda);
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
-}
-
-.preco {
-  display: inline-block;
-  margin-top: 0.3rem;
-  font-weight: 700;
-  color: var(--laranja-brasa);
-}
-
-.contador {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.contador button {
-  width: 44px;
-  padding: 0;
-  font-size: 1.2rem;
-}
-
-.contador span {
-  min-width: 1.5rem;
-  text-align: center;
-  font-weight: 700;
-}
-
-.carrinho {
-  position: sticky;
-  top: 1.5rem;
-  background: var(--superficie);
-  border: 1px solid var(--borda);
-  border-radius: 16px;
-  padding: 1.25rem;
-}
-
-.carrinho button[type='button'] {
-  width: 100%;
-}
-
-.total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  margin: 0.5rem 0 1rem;
-  border-top: 1px solid var(--borda);
-  font-size: 1.1rem;
-}
-
-.link-discreto {
-  display: block;
-  text-align: center;
-  font-size: 0.8rem;
-  color: var(--cinza-quente);
-  margin-top: 1rem;
-}
-
-.numero-grande {
-  font-size: 3rem;
-  color: var(--laranja-brasa);
-  margin: 0;
-}
-
-.acompanhamento {
-  width: 100%;
-  margin-top: 1.5rem;
-}
-
-.regua {
-  list-style: none;
-  margin: 1rem 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.regua li {
-  position: relative;
-  padding-left: 1.75rem;
-  font-size: 0.9rem;
-  color: var(--cinza-quente);
-}
-
-.regua li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.35rem;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--borda);
-  background: var(--superficie);
-}
-
-.regua li.feito::before {
-  background: var(--sucesso);
-  border-color: var(--sucesso);
-}
-
-.regua li.atual {
-  color: var(--texto);
-  font-weight: 700;
-}
-
-.regua li.atual::before {
-  background: var(--laranja-brasa);
-  border-color: var(--laranja-brasa);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

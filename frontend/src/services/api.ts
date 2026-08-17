@@ -68,3 +68,9 @@ export const moeda = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 });
+
+/** Sem símbolo: usado nas linhas de item, onde o total já carrega o R$. */
+export const valor = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});

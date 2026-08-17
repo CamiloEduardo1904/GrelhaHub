@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Grelha } from '../../components/Grelha';
 import { mensagemDeErro } from '../../services/api';
 import { autenticar } from './sessao';
 
@@ -19,8 +20,8 @@ export function Entrar() {
       await autenticar(email, senha);
       navegar('/painel');
     } catch (e) {
-      // ADR-0009 — a mensagem vem do servidor. O back devolve a mesma resposta para
-      // senha errada e usuário inativo, de propósito.
+      // ADR-0009 — a mensagem vem do servidor. O back devolve a mesma resposta
+      // para senha errada e usuário inativo, de propósito.
       setErro(mensagemDeErro(e));
     } finally {
       setEnviando(false);
@@ -29,12 +30,13 @@ export function Entrar() {
 
   return (
     <div className="tela-centro">
-      <form className="cartao form" onSubmit={enviar}>
-        <header className="marca">
-          <h1>
-            Grelha<span className="destaque">Hub</span>
-          </h1>
-          <p className="tagline">DO PEDIDO À BRASA</p>
+      <form className="placa form" onSubmit={enviar}>
+        <header>
+          <Grelha etapa={2} de={5} alta />
+          <span className="wordmark">
+            Grelha<span>Hub</span>
+          </span>
+          <p className="tagline">Do pedido à brasa</p>
         </header>
 
         <label>
@@ -61,7 +63,7 @@ export function Entrar() {
 
         {erro && <p className="erro">{erro}</p>}
 
-        <button type="submit" disabled={enviando}>
+        <button type="submit" className="btn bloco" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
 

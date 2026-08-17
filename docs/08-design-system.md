@@ -4,7 +4,7 @@
 |-------|-------|
 | Versão | 1.0 |
 | Decisão | [ADR-0012](adr/0012-direcao-visual-chapa.md) |
-| Situação | **Base oficial** — toda tela nova nasce aqui |
+| Situação | **Base oficial** — aplicada ao app em 17/08/2026 |
 | Ver funcionando | [`design/proposta-chapa.html`](design/proposta-chapa.html) · [PDF](design/GrelhaHub-Direcao-Chapa.pdf) |
 
 ---

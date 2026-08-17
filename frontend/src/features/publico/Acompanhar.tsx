@@ -1,27 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { api, mensagemDeErro, moeda } from '../../services/api';
+import { Grelha } from '../../components/Grelha';
+import { Selo } from '../../components/Selo';
+import { api, mensagemDeErro, moeda, valor } from '../../services/api';
+import { CICLO, etapaDe, ROTULO_STATUS } from '../../services/ciclo';
+import type { StatusPedido } from '../../services/tipos';
 
 interface PedidoPublico {
   numero: number;
-  status: string;
+  status: StatusPedido;
   total: number;
   criadoEm: string;
   itens: { produto: string; quantidade: number; precoPraticado: number; total: number }[];
 }
-
-/** RN-VEN-018 — as etapas que o cliente enxerga. Finalizado e Cancelado ficam de fora da régua. */
-const ETAPAS = ['Aberto', 'Confirmado', 'EmProducao', 'Pronto', 'Entregue'];
-
-const ROTULO: Record<string, string> = {
-  Aberto: 'Aguardando o restaurante',
-  Confirmado: 'Pedido confirmado',
-  EmProducao: 'Em produção',
-  Pronto: 'Pronto',
-  Entregue: 'Entregue',
-  Finalizado: 'Finalizado',
-  Cancelado: 'Cancelado',
-};
 
 export function Acompanhar() {
   const { slug = '' } = useParams();
@@ -39,12 +30,11 @@ export function Acompanhar() {
     setBuscando(true);
 
     try {
-      // O telefone vai junto do número de propósito: sem ele, alguém listaria os pedidos
-      // alheios só variando o número numa rota anônima.
-      const { data } = await api.get<PedidoPublico>(
-        `/publico/${slug}/pedidos/${numero}`,
-        { params: { telefone } },
-      );
+      // O telefone vai junto do número de propósito: sem ele, alguém listaria
+      // pedidos alheios só variando o número numa rota anônima.
+      const { data } = await api.get<PedidoPublico>(`/publico/${slug}/pedidos/${numero}`, {
+        params: { telefone },
+      });
       setPedido(data);
     } catch (e) {
       setPedido(null);
@@ -54,16 +44,18 @@ export function Acompanhar() {
     }
   }
 
-  const etapaAtual = pedido ? ETAPAS.indexOf(pedido.status) : -1;
+  const etapa = pedido ? etapaDe(pedido.status) : -1;
+  const cancelado = pedido?.status === 'Cancelado';
 
   return (
-    <div className="tela-centro publico">
-      <div className="cartao form">
-        <header className="marca">
-          <p className="tagline">ACOMPANHAR PEDIDO</p>
+    <div className="tela-centro">
+      <div className="placa form">
+        <header>
+          <Grelha etapa={2} de={5} alta />
+          <p className="tagline">Acompanhar pedido</p>
         </header>
 
-        <form onSubmit={buscar}>
+        <form onSubmit={buscar} style={{ display: 'grid', gap: '0.75rem' }}>
           <div className="linha">
             <label>
               Número
@@ -81,12 +73,13 @@ export function Acompanhar() {
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 placeholder="(11) 98765-4321"
+                inputMode="tel"
                 required
               />
             </label>
           </div>
 
-          <button type="submit" disabled={buscando}>
+          <button type="submit" className="btn bloco" disabled={buscando}>
             {buscando ? 'Buscando…' : 'Buscar'}
           </button>
         </form>
@@ -94,40 +87,40 @@ export function Acompanhar() {
         {erro && <p className="erro">{erro}</p>}
 
         {pedido && (
-          <section className="acompanhamento">
-            <h2>Pedido #{pedido.numero}</h2>
+          <section style={{ display: 'grid', gap: '0.9rem' }}>
+            <div className="comanda-id">
+              <span className="numero-pedido">{pedido.numero}</span>
+              <Selo status={pedido.status} />
+            </div>
 
-            {pedido.status === 'Cancelado' ? (
+            {cancelado ? (
               <p className="erro">Este pedido foi cancelado pelo restaurante.</p>
             ) : (
               <ol className="regua">
-                {ETAPAS.map((etapa, indice) => (
-                  <li
-                    key={etapa}
-                    className={
-                      indice < etapaAtual ? 'feito' : indice === etapaAtual ? 'atual' : ''
-                    }
-                  >
-                    {ROTULO[etapa]}
+                {CICLO.map((estado, indice) => (
+                  <li key={estado} className={indice === etapa ? 'atual' : ''}>
+                    {/* CHAPA-02 — a barra âmbar marca onde o pedido está agora. */}
+                    <Grelha etapa={indice <= etapa ? 0 : -1} de={1} />
+                    {ROTULO_STATUS[estado]}
                   </li>
                 ))}
               </ol>
             )}
 
-            <ul className="itens">
+            <ul className="comanda-itens">
               {pedido.itens.map((item, i) => (
                 <li key={i}>
                   <span>
-                    {item.quantidade}× {item.produto}
+                    <span className="qtd">{item.quantidade}×</span> {item.produto}
                   </span>
-                  <span>{moeda.format(item.total)}</span>
+                  <span>{valor.format(item.total)}</span>
                 </li>
               ))}
             </ul>
 
             <p className="total">
-              <span>Total</span>
-              <strong>{moeda.format(pedido.total)}</strong>
+              <span className="rotulo">Total</span>
+              <span className="valor">{moeda.format(pedido.total)}</span>
             </p>
           </section>
         )}

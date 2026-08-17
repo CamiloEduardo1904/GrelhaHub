@@ -1,34 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Comanda } from '../../components/Comanda';
+import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro, moeda } from '../../services/api';
-import type {
-  CategoriaInterna,
-  MeuRestaurante,
-  PedidoResumo,
-  StatusPedido,
-} from '../../services/tipos';
+import { PROXIMA_ACAO, rotaDeAvanco } from '../../services/ciclo';
+import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../services/tipos';
 import { ehGerencia, encerrarSessao, lerSessao } from './sessao';
 
 type Aba = 'pedidos' | 'cardapio' | 'link';
 
-/** RN-VEN-018 — rótulos do ciclo de vida, na ordem em que acontecem. */
-const ROTULO_STATUS: Record<StatusPedido, string> = {
-  Aberto: 'Aberto',
-  Confirmado: 'Confirmado',
-  EmProducao: 'Em produção',
-  Pronto: 'Pronto',
-  Entregue: 'Entregue',
-  Finalizado: 'Finalizado',
-  Cancelado: 'Cancelado',
-};
-
-const PROXIMA_ACAO: Partial<Record<StatusPedido, string>> = {
-  Aberto: 'Confirmar',
-  Confirmado: 'Iniciar produção',
-  EmProducao: 'Marcar pronto',
-  Pronto: 'Marcar entregue',
-  Entregue: 'Finalizar',
-};
+const ABAS: { chave: Aba; nome: string }[] = [
+  { chave: 'pedidos', nome: 'Pedidos' },
+  { chave: 'cardapio', nome: 'Cardápio' },
+  { chave: 'link', nome: 'Link público' },
+];
 
 export function Painel() {
   const navegar = useNavigate();
@@ -59,14 +44,13 @@ export function Painel() {
   useEffect(() => {
     void carregar();
 
-    // O painel de pedidos é uma tela de operação: fica aberta o serviço inteiro e precisa
-    // mostrar pedido novo sem alguém apertar F5. Polling simples resolve nesta fatia;
-    // tempo real (SSE ou WebSocket) entra com o KDS, na onda 7.
+    // O painel fica aberto o serviço inteiro e precisa mostrar pedido novo sem
+    // alguém apertar F5. Polling resolve nesta fatia; tempo real entra com o KDS.
     const timer = setInterval(() => void carregar(), 15_000);
     return () => clearInterval(timer);
   }, [carregar]);
 
-  async function acao(id: string, caminho: string, corpo?: unknown) {
+  async function agir(id: string, caminho: string, corpo?: unknown) {
     try {
       await api.post(`/v1/pedidos/${id}/${caminho}`, corpo ?? {});
       await carregar();
@@ -80,52 +64,51 @@ export function Painel() {
     navegar('/entrar');
   }
 
-  const linkCompleto = restaurante ? `${location.origin}/c/${restaurante.slug}` : '';
-
   return (
     <div className="painel">
-      <header className="barra">
-        <div className="marca-compacta">
-          Grelha<span className="destaque">Hub</span>
-        </div>
-        <div className="barra-info">
+      <header className="barra-app">
+        <span className="wordmark">
+          Grelha<span>Hub</span>
+        </span>
+
+        <span className="quem">
           <strong>{restaurante?.nomeFantasia ?? '…'}</strong>
-          <span className="secundario">
-            {sessao?.nome} · {sessao?.perfil}
-          </span>
-        </div>
-        <button className="secundario-btn" onClick={sair} type="button">
+          {sessao?.nome} · {sessao?.perfil}
+        </span>
+
+        <button className="btn" onClick={sair} type="button">
           Sair
         </button>
       </header>
 
-      <nav className="abas">
-        {(['pedidos', 'cardapio', 'link'] as Aba[]).map((chave) => (
+      <nav className="abas" role="tablist" aria-label="Seções do painel">
+        {ABAS.map(({ chave, nome }) => (
           <button
             key={chave}
             type="button"
-            className={aba === chave ? 'aba ativa' : 'aba'}
+            role="tab"
+            className="aba"
+            aria-selected={aba === chave}
             onClick={() => setAba(chave)}
           >
-            {chave === 'pedidos' && `Pedidos (${pedidos.length})`}
-            {chave === 'cardapio' && 'Cardápio'}
-            {chave === 'link' && 'Link público'}
+            {/* CHAPA-02 — uma barra âmbar por grupo: a aba ativa. */}
+            <Grelha etapa={aba === chave ? 0 : -1} de={1} />
+            {nome}
+            {chave === 'pedidos' && pedidos.length > 0 && ` · ${pedidos.length}`}
           </button>
         ))}
       </nav>
 
-      {erro && <p className="erro faixa">{erro}</p>}
-
       <main className="conteudo">
+        {erro && <p className="erro">{erro}</p>}
+
         {aba === 'pedidos' && (
-          <Pedidos pedidos={pedidos} restaurante={restaurante} aoAgir={acao} />
+          <Pedidos pedidos={pedidos} restaurante={restaurante} aoAgir={agir} />
         )}
 
         {aba === 'cardapio' && <Cardapio categorias={cardapio} aoMudar={carregar} />}
 
-        {aba === 'link' && restaurante && (
-          <LinkPublico restaurante={restaurante} link={linkCompleto} />
-        )}
+        {aba === 'link' && restaurante && <LinkPublico restaurante={restaurante} />}
       </main>
     </div>
   );
@@ -140,14 +123,15 @@ function Pedidos({
   restaurante: MeuRestaurante | null;
   aoAgir: (id: string, caminho: string, corpo?: unknown) => Promise<void>;
 }) {
-  const sessao = lerSessao();
+  const gerencia = ehGerencia(lerSessao());
 
   if (pedidos.length === 0) {
     return (
       <div className="vazio">
+        <Grelha etapa={-1} de={6} alta />
         <p>Nenhum pedido no dia operacional de hoje.</p>
         <p className="secundario">
-          Abra o link público do seu cardápio em outra aba e faça um pedido para ver ele
+          Abra o link público do seu cardápio em outra aba e faça um pedido para vê-lo
           aparecer aqui.
         </p>
       </div>
@@ -156,72 +140,46 @@ function Pedidos({
 
   return (
     <>
-      <p className="secundario resumo-dia">
-        {/* RN-GER-006 ⚠⚠ — o dia operacional vai das 04h00 às 03h59 do dia seguinte. */}
-        Dia operacional <strong>{pedidos[0]?.dataOperacional}</strong> ·{' '}
+      <p className="secundario">
+        {/* RN-GER-006 — o dia operacional vai das 04h00 às 03h59 do dia seguinte. */}
+        Dia operacional <strong className="dado">{pedidos[0]?.dataOperacional}</strong> ·{' '}
         {restaurante?.pedidosDoDia ?? pedidos.length} pedido(s)
       </p>
 
       <div className="grade">
         {pedidos.map((pedido) => (
-          <article key={pedido.id} className={`cartao pedido status-${pedido.status}`}>
-            <header>
-              <span className="numero">#{pedido.numero}</span>
-              <span className={`etiqueta ${pedido.status}`}>{ROTULO_STATUS[pedido.status]}</span>
-            </header>
-
-            <p className="cliente">
-              {pedido.cliente ?? 'Cliente não identificado'}
-              {pedido.telefone && <span className="secundario"> · {pedido.telefone}</span>}
-            </p>
-
-            <ul className="itens">
-              {pedido.itens.map((item, i) => (
-                <li key={i}>
-                  <span>
-                    {item.quantidade}× {item.produto}
-                  </span>
-                  <span>{moeda.format(item.precoPraticado * item.quantidade)}</span>
-                </li>
-              ))}
-            </ul>
-
-            {pedido.observacao && <p className="observacao">“{pedido.observacao}”</p>}
-
-            <footer>
-              <strong>{moeda.format(pedido.total)}</strong>
-
-              <div className="acoes">
+          <Comanda
+            key={pedido.id}
+            pedido={pedido}
+            acoes={
+              <>
                 {PROXIMA_ACAO[pedido.status] && (
                   <button
                     type="button"
-                    onClick={() =>
-                      aoAgir(pedido.id, pedido.status === 'Aberto' ? 'confirmar' : 'avancar')
-                    }
+                    className="btn"
+                    onClick={() => void aoAgir(pedido.id, rotaDeAvanco(pedido.status))}
                   >
                     {PROXIMA_ACAO[pedido.status]}
                   </button>
                 )}
 
                 {/* RN-VEN-014 — cancelamento é de gerência e exige motivo.
-                    Esconder o botão aqui é usabilidade; o servidor recusa de todo jeito. */}
-                {ehGerencia(sessao) &&
-                  pedido.status !== 'Cancelado' &&
-                  pedido.status !== 'Finalizado' && (
-                    <button
-                      type="button"
-                      className="perigo"
-                      onClick={() => {
-                        const motivo = prompt('Motivo do cancelamento:');
-                        if (motivo) void aoAgir(pedido.id, 'cancelar', { motivo });
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-              </div>
-            </footer>
-          </article>
+                    Esconder aqui é usabilidade; o servidor recusa de todo jeito. */}
+                {gerencia && pedido.status !== 'Cancelado' && pedido.status !== 'Finalizado' && (
+                  <button
+                    type="button"
+                    className="btn calada perigo"
+                    onClick={() => {
+                      const motivo = prompt('Motivo do cancelamento:');
+                      if (motivo) void aoAgir(pedido.id, 'cancelar', { motivo });
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </>
+            }
+          />
         ))}
       </div>
     </>
@@ -241,27 +199,30 @@ function Cardapio({
   }
 
   return (
-    <div className="lista">
+    <>
       {categorias.map((categoria) => (
-        <section key={categoria.id} className="cartao">
-          <h2>{categoria.nome}</h2>
-
-          <table className="tabela">
+        <section key={categoria.id} className="placa rolagem">
+          <table>
+            <caption>{categoria.nome}</caption>
             <thead>
               <tr>
-                <th>Produto</th>
-                <th>Preço</th>
-                <th>No cardápio</th>
+                <th scope="col">Produto</th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Preço
+                </th>
+                <th scope="col">No cardápio</th>
               </tr>
             </thead>
             <tbody>
+              {/* Cartoon para aqui. Dado é tabulação, contraste e nenhuma surpresa.
+                  Sem coluna de custo: RN-GER-012 — a API não devolve o campo. */}
               {categoria.produtos.map((produto) => (
                 <tr key={produto.id} className={produto.disponivel ? '' : 'apagado'}>
                   <td>
                     <strong>{produto.nome}</strong>
                     {produto.descricao && <p className="secundario">{produto.descricao}</p>}
                   </td>
-                  <td>{moeda.format(produto.preco)}</td>
+                  <td className="num">{moeda.format(produto.preco)}</td>
                   <td>
                     <label className="alternador">
                       <input
@@ -269,7 +230,7 @@ function Cardapio({
                         checked={produto.disponivel}
                         onChange={(e) => void alternar(produto.id, e.target.checked)}
                       />
-                      <span>{produto.disponivel ? 'Sim' : 'Acabou'}</span>
+                      {produto.disponivel ? 'Sim' : 'Acabou'}
                     </label>
                   </td>
                 </tr>
@@ -278,35 +239,39 @@ function Cardapio({
           </table>
         </section>
       ))}
-    </div>
+    </>
   );
 }
 
-function LinkPublico({ restaurante, link }: { restaurante: MeuRestaurante; link: string }) {
+function LinkPublico({ restaurante }: { restaurante: MeuRestaurante }) {
   const [copiado, setCopiado] = useState(false);
+  const link = `${location.origin}/c/${restaurante.slug}`;
 
   return (
-    <div className="cartao centro">
-      <h2>Cardápio online</h2>
-      <p className="secundario">
-        Este é o endereço que você divulga para os clientes. Ele é fixo e não muda.
-      </p>
+    <div className="painel-cartao">
+      <div>
+        <h2 className="wordmark">Cardápio online</h2>
+        <p className="secundario">
+          Este é o endereço que você divulga. Ele é fixo e não muda.
+        </p>
+      </div>
 
       <div className="link-box">
         <code>{link}</code>
         <button
           type="button"
+          className="btn"
           onClick={async () => {
             await navigator.clipboard.writeText(link);
             setCopiado(true);
             setTimeout(() => setCopiado(false), 2000);
           }}
         >
-          {copiado ? 'Copiado!' : 'Copiar'}
+          {copiado ? 'Copiado' : 'Copiar'}
         </button>
       </div>
 
-      <a className="botao-link" href={`/c/${restaurante.slug}`} target="_blank" rel="noreferrer">
+      <a className="btn calada" href={`/c/${restaurante.slug}`} target="_blank" rel="noreferrer">
         Abrir cardápio
       </a>
 
@@ -318,10 +283,6 @@ function LinkPublico({ restaurante, link }: { restaurante: MeuRestaurante; link:
         <div>
           <dt>Pedidos hoje</dt>
           <dd>{restaurante.pedidosDoDia}</dd>
-        </div>
-        <div>
-          <dt>CNPJ</dt>
-          <dd>{restaurante.cnpj}</dd>
         </div>
       </dl>
     </div>

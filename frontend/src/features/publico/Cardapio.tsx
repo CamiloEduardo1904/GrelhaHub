@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, mensagemDeErro, moeda } from '../../services/api';
+import { Grelha } from '../../components/Grelha';
+import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import type { CardapioPublico, ProdutoPublico } from '../../services/tipos';
 
 interface ItemDoCarrinho {
@@ -17,8 +18,9 @@ interface PedidoCriado {
 /**
  * Cardápio público — RN-VEN-036, RN-VEN-037.
  *
- * Página anônima: nenhum token é enviado. O recorte de dados vem do slug da URL, resolvido
- * no servidor. Os DTOs públicos não têm custo, CMV nem margem (RN-GER-012).
+ * Página anônima: nenhum token é enviado. O recorte vem do slug da URL,
+ * resolvido no servidor. Os DTOs públicos não têm custo, CMV nem margem
+ * (RN-GER-012, CHAPA-05) — não há cadeado porque não há campo.
  */
 export function Cardapio() {
   const { slug = '' } = useParams();
@@ -29,7 +31,6 @@ export function Cardapio() {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [criado, setCriado] = useState<PedidoCriado | null>(null);
-
   const [cliente, setCliente] = useState({ nome: '', telefone: '', observacao: '' });
 
   useEffect(() => {
@@ -53,15 +54,12 @@ export function Cardapio() {
   function alterar(produto: ProdutoPublico, delta: number) {
     setCarrinho((atual) => {
       const existente = atual.find((i) => i.produto.id === produto.id);
-
-      if (!existente) {
-        return delta > 0 ? [...atual, { produto, quantidade: delta }] : atual;
-      }
+      if (!existente) return delta > 0 ? [...atual, { produto, quantidade: delta }] : atual;
 
       const quantidade = existente.quantidade + delta;
 
-      // RN-VEN-011 — quantidade sempre maior que zero: zerar remove o item em vez de
-      // mandar zero para o servidor.
+      // RN-VEN-011 — quantidade sempre maior que zero: zerar remove o item em
+      // vez de mandar zero para o servidor.
       return quantidade <= 0
         ? atual.filter((i) => i.produto.id !== produto.id)
         : atual.map((i) => (i.produto.id === produto.id ? { ...i, quantidade } : i));
@@ -98,14 +96,18 @@ export function Cardapio() {
   }
 
   if (carregando) {
-    return <div className="tela-centro publico">Carregando cardápio…</div>;
+    return (
+      <div className="tela-centro">
+        <Grelha etapa={2} de={5} alta />
+      </div>
+    );
   }
 
   if (!cardapio) {
     return (
-      <div className="tela-centro publico">
-        <div className="cartao centro">
-          <h1>Restaurante não encontrado</h1>
+      <div className="tela-centro">
+        <div className="placa form">
+          <h1 className="wordmark">Restaurante não encontrado</h1>
           <p className="secundario">{erro ?? 'Confira o endereço do cardápio.'}</p>
         </div>
       </div>
@@ -114,22 +116,19 @@ export function Cardapio() {
 
   if (criado) {
     return (
-      <div className="tela-centro publico">
-        <div className="cartao centro">
-          <p className="tagline">PEDIDO ENVIADO</p>
-          <h1 className="numero-grande">#{criado.numero}</h1>
+      <div className="tela-centro">
+        <div className="placa form" style={{ textAlign: 'center' }}>
+          <p className="tagline">Pedido enviado</p>
+          <p className="numero-grande">{criado.numero}</p>
           <p>
-            Seu pedido foi enviado para <strong>{cardapio.nomeFantasia}</strong> e está
-            aguardando confirmação do restaurante.
+            Enviado para <strong>{cardapio.nomeFantasia}</strong> e aguardando confirmação do
+            restaurante.
           </p>
-          <p className="secundario">
-            Total: {moeda.format(criado.total)} · Guarde o número {criado.numero} para
-            acompanhar.
-          </p>
-          <a className="botao-link" href={`/c/${slug}/acompanhar?numero=${criado.numero}`}>
+          <p className="secundario dado">Total {moeda.format(criado.total)}</p>
+          <a className="btn bloco" href={`/c/${slug}/acompanhar?numero=${criado.numero}`}>
             Acompanhar pedido
           </a>
-          <button type="button" className="secundario-btn" onClick={() => setCriado(null)}>
+          <button type="button" className="btn calada bloco" onClick={() => setCriado(null)}>
             Fazer outro pedido
           </button>
         </div>
@@ -139,44 +138,52 @@ export function Cardapio() {
 
   return (
     <div className="publico">
-      <header className="capa">
-        <p className="tagline">CARDÁPIO ONLINE</p>
+      <header className="vitrine-capa">
+        <Grelha etapa={2} de={5} alta />
         <h1>{cardapio.nomeFantasia}</h1>
-        {cardapio.telefone && <p className="secundario">{cardapio.telefone}</p>}
+        <p className="tagline">Do pedido à brasa</p>
       </header>
 
-      <main className="publico-conteudo">
-        <section className="itens-cardapio">
+      <div className="vitrine">
+        <section>
           {cardapio.categorias.length === 0 && (
             <p className="vazio">Este cardápio ainda não tem itens disponíveis.</p>
           )}
 
           {cardapio.categorias.map((categoria) => (
-            <section key={categoria.id}>
-              <h2>{categoria.nome}</h2>
+            <div key={categoria.id} className="grupo">
+              <h2 className="grupo-titulo">{categoria.nome}</h2>
 
-              <ul className="produtos">
+              <ul className="pratos">
                 {categoria.produtos.map((produto) => {
                   const quantidade = quantidadeDe(produto.id);
 
                   return (
-                    <li key={produto.id} className="produto">
-                      <div>
+                    <li key={produto.id} className="prato">
+                      <div className="prato-info">
                         <strong>{produto.nome}</strong>
                         {produto.descricao && <p className="secundario">{produto.descricao}</p>}
-                        <span className="preco">{moeda.format(produto.preco)}</span>
+                        <span className="prato-preco">{moeda.format(produto.preco)}</span>
                       </div>
 
                       <div className="contador">
                         {quantidade > 0 && (
                           <>
-                            <button type="button" onClick={() => alterar(produto, -1)}>
+                            <button
+                              type="button"
+                              onClick={() => alterar(produto, -1)}
+                              aria-label={`Remover um ${produto.nome}`}
+                            >
                               −
                             </button>
-                            <span>{quantidade}</span>
+                            <span className="n">{quantidade}</span>
                           </>
                         )}
-                        <button type="button" onClick={() => alterar(produto, 1)}>
+                        <button
+                          type="button"
+                          onClick={() => alterar(produto, 1)}
+                          aria-label={`Adicionar um ${produto.nome}`}
+                        >
                           +
                         </button>
                       </div>
@@ -184,7 +191,7 @@ export function Cardapio() {
                   );
                 })}
               </ul>
-            </section>
+            </div>
           ))}
         </section>
 
@@ -195,20 +202,20 @@ export function Cardapio() {
             <p className="secundario">Escolha os itens ao lado.</p>
           ) : (
             <>
-              <ul className="itens">
+              <ul className="carrinho-itens">
                 {carrinho.map((item) => (
                   <li key={item.produto.id}>
                     <span>
-                      {item.quantidade}× {item.produto.nome}
+                      <span className="fraco">{item.quantidade}×</span> {item.produto.nome}
                     </span>
-                    <span>{moeda.format(item.produto.preco * item.quantidade)}</span>
+                    <span>{valor.format(item.produto.preco * item.quantidade)}</span>
                   </li>
                 ))}
               </ul>
 
               <p className="total">
-                <span>Total</span>
-                <strong>{moeda.format(total)}</strong>
+                <span className="rotulo">Total</span>
+                <span className="valor">{moeda.format(total)}</span>
               </p>
 
               <label>
@@ -226,6 +233,7 @@ export function Cardapio() {
                   value={cliente.telefone}
                   onChange={(e) => setCliente({ ...cliente, telefone: e.target.value })}
                   placeholder="(11) 98765-4321"
+                  inputMode="tel"
                   required
                 />
               </label>
@@ -244,6 +252,7 @@ export function Cardapio() {
 
               <button
                 type="button"
+                className="btn bloco"
                 onClick={() => void enviarPedido()}
                 disabled={enviando || !cliente.nome || !cliente.telefone}
               >
@@ -251,17 +260,17 @@ export function Cardapio() {
               </button>
 
               <p className="nota">
-                O restaurante ainda precisa confirmar o pedido — você receberá o número de
+                O restaurante ainda precisa confirmar — você recebe o número de
                 acompanhamento.
               </p>
             </>
           )}
 
           <a className="link-discreto" href={`/c/${slug}/acompanhar`}>
-            Já fiz um pedido, quero acompanhar
+            Já fiz um pedido
           </a>
         </aside>
-      </main>
+      </div>
     </div>
   );
 }
