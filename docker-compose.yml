@@ -65,6 +65,19 @@ services:
 
       # ADR-0015 / SPEC-VEN-002 — raiz das imagens, em volume.
       Arquivos__Raiz: /app/arquivos
+
+      # RN-GER-014 / ADR-0013 — o usuário de suporte da plataforma.
+      #
+      # ⚠ Sem estas três linhas o `.env` da VPS não chega ao container: o `.env` do compose
+      # só substitui `${VAR}` NESTE arquivo, não injeta nada no processo. Foi o que aconteceu
+      # até 17/08/2026 — o semeador rodava, não encontrava nada, registrava o aviso 1400 e a
+      # instalação seguia SEM nenhum acesso de suporte.
+      #
+      # `:-` deixa o valor vazio quando a variável não existe: ausência é estado válido
+      # (SemeadorDePlataforma avisa e segue), e o compose não reclama de variável indefinida.
+      Plataforma__Nome: ${PLATAFORMA_NOME:-Suporte GrelhaHub}
+      Plataforma__Email: ${PLATAFORMA_EMAIL:-}
+      Plataforma__SenhaInicial: ${PLATAFORMA_SENHA_INICIAL:-}
     volumes:
       # ⚠ A API ESCREVE aqui; o nginx le. É o unico estado da aplicacao fora do banco, e a
       # consequencia esta declarada no ADR-0015: `pg_dump` sozinho DEIXOU de ser backup completo.

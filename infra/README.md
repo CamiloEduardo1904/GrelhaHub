@@ -35,12 +35,14 @@ sudo ./infra/preparar-vps.sh
 #    Gerar os segredos:
 openssl rand -base64 48   # JWT_CHAVE
 openssl rand -base64 32   # POSTGRES_PASSWORD
+openssl rand -base64 24   # PLATAFORMA_SENHA_INICIAL  (RN-GER-014 — ver abaixo)
 
 # 3. Subir — HTTP, funciona por IP
 cd /opt/grelhahub && docker compose up -d
 curl -fsS http://localhost/api/health
 
 # 4. Primeira carga do schema (o pipeline faz isso sozinho depois)
+#    É ESTE passo que cria o usuário de suporte da plataforma — `up -d` não cria.
 docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
 
 # 5. Com o domínio apontando para o IP
@@ -50,6 +52,54 @@ docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
 sudo crontab -e
 # 0 3 * * * cd /opt/grelhahub && ./infra/renovar-https.sh >> /var/log/grelhahub-certbot.log 2>&1
 ```
+
+## Usuário de suporte da plataforma — RN-GER-014, ADR-0013
+
+> ⚠⚠ **Este usuário enxerga TODAS as unidades.** O recorte por restaurante (`RN-GER-009`) não se
+> aplica a ele. A senha dele é a mais sensível da instalação, e por isso não vem de migration
+> nenhuma (`RNF-008`): vem do `.env` da VPS.
+
+`SemeadorDePlataforma` roda **apenas no passo `--migrate`** — em produção o `Program.cs` só semeia
+dentro do bloco `args.Contains("--migrate")`; a semeadura no startup é restrita a
+`IsDevelopment()`. Consequência: **acrescentar as variáveis ao `.env` e dar `docker compose up -d`
+não cria nada.** É preciso rodar o passo de migration outra vez — o que é seguro, porque ele é
+idempotente nas duas pontas (sem migration pendente não aplica nada; com usuário de plataforma
+existente não toca na senha).
+
+```bash
+cd /opt/grelhahub
+
+# 1. As três variáveis, no .env (permissão 600). A senha é gerada AQUI, não no repositório.
+cat >> .env <<'FIM'
+PLATAFORMA_NOME=Suporte GrelhaHub
+PLATAFORMA_EMAIL=suporte@grelhahub.local
+PLATAFORMA_SENHA_INICIAL=cole-aqui-o-openssl-rand
+FIM
+
+# 2. Conferir que o compose está repassando (tem de listar as três Plataforma__*)
+docker compose config | grep Plataforma__
+
+# 3. Semear
+docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
+```
+
+O log do passo 3 diz qual dos três caminhos aconteceu:
+
+| Log | Significado |
+|-----|-------------|
+| `RN-GER-014 — usuário de plataforma criado (...)` | criado agora |
+| `RN-GER-014 — usuário de plataforma já existe; nada a fazer.` | já havia um — a senha do `.env` foi **ignorada** |
+| `RN-GER-014 — usuário de plataforma não configurado (...)` | as variáveis não chegaram ao container; confira o passo 2 |
+
+⚠ **O e-mail não pode pertencer a um usuário de restaurante.** O e-mail é único globalmente; nesse
+caso o semeador lança, o passo sai com código 1 e o `set -e` do pipeline aborta o deploy — antes do
+`up -d`, de propósito.
+
+⚠ **O usuário de plataforma nasce com `DeveTrocarSenha = false`** (`Usuario.CriarDePlataforma`):
+`RF-SEG-005` **não** o obriga a trocar no primeiro acesso. A senha do `.env` vale até alguém trocar
+à mão em `/trocar-senha` — rota que ele alcança, porque `TrocarSenhaCommand` não exige módulo nem
+permissão. Se a senha inicial passou por qualquer canal que não seja o `.env`, troque depois de
+entrar.
 
 ## Backup — RNF-017
 
