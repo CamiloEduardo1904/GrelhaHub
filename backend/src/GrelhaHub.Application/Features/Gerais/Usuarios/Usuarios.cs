@@ -94,7 +94,21 @@ public sealed record CriarUsuarioCommand(
     string Cpf,
     string Email,
     Guid PerfilId,
-    string SenhaInicial) : IRequest<UsuarioDto>;
+
+    /// <summary>
+    /// <c>RF-SEG-005</c> / <c>RN-GER-033</c> — <b>opcional, e a ausência é o caminho normal.</b>
+    /// <para>
+    /// Sem senha, o usuário nasce com uma credencial aleatória que ninguém conhece e recebe o
+    /// <b>convite por e-mail</b> para definir a própria (<c>RN-GER-032</c>). É o desenho melhor: a
+    /// senha que passa pelo WhatsApp de quem cadastrou não é senha.
+    /// </para>
+    /// <para>
+    /// Continua aceitando senha porque há caso real de entrega presencial — o operador que não tem
+    /// e-mail próprio, contratado na hora. Quem informa assume que duas pessoas a conhecem, e
+    /// <c>RF-SEG-005</c> obriga a troca no primeiro acesso de qualquer forma.
+    /// </para>
+    /// </summary>
+    string? SenhaInicial = null) : IRequest<UsuarioDto>;
 
 public sealed class CriarUsuarioValidator : AbstractValidator<CriarUsuarioCommand>
 {
@@ -115,9 +129,11 @@ public sealed class CriarUsuarioValidator : AbstractValidator<CriarUsuarioComman
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.PerfilId).NotEmpty();
 
+        // Opcional: sem senha, o convite por e-mail define. Quando vem, o mínimo é o mesmo das
+        // outras três rotas de senha — divergir aceitaria aqui o que a troca recusa depois.
         RuleFor(x => x.SenhaInicial)
-            .NotEmpty()
-            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.");
+            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.")
+            .When(x => !string.IsNullOrEmpty(x.SenhaInicial));
     }
 }
 
@@ -125,6 +141,7 @@ public sealed class CriarUsuarioHandler(
     IAppDbContext db,
     IContextoDeExecucao contexto,
     IHashDeSenha hash,
+    ITokensDeAcesso tokens,
     Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioCommand, UsuarioDto>
 {
@@ -204,11 +221,16 @@ public sealed class CriarUsuarioHandler(
             unidadeId,
             request.Nome,
             email,
-            hash.Gerar(request.SenhaInicial),
+
+            // Sem senha informada, entra uma credencial ALEATÓRIA que ninguém conhece: o acesso
+            // vem do convite por e-mail (RN-GER-033). Não é senha em branco nem senha padrão —
+            // as duas seriam porta aberta enquanto o convite não fosse usado.
+            hash.Gerar(request.SenhaInicial ?? tokens.Gerar().Token),
             perfil.Id,
 
-            // RF-SEG-005 — criado POR outra pessoa: a senha inicial é conhecida por quem a
-            // escolheu, e por isso o dono da conta troca no primeiro acesso.
+            // RF-SEG-005 — criado POR outra pessoa. Vale nos dois casos: com senha informada,
+            // duas pessoas a conhecem; com senha aleatória, ninguém a conhece e o dono precisa
+            // definir a sua pelo link.
             deveTrocarSenha: true,
             sobrenome: request.Sobrenome,
             cpf: cpf);
@@ -303,9 +325,20 @@ public sealed class TrocarSenhaHandler(IAppDbContext db, IContextoDeExecucao con
 
         if (!hash.Confere(request.SenhaAtual, usuario.SenhaHash))
         {
-            // Mensagem genérica: quem já está autenticado sabe quem é, mas confirmar "a atual
-            // está errada" ajuda quem roubou o token a descobrir a senha por tentativa.
-            throw new NaoAutorizadoException("Senha atual inválida.");
+            // ⚠ 422 e NÃO 401, e a diferença é a que fazia a tela parecer quebrada.
+            //
+            // `NaoAutorizadoException` mapeia para 401, e o interceptor do cliente trata 401 como
+            // "sessão expirada": limpa o token e joga para /entrar. Resultado: quem errava a senha
+            // atual era EXPULSO da tela de troca sem ler a mensagem — e voltava achando que a
+            // troca havia falhado depois de ter dado certo. O sintoma relatado era esse.
+            //
+            // Aqui quem está pedindo ESTÁ autenticado; o que falhou foi o valor digitado, que é
+            // regra de negócio. É a mesma correção que a SPEC-GER-007 §11.2 fez com o 401 que
+            // devia ser 403 na plataforma: o código de status precisa dizer o que faltou.
+            //
+            // A mensagem segue enxuta de propósito — confirmar "a atual está errada" ajuda quem
+            // roubou o token a descobrir a senha por tentativa, então ela não diz mais que isso.
+            throw new RegraDeNegocioException("Senha atual inválida.", "RF-SEG-005");
         }
 
         usuario.TrocarSenha(hash.Gerar(request.NovaSenha));

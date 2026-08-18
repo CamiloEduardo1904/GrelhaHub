@@ -81,9 +81,12 @@ de gravação deixaria sem lastro.
 
 Os três caminhos de criação de usuário emitem convite: `CriarUsuarioCommand` (restaurante),
 `CriarUsuarioDePlataformaCommand` (plataforma cria para uma casa) e `CriarUsuarioDeSuporteCommand`
-(plataforma cria colega). A senha inicial **continua existindo** — quem cadastra pode entregá-la
-presencialmente —, e `RF-SEG-005` continua exigindo a troca no primeiro acesso. O convite é o
-caminho que dispensa a entrega da senha por outro canal.
+(plataforma cria colega).
+
+⚠ **A partir de 18/08/2026 nenhuma das três pede senha — ver §12.** O convite deixou de ser um
+extra e passou a ser o caminho: o usuário nasce com credencial aleatória e define a própria pelo
+link. `senhaInicial` segue aceito para entrega presencial, e `RF-SEG-005` obriga a troca de
+qualquer forma.
 
 > ⚠ **A senha nunca viaja no e-mail.** O que viaja é o link. Senha em texto claro fica arquivada na
 > caixa de quem recebeu — e em qualquer servidor pelo caminho.
@@ -207,3 +210,43 @@ que ela continha era o e-mail de **outro** teste. A asserção certa é sobre o 
 
 É o mesmo erro de escopo que `SPEC-VEN-003` §11.7 registrou com o `Guid?` na árvore de expressão:
 teste que passa isolado e falha em conjunto.
+
+## 12. Criar usuário deixou de pedir senha — 18/08/2026
+
+**Decisão do dono do produto:** criar qualquer usuário dispara o **convite por e-mail**; substituir
+senha é operação de **edição**. Os dois fluxos passam a existir com papéis distintos:
+
+| Fluxo | O que acontece | Pendência de `RF-SEG-005` |
+|-------|----------------|----------------------------|
+| **Criar** (`POST /usuarios`, as duas rotas de plataforma) | Sem senha no corpo. O usuário nasce com credencial **aleatória que ninguém conhece** e recebe o convite | Cai quando ele define a própria pelo link (`RN-GER-035`) |
+| **Editar → redefinir senha** (`POST /usuarios/{id}/senha`) | O administrador escolhe a senha e a entrega | **Reativa** (`RN-GER-028`): a senha que um terceiro conhece não é senha |
+
+⚠ **Credencial aleatória, e não senha em branco nem senha padrão.** As duas seriam porta aberta
+enquanto o convite não fosse usado. O teste `CriadoSemSenha_DefinePeloConvite` tenta entrar com
+vazio, `12345678`, `senha` e o próprio e-mail antes de usar o link.
+
+`senhaInicial` **continua sendo aceito** e é o caso de entrega presencial — o operador contratado na
+hora, sem e-mail próprio. Quem informa assume que duas pessoas conhecem a senha, e `RF-SEG-005`
+obriga a troca no primeiro acesso de qualquer forma.
+
+## 13. ⚠⚠ O defeito relatado: "dá erro ao trocar a senha mesmo alterando certo"
+
+Investigado com um teste que percorre a sequência inteira — criar, entrar com a inicial, trocar,
+entrar com a nova — nos **três** caminhos de criação. **A API estava correta em todos.** O defeito
+eram dois, e os dois no cliente:
+
+**1. `401` onde devia ser `422`.** Senha atual incorreta lançava `NaoAutorizadoException` → 401. O
+interceptor do axios trata 401 como sessão expirada: limpa o token e faz `location.href = '/entrar'`.
+Resultado — **quem errava um caractere era expulso da tela de troca sem ler a mensagem**, e voltava
+achando que a troca havia falhado. Quem já está autenticado não tem falta de autenticação: o que
+falhou foi o valor digitado, que é regra de negócio. É a mesma correção que a `SPEC-GER-007` §11.2
+fez com o 401 que devia ser 403.
+
+**2. O interceptor não distinguia os dois sentidos de 401.** Mesmo com o status certo, um 401 vindo
+de `/autenticacao/login` — senha errada na reautenticação — destruiria a tela do mesmo jeito. As
+rotas de credencial (`login`, `minha-senha`, `definir-senha`, `esqueci-minha-senha`) passaram a ser
+exceção explícita: ali o 401 é **resposta da operação**, não sessão morta.
+
+> **Os dois defeitos eram invisíveis para o backend.** Nenhum teste de API os pegaria: o servidor
+> respondia exatamente o que devia responder. O que estava errado era o significado que o cliente
+> dava à resposta — e é por isso que o registro está aqui, e não só no comentário do código.

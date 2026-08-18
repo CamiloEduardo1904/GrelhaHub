@@ -206,7 +206,7 @@ não existe.
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **271 testes** — 76 de domínio + 7 de aplicação + 188 de integração |
+| `dotnet test -c Release` | ✔ **276 testes** — 76 de domínio + 7 de aplicação + 193 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

@@ -216,12 +216,11 @@ function FormularioDeUsuario({
     cpf: '',
     email: '',
     perfilId: '',
-    senhaInicial: '',
   });
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
-  function campo(nome: 'nome' | 'sobrenome' | 'email' | 'senhaInicial') {
+  function campo(nome: 'nome' | 'sobrenome' | 'email') {
     return {
       value: form[nome],
       onChange: (e: { target: { value: string } }) =>
@@ -296,17 +295,16 @@ function FormularioDeUsuario({
             <input type="email" {...campo('email')} required autoComplete="off" />
           </label>
 
-          <label>
-            Senha inicial
-            <input
-              type="password"
-              {...campo('senhaInicial')}
-              required
-              minLength={8}
-              autoComplete="new-password"
-            />
-          </label>
         </div>
+
+        {/* RN-GER-032 / RN-GER-033 — NÃO se digita senha aqui, e a ausência do campo é o ponto.
+            O usuário recebe um link de uso único por e-mail e define a própria senha: a senha que
+            passa pelo WhatsApp de quem cadastrou não é senha. Substituir a senha é operação de
+            EDIÇÃO (RN-GER-028), e lá ela reativa a troca obrigatória. */}
+        <p className="ajuda">
+          Ele vai receber um <strong>e-mail com um link</strong> para definir a própria senha. O
+          link vale 72 horas e só pode ser usado uma vez.
+        </p>
       </fieldset>
 
       {cpfErrado && <p className="erro">Este CPF não é válido — confira os dígitos.</p>}

@@ -454,7 +454,7 @@ function FormularioDeUsuario({
     cpf: '',
     email: '',
     perfilNome: '',
-    senhaInicial: '',
+
   });
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -601,17 +601,12 @@ function FormularioDeUsuario({
             />
           </label>
 
-          <label>
-            Senha inicial
-            <input
-              type="password"
-              value={form.senhaInicial}
-              onChange={(e) => setForm((a) => ({ ...a, senhaInicial: e.target.value }))}
-              required
-              minLength={8}
-            />
-          </label>
         </div>
+
+        {/* RN-GER-032 — sem campo de senha: o convite por e-mail define. Ver Usuarios.tsx. */}
+        <p className="ajuda">
+          Ele recebe um <strong>e-mail com link</strong> para definir a própria senha.
+        </p>
       </fieldset>
 
       {cpfErrado && <p className="erro">Este CPF não é válido.</p>}

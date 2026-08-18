@@ -208,7 +208,9 @@ public sealed record CriarUsuarioDePlataformaCommand(
     string Cpf,
     string Email,
     string PerfilNome,
-    string SenhaInicial) : IRequest<UsuarioDePlataformaDto>;
+
+    /// <summary><c>RF-SEG-005</c> — opcional: sem ela vale o convite por e-mail. Ver `CriarUsuarioCommand`.</summary>
+    string? SenhaInicial = null) : IRequest<UsuarioDePlataformaDto>;
 
 public sealed class CriarUsuarioDePlataformaValidator : AbstractValidator<CriarUsuarioDePlataformaCommand>
 {
@@ -226,8 +228,8 @@ public sealed class CriarUsuarioDePlataformaValidator : AbstractValidator<CriarU
             .WithMessage("O CPF informado não é válido.");
 
         RuleFor(x => x.SenhaInicial)
-            .NotEmpty()
-            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.");
+            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.")
+            .When(x => !string.IsNullOrEmpty(x.SenhaInicial));
     }
 }
 
@@ -235,6 +237,7 @@ public sealed class CriarUsuarioDePlataformaHandler(
     IAppDbContext db,
     IContextoDeExecucao contexto,
     IHashDeSenha hash,
+    ITokensDeAcesso tokens,
     Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioDePlataformaCommand, UsuarioDePlataformaDto>
 {
@@ -274,7 +277,7 @@ public sealed class CriarUsuarioDePlataformaHandler(
             request.UnidadeId,
             request.Nome,
             email,
-            hash.Gerar(request.SenhaInicial),
+            hash.Gerar(request.SenhaInicial ?? tokens.Gerar().Token),
             perfil.Id,
             deveTrocarSenha: true,
             sobrenome: request.Sobrenome,

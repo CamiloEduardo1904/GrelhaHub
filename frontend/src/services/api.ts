@@ -31,12 +31,33 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Rotas em que 401 significa "credencial errada", e não "sessão expirada".
+ *
+ * ⚠ Sem esta lista, o interceptor abaixo transformava senha atual incorreta em LOGOUT: ele limpava
+ * o token e navegava para /entrar, a tela de troca de senha era destruída no meio do fluxo e a
+ * mensagem do servidor nunca chegava aos olhos de ninguém. Quem errava um caractere voltava para o
+ * login achando que a troca havia falhado — depois de ela ter dado certo, em alguns casos.
+ */
+const ROTAS_DE_CREDENCIAL = [
+  '/v1/autenticacao/login',
+  '/v1/autenticacao/definir-senha',
+  '/v1/autenticacao/esqueci-minha-senha',
+  '/v1/usuarios/minha-senha',
+];
+
 api.interceptors.response.use(
   (resposta) => resposta,
   (erro: AxiosError) => {
+    const rota = erro.config?.url ?? '';
+    const eDeCredencial = ROTAS_DE_CREDENCIAL.some((r) => rota.startsWith(r));
+
     // Token expirado ou inválido: derruba a sessão em vez de deixar a tela em estado
     // ambíguo, mostrando dados velhos que o usuário acha que ainda são válidos.
-    if (erro.response?.status === 401 && lerToken()) {
+    //
+    // Mas só quando o 401 é de sessão. Nas rotas de credencial ele é resposta da operação, e a
+    // tela precisa exibir a mensagem em vez de ser substituída pelo login.
+    if (erro.response?.status === 401 && lerToken() && !eDeCredencial) {
       limparToken();
       if (!location.pathname.startsWith('/c/')) {
         location.href = '/entrar';

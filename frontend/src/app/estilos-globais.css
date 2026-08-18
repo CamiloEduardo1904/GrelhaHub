@@ -1968,7 +1968,13 @@ button.link-discreto {
    sete linhas parecendo formulário de outro produto (ADR-0012).
    ============================================================================ */
 
+/* ⚠ `max-width: none` — o cadastro NÃO é cartão de login.
+   Ele herdava o teto de 400px de `.form`, e o efeito foi o pior possível: as duas
+   colunas de hora, declaradas em `1fr`, ficaram com ~14px cada e o campo virou
+   um traço onde não se digita. Teto de largura serve a formulário de uma coluna
+   (login, troca de senha); seção de página ocupa a largura que tem. */
 .operacao-cadastro {
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1980,11 +1986,13 @@ button.link-discreto {
 .grade-endereco {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 9rem 1fr 6rem;
+  /* CEP e número têm largura de DADO (8 e 4 dígitos); rua e cidade esticam. Foi o
+     que faltava antes: `.linha` de duas colunas iguais deixava a UF do tamanho da
+     rua e a rua do tamanho da UF. */
+  grid-template-columns: 10rem minmax(12rem, 1fr) 7rem minmax(10rem, 1fr);
   grid-template-areas:
-    'cep rua numero'
-    'complemento bairro bairro'
-    'cidade cidade uf';
+    'cep rua numero complemento'
+    'bairro bairro cidade uf';
 }
 
 .campo-cep { grid-area: cep; }
@@ -2021,10 +2029,13 @@ button.link-discreto {
 
 .semana .dia {
   display: grid;
-  /* marca | dia | abre | às | fecha | alternador. Colunas fixas: sem elas,
-     "Segunda" e "Quarta" empurram os campos para posições diferentes em cada
-     linha, e a lista parece torta — foi o desalinho que apareceu na tela. */
-  grid-template-columns: auto 5.5rem 1fr auto 1fr 6.5rem;
+  /* marca | dia | abre | às | fecha | alternador.
+
+     ⚠ As colunas de HORA têm largura FIXA, não `1fr`. Com `1fr` elas dividem o
+     que sobra — e o que sobra depende do container: na coluna estreita da
+     plataforma sobrava quase nada, e o campo colapsou para uns 14px. Largura de
+     dado é do dado, não do espaço disponível. Quem estica é o nome do dia. */
+  grid-template-columns: auto minmax(4rem, 1fr) 6rem auto 6rem auto;
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
@@ -2066,6 +2077,9 @@ button.link-discreto {
    background declara color). */
 .campo-hora {
   width: 100%;
+  /* Piso de segurança: se algum container apertar a grade, o campo para de
+     encolher em 5rem em vez de virar um traço. */
+  min-width: 5rem;
   min-height: var(--toque-admin);
   margin-top: 0;
   padding: 0.35rem 0.5rem;

@@ -96,7 +96,9 @@ public sealed class ListarUsuariosDeSuporteHandler(IAppDbContext db, IContextoDe
 public sealed record CriarUsuarioDeSuporteCommand(
     string Nome,
     string Email,
-    string SenhaInicial) : IRequest<UsuarioDeSuporteDto>;
+
+    /// <summary><c>RF-SEG-005</c> — opcional: sem ela vale o convite por e-mail.</summary>
+    string? SenhaInicial = null) : IRequest<UsuarioDeSuporteDto>;
 
 public sealed class CriarUsuarioDeSuporteValidator : AbstractValidator<CriarUsuarioDeSuporteCommand>
 {
@@ -108,8 +110,8 @@ public sealed class CriarUsuarioDeSuporteValidator : AbstractValidator<CriarUsua
         // O mesmo mínimo de TrocarSenhaValidator e RedefinirSenhaValidator. Divergir aqui
         // permitiria criar uma senha que o próprio dono não conseguiria repetir na troca.
         RuleFor(x => x.SenhaInicial)
-            .NotEmpty()
-            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.");
+            .MinimumLength(8).WithMessage("A senha inicial deve ter ao menos 8 caracteres.")
+            .When(x => !string.IsNullOrEmpty(x.SenhaInicial));
     }
 }
 
@@ -117,6 +119,7 @@ public sealed class CriarUsuarioDeSuporteHandler(
     IAppDbContext db,
     IContextoDeExecucao contexto,
     IHashDeSenha hash,
+    ITokensDeAcesso tokens,
     Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioDeSuporteCommand, UsuarioDeSuporteDto>
 {
@@ -144,7 +147,7 @@ public sealed class CriarUsuarioDeSuporteHandler(
         var usuario = Usuario.CriarDePlataforma(
             request.Nome.Trim(),
             email,
-            hash.Gerar(request.SenhaInicial),
+            hash.Gerar(request.SenhaInicial ?? tokens.Gerar().Token),
             deveTrocarSenha: true);
 
         db.Usuarios.Add(usuario);

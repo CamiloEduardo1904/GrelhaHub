@@ -162,11 +162,9 @@ function rotulo(u: UsuarioDeSuporte): string {
 function NovoUsuarioDeSuporte({ aoCriar }: { aoCriar: () => Promise<void> }) {
   const sessao = lerSessao();
 
-  const [form, setForm] = useState({ nome: '', email: '', senhaInicial: '' });
+  const [form, setForm] = useState({ nome: '', email: '' });
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-
-  const curta = form.senhaInicial.length > 0 && form.senhaInicial.length < 8;
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
@@ -218,29 +216,18 @@ function NovoUsuarioDeSuporte({ aoCriar }: { aoCriar: () => Promise<void> }) {
           </label>
         </div>
 
-        <label>
-          Senha inicial
-          <input
-            type="password"
-            value={form.senhaInicial}
-            onChange={(e) => setForm((a) => ({ ...a, senhaInicial: e.target.value }))}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </label>
-
-        {curta && <p className="erro">A senha inicial deve ter ao menos 8 caracteres.</p>}
-
+        {/* RN-GER-032 / RN-GER-033 — sem campo de senha: o colega recebe o convite e define a
+            própria. Antes havia senha aqui, e ela chegava ao destinatário por outro canal — o
+            oposto do que RN-GER-033 protege. */}
         <p>
-          Ele <strong>troca a senha no primeiro acesso</strong>: enquanto ela valer,{' '}
-          {sessao?.nome ?? 'quem criou'} também entra na conta.
+          Ele recebe um <strong>e-mail com um link</strong> para definir a própria senha. Enquanto
+          não usar o link, ninguém entra nessa conta — nem {sessao?.nome ?? 'quem a criou'}.
         </p>
       </fieldset>
 
       {erro && <p className="erro">{erro}</p>}
 
-      <button type="submit" className="btn primario" disabled={enviando || curta}>
+      <button type="submit" className="btn primario" disabled={enviando}>
         {enviando ? 'Criando…' : 'Criar acesso'}
       </button>
     </form>
