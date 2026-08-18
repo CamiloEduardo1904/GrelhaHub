@@ -351,6 +351,13 @@ label textarea,
 label select {
   display: block;
   width: 100%;
+
+  /* `width: 100%` NÃO faz o campo caber: em cálculo intrínseco a porcentagem vira `auto`, e
+     o navegador volta para a largura de ~20 caracteres do controle. Numa faixa de grade
+     estreita a coluna cresce para caber isso e a linha estoura. O piso zero deixa a coluna
+     mandar na largura — o mínimo utilizável de cada campo é declarado onde ele é usado
+     (ver `.campo-hora`), que é onde se sabe qual dado ele carrega. */
+  min-width: 0;
   margin-top: 0.35rem;
   min-height: var(--toque-admin);
   padding: 0.55rem 0.7rem;
@@ -375,6 +382,15 @@ fieldset {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+
+  /* ⚠ A folha do NAVEGADOR dá ao <fieldset> `min-inline-size: min-content` — e essa é a
+     única regra de largura no projeto que não está escrita aqui. O efeito: o fieldset se
+     recusa a encolher, cresce até o min-content do conteúdo e ATRAVESSA a borda da placa,
+     em vez de quebrar as linhas dentro dela. Foi o que quebrou o cadastro de operação: as
+     duas seções saíram do cartão com larguras DIFERENTES — cada uma no seu min-content —,
+     e largura diferente entre irmãos de um flex-column é a assinatura desse padrão.
+     Nenhum outro elemento tem esse piso; por isso o zero vai na regra base. */
+  min-inline-size: 0;
 }
 
 legend {
@@ -389,7 +405,9 @@ legend {
 
 .linha {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* `minmax(0, 1fr)`, não `1fr`: `1fr` é `minmax(auto, 1fr)`, e esse `auto` é o min-content
+     do campo — duas colunas de ~11rem cada não cabem no cartão de 400px e vazam. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -1931,7 +1949,6 @@ button.link-discreto {
   display: none;
 }
 
-@media
 /* ---------------------------------------------------------------- acompanhamento
    A tela do cliente usa a mesma capa do cardápio (RN-GER-026, RN-GER-037). */
 
@@ -1956,7 +1973,6 @@ button.link-discreto {
   font-size: 1.05rem;
 }
 
-@media
 /* ============================================================================
    CADASTRO DE OPERAÇÃO — endereço e horário (RN-GER-036, RN-GER-037)
 
@@ -1973,8 +1989,19 @@ button.link-discreto {
    colunas de hora, declaradas em `1fr`, ficaram com ~14px cada e o campo virou
    um traço onde não se digita. Teto de largura serve a formulário de uma coluna
    (login, troca de senha); seção de página ocupa a largura que tem. */
-.operacao-cadastro {
+.form.operacao-cadastro {
+  /* Duas classes de propósito: é este seletor que derruba o teto de 400px de `.form`.
+     Empatar em uma classe só deixaria a largura da tela na mão da ordem do arquivo. */
   max-width: none;
+
+  /* Daqui para baixo a régua de quebra é a largura DESTE formulário, não a da janela.
+     Era esse o erro das duas `@media` que moravam aqui: a mesma tela vive em dois lugares
+     de largura muito diferente — a aba "Loja" do painel, que ocupa a página inteira, e a
+     coluna de detalhe da casa na plataforma. Em janela larga com coluna estreita, a
+     `@media` respondia "cabe" e o formulário quebrava. `@container` pergunta ao container. */
+  container-type: inline-size;
+  container-name: operacao;
+
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1989,10 +2016,13 @@ button.link-discreto {
   /* CEP e número têm largura de DADO (8 e 4 dígitos); rua e cidade esticam. Foi o
      que faltava antes: `.linha` de duas colunas iguais deixava a UF do tamanho da
      rua e a rua do tamanho da UF. */
-  grid-template-columns: 10rem minmax(12rem, 1fr) 7rem minmax(10rem, 1fr);
+  /* Cinco faixas, não quatro: com quatro, UF cai na mesma faixa do complemento — e a
+     faixa que precisa esticar para o complemento é a mesma que deixava um campo de DUAS
+     LETRAS com 430px em tela larga. Quem tem largura de dado tem faixa própria. */
+  grid-template-columns: 10rem 7rem minmax(10rem, 1fr) minmax(9rem, 1fr) 5rem;
   grid-template-areas:
-    'cep rua numero complemento'
-    'bairro bairro cidade uf';
+    'cep numero rua complemento complemento'
+    'bairro bairro bairro cidade uf';
 }
 
 .campo-cep { grid-area: cep; }
@@ -2003,16 +2033,37 @@ button.link-discreto {
 .campo-cidade { grid-area: cidade; }
 .campo-uf { grid-area: uf; }
 
-/* Coluna estreita — o detalhe da casa na plataforma cabe em ~26rem. */
-@media (max-width: 52rem) {
+/* Coluna estreita — o detalhe da casa na plataforma cabe em ~26rem.
+
+   ⚠ O número é a largura do CONTAINER, e por isso é menor que a antiga `@media`: entre a
+   janela e esta grade há a margem do painel, o padding do formulário e o do fieldset —
+   perto de 5rem que nunca estiveram disponíveis para os campos. */
+@container operacao (max-width: 48rem) {
   .grade-endereco {
-    grid-template-columns: 1fr 6rem;
+    grid-template-columns: minmax(0, 1fr) 6rem;
     grid-template-areas:
       'cep numero'
       'rua rua'
       'complemento complemento'
       'bairro bairro'
       'cidade uf';
+  }
+}
+
+/* Coluna muito estreita — celular em pé. O piso é onde a CIDADE deixa de caber ao lado da
+   UF de 6rem: abaixo de ~15rem "São Paulo" sai cortado, e cidade cortada é defeito.
+   Acima disso duas colunas ainda são melhores que sete campos empilhados. */
+@container operacao (max-width: 15rem) {
+  .grade-endereco {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'cep'
+      'numero'
+      'rua'
+      'complemento'
+      'bairro'
+      'cidade'
+      'uf';
   }
 }
 
@@ -2035,7 +2086,19 @@ button.link-discreto {
      que sobra — e o que sobra depende do container: na coluna estreita da
      plataforma sobrava quase nada, e o campo colapsou para uns 14px. Largura de
      dado é do dado, não do espaço disponível. Quem estica é o nome do dia. */
-  grid-template-columns: auto minmax(4rem, 1fr) 6rem auto 6rem auto;
+  grid-template-columns: auto 6rem 6rem auto 6rem auto;
+
+  /* `justify-content: start` porque nenhuma faixa é `1fr`: em tela larga o `1fr` no nome
+     do dia empurrava as horas para a borda direita e abria um vão de meia tela entre
+     "DOMINGO" e "11:05". A sobra fica DEPOIS da linha, não no meio dela.
+
+     ⚠ E o nome do dia é faixa FIXA, não `max-content`: cada `<li>` é uma grade
+     independente, então faixa medida pelo conteúdo daria uma largura para "SEGUNDA" e
+     outra para "SÁBADO" — as sete linhas deixariam de alinhar. */
+  justify-content: start;
+
+  /* Sem isto a linha herda o piso de min-content dos filhos e vaza junto com o fieldset. */
+  min-width: 0;
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
@@ -2126,9 +2189,9 @@ button.link-discreto {
   padding-left: 0.75rem;
 }
 
-@media (max-width: 44rem) {
+@container operacao (max-width: 40rem) {
   .semana .dia {
-    grid-template-columns: auto 3rem 1fr auto 1fr;
+    grid-template-columns: auto 3rem minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-areas: none;
     row-gap: 0.4rem;
   }
