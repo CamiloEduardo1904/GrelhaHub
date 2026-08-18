@@ -1,14 +1,48 @@
-export type Perfil = 'Administrador' | 'Gerente' | 'Atendente' | 'Cozinha';
+/**
+ * Nome do perfil — RÓTULO, para mostrar na tela.
+ *
+ * RN-GER-010 — nunca decida o que mostrar a partir dele. A pergunta é sobre PERMISSÃO
+ * (`pode(sessao, 'pedido.cancelar')`), porque o perfil Operador (RN-GER-022) foi criado depois
+ * e um `perfil === 'Gerente'` espalhado pela interface obrigaria a caçar cada condicional.
+ */
+export type Perfil =
+  | 'Administrador'
+  | 'Gerente'
+  | 'Atendente'
+  | 'Cozinha'
+  | 'Operador'
+  | 'Entregador'
+  | 'Plataforma';
 
 export interface Sessao {
   token: string;
   expiraEm: string;
   usuarioId: string;
   nome: string;
+
+  /**
+   * `RF-SEG-005` — usado pela tela de troca de senha no primeiro acesso.
+   *
+   * Trocar a senha **não** derruba a pendência do token que já está na mão: o claim
+   * `trocar_senha` viaja nele. A tela reautentica com a senha nova, e para isso precisa do e-mail.
+   */
+  email: string;
+
   perfil: Perfil;
-  unidadeId: string;
+
+  /** Nulo para o usuário de plataforma, que não pertence a unidade — RN-GER-014. */
+  unidadeId: string | null;
   restaurante: string;
   slug: string;
+
+  /** RN-GER-014 — suporte do GrelhaHub, enxerga todas as unidades (ADR-0013). */
+  ehPlataforma: boolean;
+
+  /** RN-GER-010 — códigos `recurso.acao`. Esconder na tela é conveniência; o gate está na API. */
+  permissoes: string[];
+
+  /** RF-SEG-005 — se verdadeiro, só a troca de senha responde. */
+  deveTrocarSenha: boolean;
 }
 
 export interface MeuRestaurante {
@@ -19,8 +53,30 @@ export interface MeuRestaurante {
   telefone?: string;
   slug: string;
   linkDoCardapio: string;
+  fusoHorario: string;
   totalDeProdutos: number;
   pedidosDoDia: number;
+
+  /** RN-GER-026 — a logo exibida no cardápio público. Nula é estado válido. */
+  urlLogo?: string | null;
+}
+
+/** SPEC-GER-007 — o usuário da unidade, na tela de administração. */
+export interface UsuarioDaUnidade {
+  id: string;
+
+  /** `RN-GER-009` — de qual unidade. Nulo só no de plataforma, que não aparece nas listas. */
+  unidadeId: string | null;
+  nome: string;
+  sobrenome?: string | null;
+
+  /** RN-GER-023 — chega FORMATADO da API. O banco guarda 11 dígitos. */
+  cpf?: string | null;
+  email: string;
+  perfil: Perfil;
+  perfilId: string;
+  ativo: boolean;
+  deveTrocarSenha: boolean;
 }
 
 export interface ProdutoInterno {
@@ -31,12 +87,25 @@ export interface ProdutoInterno {
   ativo: boolean;
   disponivel: boolean;
   categoriaId: string;
+
+  /** RN-VEN-042 — caminho da imagem. Nulo quando o produto não tem foto. */
+  urlImagem?: string | null;
 }
 
 export interface CategoriaInterna {
   id: string;
   nome: string;
   ordem: number;
+
+  /**
+   * RN-VEN-043 — a gestão vê categoria inativa; o cliente não.
+   *
+   * O campo é o que permite a tela oferecer "Reativar". Antes da SPEC-VEN-003 a consulta interna
+   * filtrava `Ativa` no servidor: a categoria escondida desaparecia da tela e não havia como
+   * trazê-la de volta.
+   */
+  ativa: boolean;
+
   produtos: ProdutoInterno[];
 }
 
@@ -49,6 +118,9 @@ export interface ProdutoPublico {
   nome: string;
   descricao?: string;
   preco: number;
+
+  /** RN-VEN-042 — a foto do lanche. Nula é comum e é estado válido. */
+  urlImagem?: string | null;
 }
 
 export interface CategoriaPublica {
@@ -61,6 +133,10 @@ export interface CardapioPublico {
   slug: string;
   nomeFantasia: string;
   telefone?: string;
+
+  /** RN-GER-026 — a logo da casa. Nula: a vitrine exibe o nome fantasia. */
+  urlLogo?: string | null;
+
   categorias: CategoriaPublica[];
 }
 
@@ -83,6 +159,15 @@ export interface ItemResumo {
 
 export interface PedidoResumo {
   id: string;
+
+  /**
+   * `RN-GER-009` — de qual unidade este pedido é.
+   *
+   * Sem ele a lista da base inteira é ilegível: `numero` é identificador **humano**, sequencial
+   * por dia operacional e **repetido entre unidades** — duas casas têm o pedido nº 1.
+   */
+  unidadeId: string;
+
   numero: number;
   canal: string;
   status: StatusPedido;

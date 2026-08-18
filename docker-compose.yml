@@ -62,6 +62,13 @@ services:
       Jwt__Emissor: ${JWT_EMISSOR:-grelhahub-api}
       Jwt__Audiencia: ${JWT_AUDIENCIA:-grelhahub-web}
       TZ: America/Sao_Paulo
+
+      # ADR-0015 / SPEC-VEN-002 — raiz das imagens, em volume.
+      Arquivos__Raiz: /app/arquivos
+    volumes:
+      # ⚠ A API ESCREVE aqui; o nginx le. É o unico estado da aplicacao fora do banco, e a
+      # consequencia esta declarada no ADR-0015: `pg_dump` sozinho DEIXOU de ser backup completo.
+      - arquivos:/app/arquivos
     networks:
       - interna
     deploy:
@@ -95,6 +102,10 @@ services:
       - web
     volumes:
       - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+      # Somente leitura: o nginx serve as imagens e nunca as escreve. Se um dia ele precisar
+      # escrever aqui, algo saiu do lugar.
+      - arquivos:/var/www/arquivos:ro
     networks:
       - interna
     labels:
@@ -127,6 +138,12 @@ networks:
     driver: bridge
 
 volumes:
+  # ADR-0015 — as imagens de produto e as logos. Precisa entrar na rotina de backup junto com o
+  # banco: a partir daqui, `pg_dump` sozinho nao restaura o sistema inteiro.
+  #
+  #   docker run --rm -v grelhahub_arquivos:/d -v $PWD:/b alpine   #     tar czf /b/arquivos-$(date +%F).tar.gz -C /d .
+  arquivos:
+
   pgdata:
     # RNF-017 — backup antes de qualquer apresentação:
     #   docker compose exec -T db pg_dump -U grelhahub grelhahub | gzip > backup-$(date +%F).sql.gz

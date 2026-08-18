@@ -1,4 +1,5 @@
 using FluentAssertions;
+using GrelhaHub.Domain.Common;
 using GrelhaHub.Domain.Vendas;
 
 namespace GrelhaHub.Domain.Tests.Vendas;
@@ -14,7 +15,7 @@ public class PedidoTests
     private static Pedido PedidoComUmItem(decimal preco = 28.00m, int quantidade = 1)
     {
         var pedido = new Pedido(Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null);
-        pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", preco, quantidade);
+        pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(preco), quantidade);
         return pedido;
     }
 
@@ -101,13 +102,13 @@ public class PedidoTests
             .Should().Throw<InvalidOperationException>().WithMessage("*RN-VEN-019*");
     }
 
-    [Fact(DisplayName = "RN-VEN-014 — o cancelamento exige motivo")]
+    [Fact(DisplayName = "RN-GER-002 — o cancelamento exige motivo")]
     public void Cancelamento_ExigeMotivo()
     {
         var pedido = PedidoComUmItem();
 
         pedido.Invoking(p => p.Cancelar("  "))
-            .Should().Throw<ArgumentException>().WithMessage("*RN-VEN-014*");
+            .Should().Throw<ArgumentException>().WithMessage("*RN-GER-002*");
 
         pedido.Status.Should().Be(StatusPedido.Aberto, "o pedido não pode mudar de estado quando a operação falha");
     }
@@ -119,13 +120,13 @@ public class PedidoTests
         var pedido = new Pedido(Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null);
 
         // Vendido a 32,00 hoje.
-        var item = pedido.AdicionarItem(produtoId, "X-Bacon", 32.00m, 2);
+        var item = pedido.AdicionarItem(produtoId, "X-Bacon", Dinheiro.De(32.00m), 2);
 
         // Amanhã o preço de tabela do produto sobe para 38,00 — o item não acompanha,
         // porque guarda uma cópia, não uma referência.
-        item.PrecoPraticado.Should().Be(32.00m);
-        item.Total.Should().Be(64.00m);
-        pedido.Total.Should().Be(64.00m);
+        item.PrecoPraticado.Should().Be(Dinheiro.De(32.00m));
+        item.Total.Should().Be(Dinheiro.De(64.00m));
+        pedido.Total.Should().Be(Dinheiro.De(64.00m));
     }
 
     [Fact(DisplayName = "RN-VEN-011 — a quantidade de um item é sempre maior que zero")]
@@ -133,29 +134,29 @@ public class PedidoTests
     {
         var pedido = new Pedido(Unidade, 1, CanalVenda.Balcao, null, null);
 
-        pedido.Invoking(p => p.AdicionarItem(Guid.CreateVersion7(), "X-Burger", 28m, 0))
+        pedido.Invoking(p => p.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(28m), 0))
             .Should().Throw<ArgumentOutOfRangeException>().WithMessage("*RN-VEN-011*");
     }
 
-    [Fact(DisplayName = "RN-VEN-010 — pedido em produção não aceita alteração de itens")]
+    [Fact(DisplayName = "RN-VEN-040 — pedido em produção não aceita alteração de itens")]
     public void PedidoEmProducao_NaoAceitaNovosItens()
     {
         var pedido = PedidoComUmItem();
         pedido.AvancarStatus(); // Confirmado
         pedido.AvancarStatus(); // Em produção
 
-        pedido.Invoking(p => p.AdicionarItem(Guid.CreateVersion7(), "Batata", 18m, 1))
-            .Should().Throw<InvalidOperationException>().WithMessage("*RN-VEN-010*");
+        pedido.Invoking(p => p.AdicionarItem(Guid.CreateVersion7(), "Batata", Dinheiro.De(18m), 1))
+            .Should().Throw<InvalidOperationException>().WithMessage("*RN-VEN-040*");
     }
 
-    [Fact(DisplayName = "RN-VEN-012 — o total do pedido é a soma dos itens")]
+    [Fact(DisplayName = "RN-VEN-039 — o total do pedido é a soma dos itens")]
     public void Total_EhASomaDosItens()
     {
         var pedido = new Pedido(Unidade, 1, CanalVenda.Balcao, null, null);
-        pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", 28.00m, 2);
-        pedido.AdicionarItem(Guid.CreateVersion7(), "Batata frita", 18.00m, 1);
-        pedido.AdicionarItem(Guid.CreateVersion7(), "Refrigerante", 7.00m, 2);
+        pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(28.00m), 2);
+        pedido.AdicionarItem(Guid.CreateVersion7(), "Batata frita", Dinheiro.De(18.00m), 1);
+        pedido.AdicionarItem(Guid.CreateVersion7(), "Refrigerante", Dinheiro.De(7.00m), 2);
 
-        pedido.Total.Should().Be(88.00m);
+        pedido.Total.Should().Be(Dinheiro.De(88.00m));
     }
 }

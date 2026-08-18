@@ -5,12 +5,16 @@ using GrelhaHub.Domain.Crm;
 using GrelhaHub.Domain.Vendas;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using GrelhaHub.Application.Common.Modulos;
+using GrelhaHub.Domain.Gerais;
 
 namespace GrelhaHub.Application.Features.Vendas.CriarPedidoPublico;
 
 /// <summary>
 /// Pedido feito pelo cardápio público — <c>RN-VEN-038</c>.
 /// </summary>
+[SemModulo("pertence a VEN, mas o gate vive no handler: a unidade só é conhecida depois de resolver o slug, e RN-VEN-037 exige 404 e não 403 para quem está fora")]
+[SemPermissao("rota pública anônima — RN-VEN-038")]
 public sealed record CriarPedidoPublicoCommand(
     string Slug,
     string NomeCliente,
@@ -55,7 +59,7 @@ public sealed class CriarPedidoPublicoValidator : AbstractValidator<CriarPedidoP
     }
 }
 
-public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto, IRelogio relogio)
+public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto, IRelogio relogio, IModulos modulos)
     : IRequestHandler<CriarPedidoPublicoCommand, PedidoCriadoResponse>
 {
     public async Task<PedidoCriadoResponse> Handle(CriarPedidoPublicoCommand request, CancellationToken cancellationToken)
@@ -68,6 +72,17 @@ public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecu
             ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
         contexto.DefinirUnidadePublica(unidade.Id);
+        // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline.
+        //
+        // O behavior roda antes do handler, quando a unidade ainda não está no contexto: ela só
+        // é conhecida depois de resolver o slug. E a resposta certa é 404, não 403: para quem
+        // está do lado de fora, o restaurante simplesmente não tem cardápio online — 403
+        // anunciaria que existe algo ali que não foi contratado.
+        if (!await modulos.EstaHabilitadoAsync(unidade.Id, CodigoDeModulo.Vendas, em: null, cancellationToken))
+        {
+            throw new NaoEncontradoException("Restaurante não encontrado.");
+        }
+
 
         // RN-CRM-001 — o telefone identifica o cliente. Se já pediu antes, reaproveita.
         var telefone = Cliente.NormalizarTelefone(request.Telefone);
@@ -121,7 +136,8 @@ public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecu
         db.Pedidos.Add(pedido);
         await db.SaveChangesAsync(cancellationToken);
 
-        return new PedidoCriadoResponse(pedido.Id, pedido.Numero, pedido.Total, pedido.Status.ToString());
+        return new PedidoCriadoResponse(
+            pedido.Id, pedido.Numero, pedido.Total.Valor, pedido.Status.ToString());
     }
 
     /// <summary>

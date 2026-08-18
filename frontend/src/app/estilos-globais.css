@@ -16,11 +16,23 @@
   --carvao: #14100c;
   --cinza-quente: #9c8e7e;
 
+  /* A brasa da marca **para texto sobre fundo claro**.
+     Mesmo matiz (17,9°) e mesma saturação (100%) de `--laranja-brasa`, só mais escura:
+     `#FF6B2C` sobre o papel dá **2,22:1**, abaixo do mínimo de 3:1 até para texto grande.
+     Sobre carvão a brasa pura dá 7:1, e é por isso que a wordmark da barra escura funciona.
+     Esta derivada dá 4,20:1 no papel e 4,88:1 na superfície — CHAPA-10, §7.
+     A cor de MARCA não muda (o kit manda); esta é derivada dela, como os neutros. */
+  --brasa-texto: #c23a00;
+
   /* --- Neutros derivados: viés quente, nunca cinza puro --- */
   --papel: #ebe2d6;
   --papel-alto: #f8f3ec;
   --tinta: #14100c;
-  --tinta-fraca: #6b5f52;
+
+  /* Era #6b5f52, que dava 4,84:1 sobre o papel — o piso exato do AA, e desconfortável para
+     parágrafo inteiro. Agora 6,74:1 sobre o papel e 7,83:1 sobre a superfície, sem sair do
+     marrom quente da marca. Ver CHAPA-10. */
+  --tinta-fraca: #544a40;
 
   /* --- Papéis --- */
   --ground: var(--papel);
@@ -50,12 +62,41 @@
   /* --- Toque: 48px na operação, acima dos 44 do RNF-010. CHAPA-04 --- */
   --toque: 48px;
   --toque-admin: 44px;
+
+  /* --- Movimento: CHAPA-08, docs/08-design-system.md §9 ---
+
+         12px e não 40: a Chapa é traço de 2px e sombra sólida de 5px, e a sombra que não
+         desfoca denuncia cada quadro de um objeto viajando. Doze pixels é pouco mais que o
+         deslocamento da própria sombra — o cartão ASSENTA, não viaja.
+
+         A curva arranca e freia no fim. `ease-in-out` sai devagar e chega devagar, o que
+         parece elástico; peso é o nome da regra.
+
+         O teto do atraso existe porque `--mov-passo × 6` já passa de 400ms: o último cartão
+         de uma grade chegaria depois de o olho desistir dele. */
+  --mov-subida: 12px;
+  --mov-tempo: 320ms;
+  --mov-curva: cubic-bezier(0.16, 0.84, 0.44, 1);
+  --mov-passo: 70ms;
+  --mov-teto: 280ms;
+
+  /* Sobrescrito inline no escalonamento de irmãos; zero é o padrão. */
+  --mov-atraso: 0ms;
+}
+
+/* Prosa sobre carvão. `--creme` cheio, sem opacidade: `opacity` em texto é o jeito mais
+   comum de destruir contraste sem perceber, porque o valor não aparece em nenhuma
+   ferramenta de checagem — ela mede a cor declarada, não a composta. CHAPA-10. */
+:root {
+  --prosa-escura: var(--creme);
 }
 
 /* Escuro = cozinha. Claro = administrativo. Não é enfeite: são os dois
    ambientes reais do produto. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    /* Sobre carvao a brasa PURA da 7:1: o tom derivado seria escuro sobre escuro. */
+    --brasa-texto: var(--laranja-brasa);
     --ground: #0b0907;
     --surface: #191410;
     --surface-2: #241c16;
@@ -70,6 +111,8 @@
 }
 
 :root[data-theme="dark"] {
+  /* Sobre carvao a brasa PURA da 7:1: o tom derivado seria escuro sobre escuro. */
+  --brasa-texto: var(--laranja-brasa);
   --ground: #0b0907;
   --surface: #191410;
   --surface-2: #241c16;
@@ -142,9 +185,11 @@ code,
   color: var(--muted);
 }
 
+/* METADADO, não prosa — CHAPA-10. Para frase, use a cor do texto. */
 .secundario {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .tagline {
@@ -202,7 +247,27 @@ code,
   letter-spacing: -0.04em;
 }
 
+/* Por padrão a wordmark vive sobre fundo CLARO (login, troca de senha, cartões do painel,
+   rodapé da vitrine): usa a brasa derivada. Sobre carvão, a brasa pura — que ali dá 7:1. */
 .wordmark span {
+  color: var(--brasa-texto);
+}
+
+.barra-app .wordmark span,
+.barra-site .wordmark span,
+.capa-site .wordmark span,
+.faixa.escura .wordmark span,
+.faixa-cta .wordmark span {
+  color: var(--laranja-brasa);
+}
+
+/* O "Hub" dentro de um título de seção — mesma ligadura da marca, sem o peso da wordmark,
+   porque o `h2` já é `--peso`. */
+.marca-hub {
+  color: var(--brasa-texto);
+}
+
+.faixa.escura .marca-hub {
   color: var(--laranja-brasa);
 }
 
@@ -352,8 +417,10 @@ legend {
    SUPERFÍCIES
    ============================================================================ */
 
+/* CHAPA-11 — superfície declara fundo E cor. */
 .placa {
   background: var(--surface);
+  color: var(--text);
   border: var(--traco);
   box-shadow: var(--elev-2);
 }
@@ -396,8 +463,14 @@ legend {
    COMANDA — o objeto central. Desenhada como comanda impressa.
    ============================================================================ */
 
+/* ⚠ CHAPA-11 — `color` junto do `background`, e foi um bug de verdade que trouxe esta
+   linha: a capa da vitrine declara `color: var(--creme)` na seção, e a comanda, que
+   declarava só o fundo, herdava creme. Resultado: número do pedido, itens e total em
+   creme SOBRE papel creme — ilegíveis. Os trechos que continuaram legíveis eram os que
+   tinham cor própria (`.rotulo`, `.secundario`, `.obs`, todos `--muted`). */
 .comanda {
   background: var(--surface);
+  color: var(--text);
   border: var(--traco);
   box-shadow: var(--elev-2);
   display: flex;
@@ -412,6 +485,7 @@ legend {
 }
 
 .comanda-cab {
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -549,6 +623,15 @@ legend {
   border-color: var(--carvao);
 }
 
+/* Vazado: usado na administração de plataforma para "sem código ainda" e para a dependência
+   que falta (RN-GER-020). Fica AQUI e não na folha da vitrine porque quem o usa é
+   `/plataforma`, que não carrega `vitrine.css` — estava sem estilo por isso. */
+.selo[data-fase="planejado"] {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--muted);
+}
+
 /* ============================================================================
    PAINEL DO RESTAURANTE
    ============================================================================ */
@@ -667,6 +750,7 @@ table {
 }
 
 caption {
+  color: var(--text);
   font-family: var(--mono);
   font-size: 0.7rem;
   font-weight: 700;
@@ -696,6 +780,7 @@ td {
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
+  color: var(--text);
 }
 
 tbody tr:last-child td {
@@ -752,12 +837,226 @@ tr.apagado td {
   color: var(--muted);
 }
 
+/* ----------------------------------------------------------------------------
+   CADASTRO DO CARDÁPIO — SPEC-VEN-003
+   ---------------------------------------------------------------------------- */
+
+.cardapio-gestao {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.cardapio-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.grupo-gestao {
+  padding: 0;
+  overflow: hidden;
+}
+
+.grupo-cab {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface);
+  color: var(--text);
+  border-bottom: var(--traco);
+}
+
+.grupo-cab h3 {
+  font-family: var(--peso);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+/* A ordem é dado, e dado vai em mono com tabular-nums — CHAPA-04. */
+.ordem-grupo {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Empurra as ações para a direita, e elas embrulham juntas no celular. */
+.grupo-cab-acoes {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
+/*
+  Categoria escondida do cardápio (RN-VEN-043).
+
+  Fundo levemente rebaixado e NENHUMA opacidade sobre o texto: CHAPA-10 — o que apaga é a
+  superfície, nunca a legibilidade do dado. Quem precisa reativar a categoria precisa ler o nome
+  dela.
+*/
+.grupo-gestao.escondido .grupo-cab {
+  background: var(--surface-2);
+}
+
+.sem-produto {
+  padding: 0.85rem;
+}
+
+/*
+  Campo de moeda — o "R$" é moldura do campo, não conteúdo do valor.
+
+  Prefixo dentro do texto digitado obrigaria a máscara a preservá-lo a cada tecla, e o primeiro
+  `backspace` no começo da linha o apagaria. Aqui ele é irmão do `<input>` e não existe para o
+  teclado nem para o leitor de tela — o rótulo "Preço" já diz o que é.
+*/
+.campo-moeda {
+  display: flex;
+  align-items: stretch;
+  margin-top: 0.35rem;
+  border: var(--traco);
+  background: var(--surface);
+}
+
+.campo-moeda-prefixo {
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  border-right: var(--traco);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* Anula a borda e a margem do `label input` global: a moldura agora é do invólucro. */
+.campo-moeda input {
+  margin-top: 0;
+  border: none;
+  flex: 1;
+  min-width: 0;
+
+  /* Dado, e dado é mono com tabular-nums — CHAPA-03. Um preço em sans muda de largura a cada
+     dígito, e conferir a coluna de preços deixa de ser possível. */
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.linha-acoes {
+  display: flex;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+/*
+  A GRADE DO CARDÁPIO — larguras declaradas, não medidas pelo conteúdo.
+
+  Cada categoria é uma tabela própria (elas são seções independentes, com cabeçalho e ações
+  próprias). Tabela automática mede as colunas pelo que tem dentro, então "Lanches" — com
+  descrições longas — punha PREÇO num x e "Acompanhamentos" noutro. A página ficava desalinhada
+  de seção para seção, e preço é o dado que se confere descendo a coluna com o olho.
+
+  `table-layout: fixed` + `<colgroup>`: as tabelas viram a MESMA grade. O `min-width` da tabela
+  global continua garantindo a rolagem horizontal no celular em vez de esmagar as colunas.
+*/
+.tabela-cardapio {
+  table-layout: fixed;
+  min-width: 720px;
+}
+
+.tabela-cardapio .col-foto {
+  width: 132px;
+}
+
+.tabela-cardapio .col-preco {
+  width: 116px;
+}
+
+.tabela-cardapio .col-turno {
+  width: 108px;
+}
+
+.tabela-cardapio .col-acoes {
+  width: 216px;
+}
+
+/* Cabeçalho e conteúdo da coluna de ações no mesmo lado: cabeçalho à esquerda com botões à
+   direita é o desalinhamento mais visível de todos, porque o olho usa o rótulo como referência. */
+.tabela-cardapio .cel-acoes {
+  text-align: right;
+}
+
+.tabela-cardapio .cel-acoes .linha-acoes {
+  justify-content: flex-end;
+}
+
+/* `fixed` faz o texto vazar da célula em vez de alargá-la — a descrição do produto precisa
+   quebrar. */
+.tabela-cardapio td {
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+/*
+  A célula da foto: miniatura menor e botões na horizontal.
+
+  Empilhados, TROCAR e REMOVER dobravam a altura de TODA linha — 130 px para uma linha cujo
+  conteúdo é um nome e um preço. A operação lê esta tabela de cima a baixo; altura de linha é
+  quantidade de produto que cabe na tela.
+*/
+.cel-foto .envio-imagem {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+
+  /* A mensagem de erro do envio é irmã dos botões: sem `wrap` ela entraria na mesma linha e
+     esmagaria a miniatura. Com `wrap`, ela desce. */
+  flex-wrap: wrap;
+}
+
+.cel-foto .miniatura {
+  width: 56px;
+  height: 42px;
+  flex: none;
+}
+
+.cel-foto .envio-imagem-acoes {
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/*
+  Aqui o alvo de toque cai abaixo dos 44 px de `RNF-010`, e é decisão consciente: trocar foto é
+  operação de cadastro feita no computador, não no tablet no meio do serviço. Manter 44 px de
+  altura em dois botões empilhados devolveria a linha de 130 px que este bloco existe para
+  resolver. O alvo cheio continua onde a regra pede: pedido, comanda, disponibilidade.
+*/
+.cel-foto .envio-imagem .btn {
+  min-height: 26px;
+  padding: 0 0.45rem;
+  font-size: 0.62rem;
+  box-shadow: none;
+}
+
+/* A mensagem de erro do envio não pode alargar a coluna de 132 px. */
+.cel-foto .erro {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.4rem;
+}
+
 /* ============================================================================
    LINK PÚBLICO
    ============================================================================ */
 
 .painel-cartao {
   background: var(--surface);
+  color: var(--text);
   border: var(--traco);
   box-shadow: var(--elev-2);
   padding: 1.25rem;
@@ -881,6 +1180,7 @@ tr.apagado td {
   gap: 1rem;
   padding: 0.8rem;
   background: var(--surface);
+  color: var(--text);
   border: var(--traco);
   box-shadow: var(--elev-1);
 }
@@ -951,6 +1251,7 @@ tr.apagado td {
   position: sticky;
   top: 1.5rem;
   background: var(--surface);
+  color: var(--text);
   border: var(--traco);
   box-shadow: var(--elev-2);
   padding: 1.1rem;
@@ -1073,4 +1374,416 @@ tr.apagado td {
     transition: none !important;
     animation: none !important;
   }
+
+  /*
+    ⚠ E DESFAZ O ESTADO INICIAL DA REVELAÇÃO — design system §9.4.
+
+    Sem estas duas linhas, o `!important` acima mata a transição e o bloco fica parado no
+    `opacity: 0` em que nasceu: **conteúdo invisível para sempre**, para exatamente quem pediu
+    menos movimento. O interruptor de acessibilidade viraria a pior falha de acessibilidade
+    da página.
+  */
+  [data-revela] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================================
+   IMAGEM — RN-VEN-042 e RN-GER-026 · SPEC-VEN-002
+
+   `object-fit: cover` com proporção fixa: o restaurante envia a foto como
+   quer, e não redimensionamos (ADR-0015). Sem proporção fixa, uma foto
+   vertical estica a linha da tabela e a lista perde o ritmo.
+   ============================================================================ */
+
+.envio-imagem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.envio-imagem-acoes {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.envio-imagem .btn {
+  min-height: var(--toque-admin);
+  padding: 0 0.7rem;
+  font-size: 0.68rem;
+}
+
+.miniatura {
+  display: block;
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border: var(--traco);
+  box-shadow: var(--elev-1);
+  background: var(--surface-2);
+}
+
+/* Moldura vazia: diz "cabe uma imagem aqui" sem inventar ícone de ausência. */
+.miniatura.vazia {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* A logo no topo do cardápio público. Altura limitada: a capa é do NOME da casa, e uma
+   logo alta empurraria o cardápio para fora da primeira tela no celular. */
+.logo-casa {
+  display: block;
+  max-height: 88px;
+  max-width: 240px;
+  object-fit: contain;
+  border: var(--traco);
+  border-color: var(--cinza-quente);
+  background: var(--papel-alto);
+  padding: 0.4rem 0.6rem;
+}
+
+.prato-foto {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border: var(--traco);
+  align-self: stretch;
+}
+
+/* Linha de módulo na administração de plataforma — SPEC-GER-007. */
+.linha-modulo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.linha-modulo:last-child {
+  border-bottom: none;
+}
+
+/* ============================================================================
+   ACOMPANHAMENTO AO VIVO — o pedido do cliente se atualizando
+
+   CHAPA-06 — o sinal de "vivo" é a listra âmbar, não bolinha pulsando nem
+   emoji. CHAPA-08 — nada pisca: movimento tem massa, e um indicador que
+   pulsa a cada segundo é ruído numa tela que a pessoa fica olhando.
+   ============================================================================ */
+
+.ao-vivo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  padding-top: 0.7rem;
+  border-top: 2px dashed var(--rule);
+}
+
+.ao-vivo-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ao-vivo .btn {
+  min-height: var(--toque-admin);
+  padding: 0 0.7rem;
+  font-size: 0.68rem;
+  margin-left: auto;
+}
+
+.ao-vivo .secundario {
+  margin-left: auto;
+}
+
+.ao-vivo.encerrado {
+  margin: 0;
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   SESSÃO DE SUPORTE — RN-GER-015 · ADR-0013
+
+   A moldura muda de traço, não de cor de fundo: sessão aberta é estado
+   PERIGOSO (o suporte pode escrever no dado de um cliente), e fundo colorido
+   comemoraria o que devia incomodar. Traço âmbar cheio versus tracejado
+   apagado — CHAPA-02, uma barra âmbar por grupo.
+   ============================================================================ */
+
+.sessao-suporte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 2px dashed var(--rule);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sessao-suporte.aberta {
+  border: 2px solid var(--ambar-chama);
+  border-left-width: 6px;
+}
+
+.sessao-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sessao-suporte .btn {
+  align-self: flex-start;
+}
+
+/* `fieldset[disabled]` já apaga os controles; isto avisa que a seção inteira está
+   fora do ar, e não que cada campo por acaso desabilitou. */
+fieldset:disabled {
+  opacity: 0.55;
+}
+
+fieldset:disabled legend::after {
+  content: " — exige sessão de suporte";
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* ============================================================================
+   ALINHAMENTO DE COLUNA NUMÉRICA
+
+   `td.num` já ia à direita; o `th` ficava à esquerda, e o cabeçalho descolava
+   do número — que é justamente o caso em que a coluna existe para ser
+   comparada de cima a baixo.
+   ============================================================================ */
+
+th.num {
+  text-align: right;
+}
+
+/* A coluna numérica não deve esticar para preencher a sobra da tabela.
+   Esticada, o rótulo à direita fica a meia tela do número e PARECE desalinhado
+   sem estar — foi o que aconteceu com a coluna USUÁRIOS. `width: 1%` com
+   `white-space: nowrap` faz a coluna encolher até o conteúdo. */
+th.col-estreita,
+td.col-estreita {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* O `letter-spacing` do cabeçalho aplica espaço DEPOIS da última letra também, o
+   que deixa o rótulo ~2 px à esquerda do número. Compensa. */
+th.num {
+  padding-right: calc(0.85rem - 0.12em);
+}
+
+/* ============================================================================
+   FLUXO DA CASA — o suporte lendo o dia de um cliente (ADR-0013)
+   ============================================================================ */
+
+.fluxo-da-casa {
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.fluxo-da-casa .abas {
+  border-bottom: var(--traco);
+}
+
+.fluxo-conteudo {
+  padding: 0;
+}
+
+/* A tabela encosta na moldura: o filete da moldura já separa, e uma segunda
+   borda interna faria moldura dentro de moldura. */
+.fluxo-conteudo > .rolagem > table {
+  min-width: 560px;
+}
+
+.fluxo-da-casa > .nota {
+  margin: 0.9rem;
+}
+
+/* ============================================================================
+   ÍCONE EM BOTÃO — SVG inline (ADR-0012: sem webfont; CHAPA-06: sem emoji)
+
+   O `.btn` já é flex com gap, então o SVG só precisa não encolher e assentar
+   na linha do texto.
+   ============================================================================ */
+
+.btn > svg {
+  flex: none;
+  margin-right: -0.1rem;
+}
+
+/* ============================================================================
+   CHIPS DE FILTRO — a fase do pedido escolhida (CHAPA-02: uma âmbar por grupo)
+   ============================================================================ */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: var(--toque-admin);
+  padding: 0 0.75rem;
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Selecionado por PESO e cor de texto, não por fundo colorido: a cor de destaque
+   é da barra âmbar, e um chip pastel é o que CHAPA-05 recusa. */
+.chip[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: var(--elev-1);
+}
+
+/* ============================================================================
+   OPERAÇÃO DA CASA — pedidos por dia operacional (RN-GER-006)
+   ============================================================================ */
+
+.operacao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.operacao-filtros {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.operacao-filtros label {
+  flex: 1 1 180px;
+}
+
+/* ============================================================================
+   DETALHE DA CASA — o que vive atrás do olho
+   ============================================================================ */
+
+.detalhe-casa {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detalhe-casa > .abas {
+  margin: 0 -1.25rem;
+  border-top: var(--traco);
+  border-bottom: var(--traco);
+}
+
+.detalhe-casa .operacao {
+  margin: 0 -1.25rem -1.25rem;
+}
+
+/* Um `button` que precisa parecer link — a ação é de navegação, mas `<a>` sem `href`
+   não é focável por teclado e `<a href="#">` navega. O elemento certo é o botão. */
+button.link-discreto {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.35rem 0;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* ============================================================================
+   DIÁLOGO — substitui `confirm()` e `prompt()` do navegador
+
+   O `<dialog>` nativo entrega `::backdrop`, armadilha de foco, `Esc` e
+   `aria-modal`. O que a Chapa acrescenta é só a matéria: traço de 2 px, sombra
+   sólida deslocada, zero raio de desfoque, zero canto arredondado.
+   ============================================================================ */
+
+.dialogo {
+  max-width: 460px;
+  width: calc(100vw - 2.5rem);
+  padding: 1.25rem;
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  background: var(--surface);
+
+  /* CHAPA-11 — quem declara fundo declara cor. O `<dialog>` é filho do `<body>` no topo da
+     pilha, então não herda de seção nenhuma; a linha está aqui porque a regra é mecânica. */
+  color: var(--text);
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* Carvão sólido a 72%: escurece o que está atrás sem desfocar. `backdrop-filter` é o
+   glassmorphism que a §5 recusa. */
+.dialogo::backdrop {
+  background: rgb(20 16 12 / 0.72);
+}
+
+.dialogo-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.dialogo-cabecalho h2 {
+  font-family: var(--peso);
+  font-size: 1.15rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.dialogo-texto {
+  font-size: 0.95rem;
+  line-height: 1.55;
+
+  /* CHAPA-10 — é prosa, e prosa não usa a cor secundária. */
+  color: var(--text);
+}
+
+/*
+  Campos próprios do diálogo — o formulário de categoria e de produto (SPEC-VEN-003).
+
+  O diálogo cresce e rola em vez de vazar da tela: quatro campos mais um texto de apoio passam da
+  altura do celular deitado, e `max-height` na `.dialogo` sem rolagem aqui cortaria o botão de
+  confirmar — o botão que a pessoa veio apertar.
+*/
+.dialogo-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.dialogo-acoes {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.2rem;
+}
+
+/* A ação de confirmar ocupa o resto: é o alvo maior, e fica à direita, onde o polegar
+   termina a leitura. */
+.dialogo-acoes .btn:last-child {
+  flex: 1;
 }

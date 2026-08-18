@@ -14,7 +14,7 @@ public sealed class ItemPedido : Entidade, IPertenceAUnidade
         Guid pedidoId,
         Guid produtoId,
         string nomeProduto,
-        decimal precoPraticado,
+        Dinheiro precoPraticado,
         int quantidade,
         string? observacao)
     {
@@ -25,7 +25,7 @@ public sealed class ItemPedido : Entidade, IPertenceAUnidade
                 "RN-VEN-011 — a quantidade deve ser maior que zero.");
         }
 
-        if (precoPraticado < 0)
+        if (precoPraticado.Valor < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(precoPraticado), precoPraticado,
@@ -36,7 +36,7 @@ public sealed class ItemPedido : Entidade, IPertenceAUnidade
         PedidoId = pedidoId;
         ProdutoId = produtoId;
         NomeProduto = nomeProduto;
-        PrecoPraticado = Math.Round(precoPraticado, 2, MidpointRounding.AwayFromZero);
+        PrecoPraticado = precoPraticado;
         Quantidade = quantidade;
         Observacao = observacao?.Trim();
     }
@@ -49,7 +49,7 @@ public sealed class ItemPedido : Entidade, IPertenceAUnidade
     /// <c>RN-VEN-008</c> ⚠ — <b>cópia</b> do preço no momento da venda. Não muda se o preço
     /// de tabela do produto for alterado depois.
     /// </summary>
-    public decimal PrecoPraticado { get; private set; }
+    public Dinheiro PrecoPraticado { get; private set; }
 
     /// <summary>
     /// Nome do produto no momento da venda, também congelado.
@@ -60,11 +60,22 @@ public sealed class ItemPedido : Entidade, IPertenceAUnidade
     /// </summary>
     public string NomeProduto { get; private set; } = null!;
 
+    /// <summary>
+    /// <c>RN-VEN-011</c> — inteiro, e não <see cref="Common.Quantidade"/>: são dois lanches,
+    /// não 2,0000 lanches. Insumo se mede em quatro casas; produto vendido se conta.
+    /// </summary>
     public int Quantidade { get; private set; }
     public string? Observacao { get; private set; }
 
-    /// <summary><c>RN-VEN-009</c> — quantidade × preço praticado. Coluna gerada no banco.</summary>
-    public decimal Total => PrecoPraticado * Quantidade;
+    /// <summary>
+    /// <c>RN-VEN-009</c> — quantidade × preço praticado.
+    /// <para>
+    /// Calculado no domínio, não coluna gerada — dívida declarada na §8 de
+    /// <c>SPEC-VEN-001</c>, que resolve na onda 4, quando ajustes e desconto mudam a fórmula
+    /// (<c>RN-VEN-028</c>).
+    /// </para>
+    /// </summary>
+    public Dinheiro Total => PrecoPraticado * Quantidade;
 
     public Pedido? Pedido { get; private set; }
 }

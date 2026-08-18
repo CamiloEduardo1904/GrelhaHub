@@ -1,11 +1,17 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
 import { mensagemDeErro } from '../../services/api';
-import { autenticar } from './sessao';
+import { autenticar, lerSessao } from './sessao';
 
 export function Entrar() {
   const navegar = useNavigate();
+
+  // Quem já tem sessão vai direto ao painel. Antes da vitrine, `/` redirecionava para
+  // `/painel` e isto era resolvido pelo roteador; agora `/` é a página pública, e sem esta
+  // checagem quem já está logado teria de digitar a senha de novo para entrar pelo domínio.
+  const [sessaoExistente] = useState(lerSessao);
+
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -17,8 +23,17 @@ export function Entrar() {
     setEnviando(true);
 
     try {
-      await autenticar(email, senha);
-      navegar('/painel');
+      const sessao = await autenticar(email, senha);
+
+      // RF-SEG-005 antes de tudo: com a troca pendente, o pipeline recusa todas as outras rotas.
+      if (sessao.deveTrocarSenha) {
+        navegar('/trocar-senha');
+        return;
+      }
+
+      // RN-GER-014 — o usuário de plataforma não tem unidade, e `/painel` pressupõe uma. Mandá-lo
+      // para lá renderizaria um painel sem restaurante, que parece defeito.
+      navegar(sessao.ehPlataforma ? '/plataforma' : '/painel');
     } catch (e) {
       // ADR-0009 — a mensagem vem do servidor. O back devolve a mesma resposta
       // para senha errada e usuário inativo, de propósito.
@@ -26,6 +41,14 @@ export function Entrar() {
     } finally {
       setEnviando(false);
     }
+  }
+
+  if (sessaoExistente) {
+    if (sessaoExistente.deveTrocarSenha) {
+      return <Navigate to="/trocar-senha" replace />;
+    }
+
+    return <Navigate to={sessaoExistente.ehPlataforma ? '/plataforma' : '/painel'} replace />;
   }
 
   return (
@@ -66,10 +89,7 @@ export function Entrar() {
         <button type="submit" className="btn bloco" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
-
-        <p className="rodape-form">
-          Ainda não tem conta? <Link to="/cadastrar">Cadastre seu restaurante</Link>
-        </p>
+        {/* Sem "criar conta": a conta do restaurante e criada pela plataforma, com o contrato. */}
       </form>
     </div>
   );

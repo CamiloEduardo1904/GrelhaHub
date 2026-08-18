@@ -25,7 +25,7 @@
 
 | Documento | O que contém | Quando muda |
 |-----------|--------------|-------------|
-| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **138 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
+| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **166 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
 | [04 — Parâmetros do sistema](04-parametros-do-sistema.md) | Valores configuráveis da operação (`PAR-*`) | Quando surge valor comercial configurável |
 
 > **Regra de ouro:** regra de negócio mora **só** no catálogo. Se você encontrar uma regra
@@ -51,7 +51,7 @@
 
 | Diretório | O que contém |
 |-----------|--------------|
-| [`adr/`](adr/) | 12 Architecture Decision Records + decisões em aberto |
+| [`adr/`](adr/) | 14 Architecture Decision Records + decisões em aberto |
 | [`design/`](design/) | Propostas de design navegáveis. Abra o HTML direto no navegador |
 | [`specs/`](specs/) | Specs de implementação. [Template](specs/_template.md) |
 
@@ -85,10 +85,15 @@
 
 | Item | Situação |
 |------|----------|
-| Regras catalogadas | **138** — 134 em `HIP` (hipótese), 4 em `DEC` (decisão de produto) |
+| Regras catalogadas | **159** — 140 em `HIP`, 19 em `DEC` (decisão de produto), das quais 6 com origem `IMP` |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco. Risco RS5 |
-| ADRs | 12 aceitos, 4 decisões em aberto |
-| Specs escritas | **6** — onda 0 completa (`PRONTA`) + `SPEC-VEN-001` (fatia vertical, em implementação) |
+| ADRs | **15 aceitos**, 4 decisões em aberto. **ADR-0013 revisa o ADR-0005**; ADR-0015 decide o armazenamento de imagem |
+| Specs | **9 — todas `ENTREGUE`.** `GER-001` a `007` (onda 0), `VEN-001` (fatia vertical) e `VEN-002` (imagem) |
+| Cobertura de regra por spec | **44 de 159** — `RN-EST-021` a `023` têm regra escrita e código pendente (onda 3) |
+| Código entregue | Fatia vertical (`SPEC-VEN-001`) + **onda 0 completa**: unidade e convenções, dia operacional, parâmetros com vigência, usuários e permissões, trilha de auditoria, módulos por unidade. **40 regras com o ID citado em teste** |
+| Testes | **240 verdes** — 65 de domínio + 7 de aplicação + 168 de integração contra PostgreSQL real (Testcontainers, exige Docker) |
+| Gates | `dotnet build -c Release`, `dotnet test`, `npm run lint` e `npm run build` — **todos limpos** |
+| Vitrine pública | ✔ `/` em `grelhahub.com` — design system §8, regra `CHAPA-09` |
 | Sprint | 1 & 2 — documentação entregue; falta entrevista e anexos |
 
 ### Bloqueadores para começar a modelar

@@ -14,7 +14,7 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0002](0002-clean-architecture-com-cqrs.md) | Clean Architecture com CQRS via MediatR | Aceito |
 | [0003](0003-frontend-e-backend-desacoplados.md) | Frontend e backend desacoplados (REST + JWT) | Aceito |
 | [0004](0004-postgresql-como-sgbd.md) | PostgreSQL como SGBD | Aceito |
-| [0005](0005-multi-estabelecimento-por-coluna-discriminadora.md) | Multi-unidade por coluna discriminadora | Aceito |
+| [0005](0005-multi-estabelecimento-por-coluna-discriminadora.md) | Multi-unidade por coluna discriminadora | Aceito — **revisado pelo ADR-0013** |
 | [0006](0006-deploy-em-vps-unica-com-docker.md) | Deploy em VPS única com Docker | Aceito — revisado: Traefik é a borda |
 | [0007](0007-core-generico-com-nicho-por-configuracao.md) | Core genérico com nicho por configuração | Aceito |
 | [0008](0008-estoque-como-livro-razao.md) | Estoque como livro-razão de movimentos | Aceito — revisado na consolidação |
@@ -22,6 +22,9 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0010](0010-custeio-por-lote-com-fefo.md) | Custeio específico por lote com consumo FEFO | Aceito |
 | [0011](0011-dia-operacional.md) | Dia operacional como dimensão do modelo | Aceito |
 | [0012](0012-direcao-visual-chapa.md) | Direção visual **Chapa** — base da interface | Aceito |
+| [0013](0013-acesso-de-plataforma.md) ⚠⚠ | Acesso de plataforma: o suporte enxerga todas as unidades | Aceito — **revisa o ADR-0005** |
+| [0014](0014-modularidade-comercial.md) | Modularidade comercial: módulo habilitado por unidade | Aceito |
+| [0015](0015-armazenamento-de-imagem.md) | Imagem em volume de disco, servida pelo Nginx — não `bytea`, não objeto remoto | Aceito |
 
 ## Decisões ainda em aberto
 

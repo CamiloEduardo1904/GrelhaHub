@@ -4,7 +4,7 @@
 |-------|-------|
 | ID | `SPEC-GER-001-unidade-e-convencoes-do-modelo` |
 | Módulo | GER |
-| Situação | `PRONTA` |
+| Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | 0 — fundação |
 | Regras implementadas | `RN-GER-009` ⚠, `RN-GER-002`, `RN-GER-003`, `RN-GER-004`, `RN-GER-005` |
 | ADRs aplicáveis | [ADR-0004](../adr/0004-postgresql-como-sgbd.md), [ADR-0005](../adr/0005-multi-estabelecimento-por-coluna-discriminadora.md), [ADR-0009](../adr/0009-onde-as-regras-de-negocio-vivem.md) |
@@ -39,6 +39,11 @@ A unidade não tem CRUD exposto no MVP: existe uma única unidade, criada pela c
 (premissa P4). A API expõe apenas a consulta.
 
 ### `ObterUnidadeAtualQuery`
+
+> **Entregue por `ObterMeuRestauranteQuery`**, de `SPEC-VEN-001`, e não por uma consulta nova.
+> Ela já devolve `id`, `razaoSocial`, `nomeFantasia` e `cnpj` a partir do token; `fusoHorario`
+> foi acrescentado ao contrato para fechar esta seção. Uma segunda consulta com os mesmos
+> campos seria duplicação, e duas leituras da mesma entidade divergem com o tempo.
 
 **Entrada:** nenhuma — a unidade vem do token (`IContextoDeExecucao.UnidadeId`).
 
@@ -78,6 +83,32 @@ configuração de entidade precise repeti-las:
 > **Dinheiro e quantidade são value objects, não `decimal` cru.** Um `decimal` solto não
 > distingue R$ 12,00 de 12 gramas, e o compilador não impede somar os dois. Com tipos
 > distintos, a precisão certa é aplicada por convenção e a confusão vira erro de compilação.
+
+**Não existe convenção para `decimal` cru, e a ausência é deliberada.** Uma regra geral
+`Properties<decimal>().HavePrecision(12, 2)` parece prudente e é a armadilha: a primeira
+quantidade de insumo declarada como `decimal` herdaria duas casas e `0,1563` seria gravado
+como `0,16` **sem erro nenhum**. Quem tentar usar `decimal` cru é barrado por
+`GrelhaHubDbContext.GarantirAusenciaDeDecimalCru`, que **recusa o modelo na partida** e diz
+qual propriedade corrigir.
+
+### Custo descoberto na implementação — projeção em memória
+
+O EF Core **não traduz acesso a membro de propriedade com conversor de valor**:
+`p.Preco.Valor` dentro de uma árvore de expressão não vira SQL, e `Sum(i => i.PrecoPraticado *
+i.Quantidade)` não compila para consulta.
+
+Consequência assumida: as quatro consultas de leitura filtram e ordenam no banco, mas montam
+o DTO **em memória**. Os contratos de API seguem em `decimal` — value object é conceito de
+domínio, não formato de fio.
+
+Isso teve um efeito colateral bom: o total do pedido saía de um `Sum` na consulta, uma
+**segunda definição** de `RN-VEN-039` que divergiria de `Pedido.Total` no dia em que taxa de
+serviço entrasse na fórmula. Agora as duas consultas carregam o agregado e usam
+`Pedido.Total` — a regra tem um lugar só.
+
+Para o volume atual — o cardápio de um restaurante, os pedidos de um dia operacional — a
+diferença é irrelevante. A onda 9 (analítico) não vai por aqui: usa view e projeção
+dedicadas, que é o mecanismo `VW` já previsto no catálogo.
 
 ### Filtro global de unidade
 
@@ -154,15 +185,19 @@ CREATE TABLE unidade (
     cnpj           varchar(14)  NOT NULL,
     fuso_horario   varchar(50)  NOT NULL DEFAULT 'America/Sao_Paulo',
     ativa          boolean      NOT NULL DEFAULT true,
-    criado_em      timestamptz  NOT NULL,
+    dh_criacao     timestamptz  NOT NULL,
 
-    CONSTRAINT uq_unidade_cnpj    UNIQUE (cnpj),
-    CONSTRAINT ck_unidade_cnpj    CHECK (cnpj ~ '^[0-9]{14}$'),
-    CONSTRAINT ck_unidade_r_social CHECK (length(trim(razao_social)) > 0)
+    CONSTRAINT uq_unidade_cnpj         UNIQUE (cnpj),
+    CONSTRAINT uq_unidade_slug         UNIQUE (slug),
+    CONSTRAINT ck_unidade_cnpj         CHECK (cnpj ~ '^[0-9]{14}$'),
+    CONSTRAINT ck_unidade_slug         CHECK (slug ~ '^[a-z0-9-]{3,60}$'),
+    CONSTRAINT ck_unidade_razao_social CHECK (length(trim(razao_social)) > 0)
 );
 ```
 
-**Migration necessária:** sim — `0001_Fundacao`.
+**Migrations:** `Fundacao` criou a tabela; `ConvencoesDoModelo` acrescentou
+`ck_unidade_razao_social` e os `DEFAULT` de `ativa` e `fuso_horario`. O nome da coluna de
+criação é `dh_criacao`, e não `criado_em` — convenção seguida por todas as tabelas.
 
 **Padrão para as tabelas seguintes:**
 
@@ -190,22 +225,45 @@ Nenhum.
 
 | Artefato | Caminho |
 |----------|---------|
-| Entidade | `src/GrelhaHub.Domain/Gerais/Unidade.cs` |
-| Value objects | `src/GrelhaHub.Domain/Common/Dinheiro.cs`, `Quantidade.cs` |
-| Marcadores | `src/GrelhaHub.Domain/Common/Entidade.cs` |
-| Configuração EF | `src/GrelhaHub.Infrastructure/Persistence/Configurations/UnidadeConfiguration.cs` |
-| Convenções | `src/GrelhaHub.Infrastructure/Persistence/GrelhaHubDbContext.cs` |
-| Interceptor | `src/GrelhaHub.Infrastructure/Persistence/Interceptors/UnidadeInterceptor.cs` |
-| Migration | `src/GrelhaHub.Infrastructure/Persistence/Migrations/0001_Fundacao` |
-| Testes | `tests/GrelhaHub.Domain.Tests/Common/`, `tests/GrelhaHub.Integration.Tests/Gerais/` |
+| Entidade | `src/GrelhaHub.Domain/Gerais/Unidade.cs` ✔ |
+| Value objects | `src/GrelhaHub.Domain/Common/Dinheiro.cs`, `Quantidade.cs` ✔ |
+| Marcadores | `src/GrelhaHub.Domain/Common/Entidade.cs` ✔ |
+| Configuração EF | `src/GrelhaHub.Infrastructure/Persistence/Configurations/ConfiguracoesDoModelo.cs` ✔ |
+| Conversores | `src/GrelhaHub.Infrastructure/Persistence/Conversores.cs` ✔ |
+| Convenções de tipo | `src/GrelhaHub.Infrastructure/Persistence/ConvencoesDeTipo.cs` ✔ — em ponto próprio para poder ser testada sem tabela que a use |
+| Convenções e guarda | `src/GrelhaHub.Infrastructure/Persistence/GrelhaHubDbContext.cs` ✔ |
+| Interceptor | `src/GrelhaHub.Infrastructure/Persistence/Interceptors/InterceptorDeUnidade.cs` ✔ |
+| Migrations | `Migrations/20260817051948_Fundacao`, `Migrations/20260817152502_ConvencoesDoModelo` ✔ |
+| Testes de domínio | `tests/GrelhaHub.Domain.Tests/Common/DinheiroTests.cs`, `QuantidadeTests.cs` ✔ (16 casos) |
+| Testes de integração | `tests/GrelhaHub.Integration.Tests/Gerais/ConvencoesDoModeloTests.cs` ✔ (8 casos), `PrecisaoDeQuantidadeTests.cs` ✔ (3 casos, CA-4) |
 
 ## 10. Definição de pronto
 
-- [ ] `unidade` criada com todas as constraints da §6
-- [ ] Convenções de tipo aplicadas no `DbContext`, não repetidas por entidade
-- [ ] Filtro global ativo e coberto por teste de integração (CA-2)
-- [ ] Interceptor preenchendo `unidade_id`
-- [ ] Um teste por regra, com o ID no `DisplayName`
-- [ ] CA-1 a CA-6 passando como teste de integração contra PostgreSQL real
-- [ ] Rastreabilidade do [catálogo §16](../03-catalogo-de-regras-de-negocio.md#16-rastreabilidade-regra--spec) atualizada
-- [ ] `dotnet build -c Release` e `dotnet test` verdes
+- [x] `unidade` criada com todas as constraints da §6
+- [x] Convenções de tipo aplicadas no `DbContext`, não repetidas por entidade
+- [x] Filtro global ativo e coberto por teste de integração (CA-2) — inclui contagem e busca
+      direta, não só listagem: é onde um filtro aplicado na consulta errada deixaria vazar
+- [x] Interceptor preenchendo `unidade_id`, **e um teste que prova que a API o registra** —
+      nenhum fluxo atual cria entidade sem unidade, então sem essa asserção a fiação poderia
+      ser removida sem nenhum teste ficar vermelho
+- [x] Um teste por regra, com o ID no `DisplayName`
+- [x] **CA-1 a CA-6** passando como teste de integração contra PostgreSQL real
+- [x] **CA-4 fechado sem esperar a onda 2.** Nenhuma tabela tem coluna de quantidade ainda, mas
+      a convenção é verificável sem ela: `PrecisaoDeQuantidadeTests` **deriva a DDL do próprio
+      modelo** — lê a precisão e a escala que `ConvencoesDeTipo` atribui a uma propriedade
+      `Quantidade`, cria a coluna com esses valores e grava `0,15625`. Com quatro casas o valor
+      sobrevive como `0,1563`; se alguém trocar a convenção para a precisão do dinheiro, a
+      coluna nasce `numeric(12,2)`, o PostgreSQL devolve `0,16` e o teste fica vermelho.
+      É a convenção sob teste, não uma constante repetida no teste
+- [x] Rastreabilidade do [catálogo §16](../03-catalogo-de-regras-de-negocio.md#16-rastreabilidade-regra--spec) atualizada
+- [x] `dotnet build -c Release` e `dotnet test` verdes — **73 testes**: 42 de domínio, 31 de integração
+
+> **Verificado por mutação — 17/08/2026.** Trocar a convenção de quantidade para a precisão do
+> dinheiro faz dois testes falharem com a mensagem exata do modo de falha que `RN-GER-004`
+> existe para impedir: *"Expected gravado to be 0.1563M ... but found 0.16M"*. E remover o
+> registro do interceptor em `AdicionarInfrastructure` derruba
+> `CA1_OInterceptorEstaLigadoNaApi`. As duas asserções que mais importam nesta spec têm dentes.
+>
+> Além do CA-4, o modelo **recusa** na partida qualquer propriedade mapeada como `decimal` cru
+> (`GarantirAusenciaDeDecimalCru`): em vez de testar que uma coluna está certa, impede a classe
+> de erro.

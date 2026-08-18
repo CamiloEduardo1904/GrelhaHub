@@ -4,7 +4,7 @@
 |-------|-------|
 | ID | `SPEC-GER-002-dia-operacional` |
 | Módulo | GER |
-| Situação | `PRONTA` |
+| Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | 0 — fundação |
 | Regras implementadas | `RN-GER-006` ⚠⚠ |
 | ADRs aplicáveis | [ADR-0011](../adr/0011-dia-operacional.md), [ADR-0009](../adr/0009-onde-as-regras-de-negocio-vivem.md) |
@@ -159,11 +159,31 @@ casos em que o instante importa e o dia não.
 
 | Objeto | Operação | Observação |
 |--------|:--------:|------------|
-| `dim_tempo` | criação | View materializada, `REFRESH` diário e após carga |
+| `dim_tempo` | criação | View materializada, uma linha por dia operacional |
 | Demais tabelas | alteração | Coluna gerada + índice, acrescentados por cada spec que criar a tabela |
 
-**Migration necessária:** sim — `0001_Fundacao` cria `dim_tempo` e a função auxiliar; cada
-spec seguinte acrescenta a coluna à sua tabela.
+**Migrations:** `Fundacao` criou a coluna gerada em `pedido`; `DimensaoTempo` criou a view
+materializada. Cada spec seguinte acrescenta a coluna à sua própria tabela.
+
+### Correção de desenho — `REFRESH` não é diário
+
+A versão anterior desta spec previa `REFRESH` diário. **Não é necessário, e o motivo importa:**
+o intervalo de `dim_tempo` é **fixo** (2024-2040) na definição da view. Uma definição que
+dependesse de `now()` mudaria de conteúdo a cada refresh — e faria o teste de um dia específico
+depender da data em que roda.
+
+`REFRESH` só é preciso quando a **definição** muda: estender o intervalo ou alterar a hora de
+virada. As duas coisas são migration, não rotina. O índice `UNIQUE` existe para que, quando
+acontecer, o `REFRESH MATERIALIZED VIEW CONCURRENTLY` não bloqueie quem estiver lendo — e há
+teste que prova que ele é aceito.
+
+### `fim_utc` é EXCLUSIVO
+
+O filtro correto é `dh_criacao >= inicio_utc AND dh_criacao < fim_utc`.
+
+Limite exclusivo de propósito: um `fim_utc` inclusivo obrigaria a escolher entre `03:59:59` e
+`03:59:59.999999`, e a venda registrada na fração restante desapareceria da apuração sem
+ninguém notar — o mesmo modo de falha silenciosa que `RN-GER-006` existe para evitar.
 
 ## 7. Parâmetros consumidos
 
@@ -185,16 +205,33 @@ spec seguinte acrescenta a coluna à sua tabela.
 | Marcador | `IPossuiDiaOperacional` em `src/GrelhaHub.Domain/Common/Entidade.cs` ✔ |
 | Serviço | `src/GrelhaHub.Infrastructure/Services/Relogio.cs` ✔ |
 | `dim_tempo` | `src/GrelhaHub.Infrastructure/Persistence/Migrations/0001_Fundacao` |
-| Teste unitário | `tests/GrelhaHub.Domain.Tests/Gerais/DiaOperacionalTests.cs` ✔ (5 casos) |
-| Teste de paridade | `tests/GrelhaHub.Integration.Tests/Gerais/DiaOperacionalParidadeTests.cs` (CA-4) |
+| Teste unitário | `tests/GrelhaHub.Domain.Tests/Gerais/DiaOperacionalTests.cs` ✔ (4 casos) |
+| Teste de paridade | `tests/GrelhaHub.Integration.Tests/Gerais/DiaOperacionalParidadeTests.cs` ✔ (CA-2, CA-3, CA-4, CA-5) |
+| `dim_tempo` | `src/GrelhaHub.Infrastructure/Persistence/Migrations/20260817162232_DimensaoTempo.cs` ✔ |
+| Teste da dimensão | `tests/GrelhaHub.Integration.Tests/Gerais/DimensaoTempoTests.cs` ✔ (11 casos) |
+| Harness de integração | `tests/GrelhaHub.Integration.Tests/Infraestrutura/` ✔ |
 
 ## 10. Definição de pronto
 
 - [x] Cálculo no domínio, testável sem banco
 - [x] Testes unitários cobrindo madrugada, virada e limites
-- [ ] Coluna gerada e índice na migration de fundação
-- [ ] `dim_tempo` criada com `inicio_utc` e `fim_utc`
-- [ ] **CA-4 — teste de paridade C# × PostgreSQL passando nas 96 amostras do dia**
-- [ ] CA-5 — teste com data de horário de verão
-- [ ] Rastreabilidade do catálogo §16 atualizada
-- [ ] `dotnet build -c Release` e `dotnet test` verdes
+- [x] Coluna gerada e índice **em `pedido`** — a única tabela de evento que existe até agora.
+      As demais recebem a coluna conforme cada spec as criar
+- [x] `dim_tempo` criada com `inicio_utc` e `fim_utc` — migration `DimensaoTempo`, 6.210 dias
+      (2024-2040), índice `UNIQUE` para permitir `REFRESH ... CONCURRENTLY`
+- [x] **CA-4 — teste de paridade C# × PostgreSQL passando nas 96 amostras do dia**
+- [x] CA-2 — a virada às 04h00 conferida contra a coluna gerada
+- [x] CA-3 — o banco recusa escrita da aplicação em `data_operacional`
+- [x] CA-5 — teste com data de horário de verão (10/02/2018, deslocamento −02:00)
+- [x] Rastreabilidade do catálogo §16 atualizada
+- [x] `dotnet build -c Release` e `dotnet test` verdes — **84 testes**: 42 de domínio, 42 de integração
+
+> **O teste que decide se a dimensão presta** é o de coerência com a coluna gerada: instantes
+> nas duas bordas de `[inicio_utc, fim_utc)` têm de cair no mesmo `data_operacional`, e o
+> instante exatamente em `fim_utc` no dia seguinte. Se dimensão e coluna discordarem, relatório
+> e fechamento de caixa passam a contar coisas diferentes — sem erro, com números plausíveis.
+
+> **A paridade tem dentes — verificado por mutação em 17/08/2026.** Trocar a hora de virada de
+> 04h para 05h **apenas no C#** faz o teste falhar apontando o instante exato da divergência
+> (`2026-08-15 07:00Z → aplicação 2026-08-14, banco 2026-08-15`). É essa checagem que impede o
+> modo de falha da `RN-GER-006`: não dar erro, e devolver um número plausível.

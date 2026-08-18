@@ -2,6 +2,8 @@ using GrelhaHub.Application.Common.Exceptions;
 using GrelhaHub.Application.Common.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using GrelhaHub.Application.Common.Modulos;
+using GrelhaHub.Domain.Gerais;
 
 namespace GrelhaHub.Application.Features.Cardapio.AlternarDisponibilidade;
 
@@ -12,6 +14,8 @@ namespace GrelhaHub.Application.Features.Cardapio.AlternarDisponibilidade;
 /// permanece no histórico. Isto aqui é temporário e do dia a dia.
 /// </para>
 /// </summary>
+[ExigeModulo(CodigoDeModulo.Vendas)]
+[ExigePermissao("cardapio.gerenciar")]
 public sealed record AlternarDisponibilidadeCommand(Guid ProdutoId, bool Disponivel) : IRequest;
 
 public sealed class AlternarDisponibilidadeHandler(IAppDbContext db)

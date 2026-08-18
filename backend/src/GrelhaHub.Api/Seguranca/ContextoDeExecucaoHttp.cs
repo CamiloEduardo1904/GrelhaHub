@@ -49,12 +49,47 @@ public sealed class ContextoDeExecucaoHttp(IHttpContextAccessor acessor) : ICont
         }
     }
 
-    /// <summary><c>RN-GER-012</c> — custo, CMV e margem só para perfis de gerência.</summary>
-    public bool PodeVerCusto => EhGerencia;
+    /// <summary>
+    /// <c>RN-GER-010</c> — permissoes do token, uma claim por codigo.
+    /// <para>
+    /// A versao anterior derivava autorizacao do NOME do perfil (IsInRole("Gerente")), e era o
+    /// que a regra proibe: criar o perfil Operador (RN-GER-022) exigiria cacar cada condicional.
+    /// </para>
+    /// </summary>
+    public IReadOnlySet<string> Permissoes =>
+        _permissoes ??= Usuario?.FindAll(ClaimPermissao)
+            .Select(claim => claim.Value)
+            .ToHashSet(StringComparer.Ordinal)
+            ?? [];
 
-    public bool EhGerencia =>
-        Usuario?.IsInRole(nameof(PerfilUsuario.Administrador)) == true ||
-        Usuario?.IsInRole(nameof(PerfilUsuario.Gerente)) == true;
+    private HashSet<string>? _permissoes;
+
+    /// <summary><c>RN-GER-010</c> — o usuario de plataforma opera acima das permissoes de unidade.</summary>
+    public bool Pode(string permissao) => EhPlataforma || Permissoes.Contains(permissao);
+
+    /// <summary><c>RN-GER-012</c> — custo, CMV e margem so saem do servidor com esta permissao.</summary>
+    public bool PodeVerCusto => Pode(PermissaoDeCusto);
+
+    public const string PermissaoDeCusto = "custo.visualizar";
+
+    /// <summary>Precisa casar com GeradorDeTokenJwt.ClaimPermissao.</summary>
+    public const string ClaimPermissao = "permissao";
+
+    /// <summary><c>RF-SEG-005</c> — vem do token, emitido no login.</summary>
+    public bool DeveTrocarSenha =>
+        string.Equals(Usuario?.FindFirstValue(ClaimTrocarSenha), "true", StringComparison.Ordinal);
+
+    public const string ClaimTrocarSenha = "trocar_senha";
+
+    /// <summary>
+    /// <c>RN-GER-014</c> — vem de UMA claim (<c>plataforma</c>), emitida só para usuário de
+    /// plataforma. É o único ponto de onde o desligamento do filtro global pode nascer.
+    /// </summary>
+    public bool EhPlataforma =>
+        string.Equals(Usuario?.FindFirstValue(ClaimPlataforma), "true", StringComparison.Ordinal);
+
+    /// <summary>Nome da claim, para que emissor e leitor não divirjam por literal repetido.</summary>
+    public const string ClaimPlataforma = "plataforma";
 
     public void DefinirUnidadePublica(Guid unidadeId)
     {

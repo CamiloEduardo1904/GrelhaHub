@@ -35,11 +35,60 @@ public sealed class Unidade : Entidade
     public string Slug { get; private set; } = null!;
 
     public string? Telefone { get; private set; }
+    /// <summary>
+    /// <c>RN-GER-029</c> — a unidade está operando.
+    /// <para>
+    /// ⚠ <b>Esta propriedade existiu com <c>private set</c> e sem nenhum método por três specs.</b>
+    /// <c>Autenticar</c> já a consultava (<c>RN-GER-027</c>), então o bloqueio de acesso estava
+    /// pronto e era <b>inalcançável</b>: não havia como inativar. Comportamento correto e sem
+    /// caminho é indistinguível de comportamento ausente.
+    /// </para>
+    /// </summary>
     public bool Ativa { get; private set; } = true;
+
+    /// <summary>
+    /// <c>RN-GER-029</c> — para a operação da unidade. <b>Não apaga nada</b>
+    /// (<c>RN-GER-002</c>): o cardápio público para de responder, os usuários param de autenticar
+    /// (<c>RN-GER-027</c>) e todo o histórico permanece.
+    /// </summary>
+    public void Inativar() => Ativa = false;
+
+    /// <summary>
+    /// <c>RN-GER-029</c> — devolve o acesso. Não restaura nada, porque nada foi removido.
+    /// </summary>
+    public void Reativar() => Ativa = true;
     public DateTimeOffset CriadoEm { get; private set; }
 
     /// <summary><c>RN-GER-005</c> — a operação ocorre neste fuso.</summary>
     public string FusoHorario { get; private set; } = "America/Sao_Paulo";
+
+    /// <summary>
+    /// <c>RN-GER-026</c> — o caminho da logomarca, exibida no cardápio público
+    /// (<c>RN-VEN-037</c>).
+    /// <para>
+    /// <b>Nula é estado válido:</b> unidade sem logo exibe o nome fantasia. A ausência não é erro
+    /// a ser corrigido com imagem genérica — placeholder de "sem logo" numa vitrine de
+    /// restaurante é pior do que o nome escrito.
+    /// </para>
+    /// </summary>
+    public string? UrlLogo { get; private set; }
+
+    /// <summary>
+    /// <c>RN-GER-026</c> — aponta para a logo nova. <b>Não apaga a anterior</b>
+    /// (<c>RN-GER-002</c>), pelo mesmo motivo de <c>Produto.DefinirImagem</c>.
+    /// </summary>
+    public void DefinirLogo(string caminho)
+    {
+        if (string.IsNullOrWhiteSpace(caminho))
+        {
+            throw new ArgumentException("O caminho da logo é obrigatório.", nameof(caminho));
+        }
+
+        UrlLogo = caminho;
+    }
+
+    /// <summary>Limpa a referência. O arquivo permanece, por <c>RN-GER-002</c>.</summary>
+    public void RemoverLogo() => UrlLogo = null;
 
     public void Renomear(string razaoSocial, string nomeFantasia, string? telefone)
     {
@@ -53,6 +102,7 @@ public sealed class Unidade : Entidade
             ? throw new ArgumentException($"{campo} é obrigatório.", campo)
             : valor.Trim();
 
+    /// <summary><c>RN-GER-013</c> — documento e telefone sem máscara. A máscara é apresentação.</summary>
     private static string SomenteDigitos(string valor) =>
         new(valor.Where(char.IsDigit).ToArray());
 

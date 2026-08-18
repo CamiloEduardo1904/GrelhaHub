@@ -1,0 +1,741 @@
+/* ============================================================================
+   VITRINE — a landing pública (grelhahub.com)
+   docs/08-design-system.md §8 · ADR-0012
+
+   Folha própria, e não mais uma seção de `estilos-globais.css`, por dois
+   motivos: nada aqui é usado pela operação (o painel e o cardápio nunca
+   carregam estas regras), e o Vite separa o pedaço junto com a rota. Os
+   TOKENS continuam vindo da global — aqui não se define nenhuma cor nova.
+
+   Nenhum recurso de estilo novo: mesma sombra sólida, mesmo traço de 2 px,
+   mono no dado, prosa em sans. A página vende com o que a Chapa já tem.
+   ============================================================================ */
+
+.site {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site {
+    scroll-behavior: auto;
+  }
+}
+
+/* A barra é fixa: a âncora precisa parar abaixo dela, não atrás. */
+.site section[id] {
+  scroll-margin-top: 88px;
+}
+
+/* ============================================================================
+   REVELAÇÃO AO ROLAR — CHAPA-08, design system §9
+
+   O bloco entra NO LUGAR DELE: sobe 12 px e para seco. Não desliza pela tela,
+   não escala, não gira, não pisca. Um eixo, e nada mais.
+
+   O estado inicial é desfeito em `prefers-reduced-motion` na folha global
+   (§9.4) — sem isso, o interruptor de acessibilidade deixaria a página em
+   branco.
+   ============================================================================ */
+
+[data-revela] {
+  opacity: 0;
+  transform: translateY(var(--mov-subida));
+
+  /*
+    `opacity` e `transform` só. Animar `height`, `top` ou `margin` obriga o navegador a
+    recalcular layout a cada quadro, e a rolagem engasga no tablet — que é o aparelho em que
+    o produto roda.
+  */
+  transition:
+    opacity var(--mov-tempo) var(--mov-curva) var(--mov-atraso),
+    transform var(--mov-tempo) var(--mov-curva) var(--mov-atraso);
+
+  /* Avisa o compositor antes do primeiro quadro. Sai sozinho quando a transição termina,
+     porque `will-change` permanente consome memória de vídeo por nada. */
+  will-change: opacity, transform;
+}
+
+[data-revela][data-revelado='true'] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/*
+  O escalonamento de irmãos, em CSS e não em JavaScript.
+
+  Calcular o atraso no React exigiria repetir `--mov-passo` e `--mov-teto` como constantes de
+  TypeScript — o mesmo número de design em dois arquivos, que é a receita para eles divergirem.
+  Aqui os tokens ficam em um lugar só.
+
+  O teto está no 5º filho de propósito: `70ms × 6` já passa de 400 ms, e o último cartão de uma
+  grade chegaria depois de o olho ter desistido dele. Do quinto em diante todos entram juntos, e o
+  grupo lê como UM gesto escalonado em vez de uma onda.
+*/
+[data-revela-grupo] > [data-revela]:nth-child(2) {
+  --mov-atraso: var(--mov-passo);
+}
+
+[data-revela-grupo] > [data-revela]:nth-child(3) {
+  --mov-atraso: calc(var(--mov-passo) * 2);
+}
+
+[data-revela-grupo] > [data-revela]:nth-child(4) {
+  --mov-atraso: calc(var(--mov-passo) * 3);
+}
+
+[data-revela-grupo] > [data-revela]:nth-child(n + 5) {
+  --mov-atraso: var(--mov-teto);
+}
+
+/* ============================================================================
+   BARRA — "Acesse já" no alto, à direita
+   ============================================================================ */
+
+.barra-site {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--carvao);
+  color: var(--creme);
+  border-bottom: var(--traco);
+}
+
+.barra-site-interna {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.barra-site .marca {
+  flex: none;
+  color: inherit;
+  text-decoration: none;
+}
+
+.barra-site .wordmark {
+  font-size: 1.15rem;
+}
+
+.menu-site {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-left: auto;
+}
+
+.menu-site a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: var(--toque-admin);
+  color: var(--cinza-quente);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.menu-site a[aria-current='true'] {
+  color: var(--creme);
+}
+
+/* A listra vive sobre carvão aqui: o apagado do token global desaparece. */
+.menu-site .grelha i {
+  height: 14px;
+  background: var(--cinza-quente);
+}
+
+.barra-site-acoes {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+}
+
+.barra-site-acoes .btn {
+  min-height: var(--toque-admin);
+  box-shadow: none;
+}
+
+.barra-site-acoes .btn.calada {
+  background: transparent;
+  color: var(--creme);
+  border-color: var(--cinza-quente);
+}
+
+/* ============================================================================
+   CAPA
+   ============================================================================ */
+
+.capa-site {
+  background: var(--carvao);
+  color: var(--creme);
+  border-bottom: var(--traco);
+
+  /* Filete de brasa no pé da capa — o único elemento decorativo, e é a marca.
+     Não é gradiente: é uma faixa de cor sólida de 5 px. */
+  background-image: linear-gradient(var(--laranja-brasa), var(--laranja-brasa));
+  background-repeat: no-repeat;
+  background-size: 100% 5px;
+  background-position: bottom;
+}
+
+.capa-interna {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem 4rem;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.capa-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.1rem;
+}
+
+.capa-texto h1 {
+  font-family: var(--peso);
+  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.capa-sub {
+  max-width: 46ch;
+  font-size: 1.08rem;
+  line-height: 1.6;
+
+  /* Sem `opacity`: era 0.82, que levava o contraste de 15,5:1 para ~10:1 e amaciava o texto
+     mais importante da página. A cor cheia mantém a hierarquia pelo TAMANHO, não pelo
+     apagamento (CHAPA-10). */
+  color: var(--prosa-escura);
+}
+
+.capa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.capa-acoes .btn.calada {
+  background: transparent;
+  color: var(--creme);
+  border-color: var(--creme);
+}
+
+.capa-garantias {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cinza-quente);
+}
+
+.capa-garantias li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* Marcador quadrado — CHAPA-06: não é emoji nem ícone de biblioteca. */
+.capa-garantias li::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--ambar-chama);
+}
+
+.capa-mostra {
+  transform: rotate(-1.4deg);
+}
+
+.capa-mostra .comanda {
+  max-width: 340px;
+  margin-left: auto;
+}
+
+/* ============================================================================
+   FAIXAS
+   ============================================================================ */
+
+.faixa {
+  background: var(--ground);
+  border-bottom: var(--traco);
+}
+
+.faixa.alternada {
+  background: var(--surface-2);
+}
+
+.faixa.escura {
+  background: var(--carvao);
+  color: var(--creme);
+}
+
+.faixa-interna {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3.25rem 1.25rem;
+}
+
+.faixa-interna.estreita {
+  max-width: 720px;
+}
+
+.titulo-secao {
+  max-width: 60ch;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.titulo-secao h2 {
+  font-family: var(--peso);
+  font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.titulo-secao.claro .rotulo {
+  color: var(--cinza-quente);
+}
+
+.titulo-apoio {
+  max-width: 56ch;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.titulo-secao.claro .titulo-apoio {
+  color: var(--prosa-escura);
+}
+
+/* ============================================================================
+   GRADES
+   ============================================================================ */
+
+.grade-dores,
+.grade-quatro,
+.grade-tres,
+.grade-recursos,
+.grade-planos {
+  display: grid;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.grade-dores {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grade-quatro {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.grade-tres {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grade-recursos {
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+}
+
+.grade-planos {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ============================================================================
+   CARTÕES
+   ============================================================================ */
+
+/* CHAPA-11 — cor junto do fundo: estes cartões podem cair numa `.faixa.escura`, que
+   declara `color: var(--creme)`, e aí herdariam creme sobre papel. */
+.cartao-dor,
+.cartao-num,
+.bloco-recurso {
+  height: 100%;
+  padding: 1.15rem;
+  background: var(--surface);
+  color: var(--text);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.cartao-dor h3,
+.cartao-num h3,
+.bloco-recurso h3 {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* CHAPA-10 — corpo de cartão é PROSA: cor de texto cheia. A hierarquia contra o título vem
+   de mono-versalete × sans, que a Chapa já usa, e não de apagar a frase. */
+.cartao-dor p,
+.cartao-num p,
+.bloco-recurso p {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* O número é referência de leitura, não ornamento: mono, no canto. */
+.cartao-num {
+  position: relative;
+  padding-top: 1.9rem;
+}
+
+.cartao-num-n {
+  position: absolute;
+  top: 0.7rem;
+  left: 1.15rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--laranja-brasa);
+}
+
+/* ============================================================================
+   RECURSOS — CHAPA-09: só entra aqui o que está no ar
+   ============================================================================ */
+
+/* ============================================================================
+   PASSOS
+   ============================================================================ */
+
+.passos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.passos li {
+  padding-top: 1rem;
+  border-top: var(--traco);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.passos h3 {
+  font-family: var(--peso);
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.passos p {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* ============================================================================
+   FUNDAÇÃO — ocupa o lugar do depoimento (§8.5)
+   ============================================================================ */
+
+/* ============================================================================
+   PLANOS
+   ============================================================================ */
+
+.plano {
+  height: 100%;
+  padding: 1.25rem;
+  background: var(--surface);
+  color: var(--text);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* O indicado se destaca por PESO, não por cor de fundo: a cor é da barra âmbar,
+   e CHAPA-02 diz que só existe uma por grupo. */
+.plano.indicado {
+  border-width: 3px;
+  box-shadow: 7px 7px 0 var(--shadow);
+}
+
+.plano h3 {
+  font-family: var(--peso);
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.plano-resumo {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.plano-preco {
+  padding: 0.75rem 0;
+  border-top: 2px dashed var(--rule);
+  border-bottom: 2px dashed var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.plano-preco strong {
+  font-family: var(--peso);
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+}
+
+.plano-itens {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.plano-itens li {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.plano-itens li::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.5rem;
+  background: var(--laranja-brasa);
+}
+
+/* ============================================================================
+   PERGUNTAS — <details> nativo
+   ============================================================================ */
+
+.perguntas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pergunta {
+  background: var(--surface);
+  color: var(--text);
+  border: var(--traco);
+  box-shadow: var(--elev-1);
+}
+
+.pergunta summary {
+  min-height: var(--toque-admin);
+  padding: 0.7rem 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pergunta summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Sinal de abrir e fechar em texto: renderiza igual em todo sistema. */
+.pergunta summary::after {
+  content: '+';
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--laranja-brasa);
+}
+
+.pergunta[open] summary::after {
+  content: '\2212';
+}
+
+.pergunta[open] summary {
+  border-bottom: 2px dashed var(--rule);
+}
+
+.pergunta p {
+  padding: 0.85rem 0.95rem;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* ============================================================================
+   CHAMADA FINAL
+   ============================================================================ */
+
+.faixa-cta {
+  background: var(--carvao);
+  color: var(--creme);
+  border-bottom: var(--traco);
+  text-align: center;
+}
+
+.faixa-cta .faixa-interna {
+  padding: 3.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.faixa-cta h2 {
+  font-family: var(--peso);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  letter-spacing: -0.03em;
+}
+
+.faixa-cta p {
+  max-width: 52ch;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--prosa-escura);
+}
+
+/* ============================================================================
+   RODAPÉ
+   ============================================================================ */
+
+.rodape-site {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.rodape-colunas {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: 2rem;
+}
+
+.rodape-colunas > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.rodape-colunas ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.rodape-colunas a {
+  font-size: 0.9rem;
+}
+
+/* A descrição da empresa é prosa, não metadado — CHAPA-10. */
+.rodape-colunas > div > .secundario {
+  color: var(--text);
+}
+
+.rodape-fim {
+  margin-top: 2rem;
+  padding-top: 1.1rem;
+  border-top: var(--traco);
+}
+
+/* ============================================================================
+   RESPONSIVO — RNF-012
+   ============================================================================ */
+
+@media (max-width: 1000px) {
+  .grade-quatro {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grade-planos,
+  .grade-tres,
+  .passos {
+    grid-template-columns: 1fr;
+  }
+
+  .capa-interna {
+    grid-template-columns: 1fr;
+    gap: 2.25rem;
+  }
+
+  .capa-mostra {
+    transform: none;
+  }
+
+  .capa-mostra .comanda {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 780px) {
+  .grade-dores {
+    grid-template-columns: 1fr;
+  }
+
+  .rodape-colunas {
+    grid-template-columns: 1fr;
+  }
+
+  /* As âncoras rolam na horizontal, mesmo padrão das abas do painel (`.abas`). Sem
+     alternador: um botão "Menu" para revelar quatro links é um clique a mais e um estado a
+     mais, e a barra cabe rolando. `Acesse já` continua fixo no alto, à direita. */
+  .barra-site-interna {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .menu-site {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    gap: 1rem;
+    overflow-x: auto;
+
+    /* Sem barra de rolagem visível numa faixa de 14 px de altura — ela cobriria as letras. */
+    scrollbar-width: none;
+  }
+
+  .menu-site::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu-site a {
+    white-space: nowrap;
+  }
+
+  .barra-site-acoes {
+    margin-left: auto;
+  }
+}

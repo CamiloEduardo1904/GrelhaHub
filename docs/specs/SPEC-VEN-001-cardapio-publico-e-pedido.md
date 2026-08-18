@@ -4,9 +4,9 @@
 |-------|-------|
 | ID | `SPEC-VEN-001-cardapio-publico-e-pedido` |
 | Módulo | VEN |
-| Situação | `EM IMPLEMENTAÇÃO` |
+| Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | **Fatia vertical antecipada** — ver §0 |
-| Regras implementadas | `RN-VEN-036`, `RN-VEN-037`, `RN-VEN-038`, `RN-VEN-001`, `RN-VEN-002`, `RN-VEN-003`, `RN-VEN-008`, `RN-VEN-011`, `RN-VEN-018` *(parcial)*, `RN-VEN-020`, `RN-GER-006`, `RN-GER-009`, `RN-GER-010`, `RN-GER-012`, `RN-CRM-001`, `RN-CRM-003` |
+| Regras implementadas | `RN-VEN-036`, `RN-VEN-037`, `RN-VEN-038`, `RN-VEN-001`, `RN-VEN-002`, `RN-VEN-003`, `RN-VEN-008`, `RN-VEN-009`, `RN-VEN-011`, `RN-VEN-018` *(parcial)*, `RN-VEN-019`, `RN-VEN-020`, `RN-VEN-032`, `RN-VEN-039`, `RN-VEN-040`, `RN-GER-002` *(parcial)*, `RN-GER-003`, `RN-GER-005`, `RN-GER-006` *(parcial)*, `RN-GER-009` *(parcial)*, `RN-GER-010` *(parcial)*, `RN-GER-012`, `RN-GER-013`, `RN-CRM-001`, `RN-CRM-003`, `RN-RH-006` *(parcial)* |
 | ADRs aplicáveis | [ADR-0002](../adr/0002-clean-architecture-com-cqrs.md), [ADR-0003](../adr/0003-frontend-e-backend-desacoplados.md), [ADR-0005](../adr/0005-multi-estabelecimento-por-coluna-discriminadora.md), [ADR-0011](../adr/0011-dia-operacional.md) |
 | Data | 17/08/2026 |
 
@@ -42,15 +42,31 @@ receba pedidos por ele — e que a equipe do restaurante veja esses pedidos cheg
 | `RN-VEN-002` | Pedido tem ao menos um item | Aplicação | Validator |
 | `RN-VEN-003` | Item refere-se a exatamente um produto | Modelo | FK `NOT NULL` |
 | `RN-VEN-008` ⚠ | Preço praticado é copiado no item e não muda depois | Modelo | Coluna própria em `item_pedido` |
+| `RN-VEN-009` | Total do item é quantidade × preço praticado | Domínio | `ItemPedido.Total` |
 | `RN-VEN-011` | Quantidade sempre maior que zero | Modelo | `CHECK` |
 | `RN-VEN-018` ⚠ | Ciclo `Aberto → Confirmado → …` | Modelo + Domínio | `ENUM` + método de transição |
+| `RN-VEN-019` | Finalizado ou Cancelado não retorna a estado anterior | Domínio | Guarda em `Pedido.Avancar` e `Cancelar` |
 | `RN-VEN-020` | Produto inativo não entra em pedido novo | Aplicação | Filtro na consulta e no lançamento |
+| `RN-VEN-032` | Preço de tabela sempre maior que zero | Modelo | `CHECK (preco > 0)` + validator |
+| `RN-VEN-039` `IMP` | Total do pedido é a soma dos itens | Domínio | `Pedido.Total` |
+| `RN-VEN-040` `IMP` | Composição congelada a partir de Em produção | Domínio | `Pedido.AceitaAlteracaoDeItens` |
+| `RN-GER-002` | Não se exclui; cancela-se com motivo | Domínio + Modelo | `Cancelar(motivo)`; `ON DELETE RESTRICT` |
+| `RN-GER-003` | Moeda com duas casas decimais | Modelo | `numeric(12,2)` por convenção do `DbContext` |
+| `RN-GER-005` | Data e hora com fuso; operação em `America/Sao_Paulo` | Modelo | `timestamptz`; `unidade.fuso_horario` |
 | `RN-GER-006` ⚠⚠ | Dia operacional 04h–03h59 | Modelo | Coluna gerada + índice |
 | `RN-GER-009` ⚠ | `unidade_id` em toda tabela transacional | Modelo + Aplicação | FK + filtro global |
 | `RN-GER-010` | Perfil determina operações permitidas | Aplicação | Política de autorização |
 | `RN-GER-012` | Custo e margem não são retornados pela API | Aplicação | Ausência do campo na projeção pública |
+| `RN-GER-013` `IMP` | Documento e telefone sem máscara | Modelo + Domínio | `CHECK (cnpj ~ '^[0-9]{14}$')` + normalização |
 | `RN-CRM-001` | Cliente identificado pelo telefone | Modelo | `UNIQUE (unidade_id, telefone)` |
 | `RN-CRM-003` | Delivery exige cliente identificado | Aplicação | Validator |
+| `RN-RH-006` | Usuário inativo não registra operação | Aplicação | Login recusa `ativo = false` |
+
+> **Três destas regras nasceram desta implementação** — `RN-VEN-039`, `RN-VEN-040` e
+> `RN-GER-013`, origem `IMP` no catálogo v1.3. O comportamento já estava no código, citando
+> por aproximação o ID de outra regra; a auditoria de rastreabilidade o corrigiu. É o
+> procedimento da [§7 do guia de specs](../06-guia-de-specs.md#7-quando-a-implementação-descobre-uma-regra)
+> aplicado **depois** do fato — e o custo de tê-lo aplicado tarde foi justamente esta auditoria.
 
 ## 3. Contrato
 
@@ -59,14 +75,27 @@ receba pedidos por ele — e que a equipe do restaurante veja esses pedidos cheg
 | Verbo | Rota | Descrição | Perfil |
 |-------|------|-----------|--------|
 | `POST` | `/autenticacao/login` | Autentica e devolve JWT | anônimo |
-| `POST` | `/restaurantes` | Cadastra restaurante + usuário administrador | anônimo |
-| `GET` | `/restaurantes/meu` | Dados do restaurante e link do cardápio | autenticado |
-| `GET` | `/categorias` · `POST` `/categorias` | Categorias | Gerência para escrita |
-| `GET` | `/produtos` · `POST` `/produtos` · `PUT` `/produtos/{id}` | Produtos | Gerência para escrita |
-| `GET` | `/pedidos` | Pedidos da unidade, com filtro por status | autenticado |
+| `POST` | `/autenticacao/cadastrar-restaurante` | Cadastra restaurante + usuário administrador | anônimo |
+| `GET` | `/restaurante/meu` | Dados do restaurante e link do cardápio | autenticado |
+| `GET` | `/cardapio` | Categorias com seus produtos, incluindo os inativos | autenticado |
+| `POST` | `/cardapio/produtos` | Cria **ou atualiza** produto — `id` nulo cria | Gerência |
+| `PATCH` | `/cardapio/produtos/{id}/disponibilidade` | Liga e desliga o "acabou hoje" | Gerência |
+| `GET` | `/pedidos` | Pedidos da unidade, filtro por status e dia operacional | autenticado |
 | `POST` | `/pedidos/{id}/confirmar` | `Aberto → Confirmado` | autenticado |
 | `POST` | `/pedidos/{id}/avancar` | Avança um estado do ciclo | autenticado |
 | `POST` | `/pedidos/{id}/cancelar` | Cancela com motivo | Gerência |
+
+> **Divergências desta seção em relação à versão anterior da spec** — corrigidas em
+> 17/08/2026 pela regra 4 do processo, que manda ajustar a spec depois da implementação:
+>
+> - `POST /restaurantes` virou `POST /autenticacao/cadastrar-restaurante`, e
+>   `/restaurantes/meu` virou `/restaurante/meu` — a unidade é singular no MVP (premissa P4)
+> - `/categorias` e `/produtos` viraram `/cardapio` e `/cardapio/produtos`: a gestão do
+>   cardápio é uma tela só, e uma rota por agregado evitava duas chamadas para montá-la
+> - `PUT /produtos/{id}` não existe. `POST /cardapio/produtos` cria e atualiza — o
+>   `SalvarProdutoCommand` carrega `id` opcional
+> - **Não há rota de escrita de categoria.** As categorias vêm do cardápio de exemplo
+>   semeado no cadastro; criar categoria entra na onda 1, com `SPEC-VEN-002`
 
 ### Área pública — `/api/publico` *(sem autenticação)*
 
@@ -74,7 +103,11 @@ receba pedidos por ele — e que a equipe do restaurante veja esses pedidos cheg
 |-------|------|-----------|
 | `GET` | `/{slug}/cardapio` | Restaurante + categorias + produtos ativos |
 | `POST` | `/{slug}/pedidos` | Cria pedido; devolve número de acompanhamento |
-| `GET` | `/{slug}/pedidos/{numero}` | Status do pedido, para o cliente acompanhar |
+| `GET` | `/{slug}/pedidos/{numero}?telefone=` | Status do pedido, para o cliente acompanhar |
+
+O `telefone` é obrigatório no acompanhamento: o número do pedido é sequencial por dia
+operacional e, sozinho, seria adivinhável — qualquer pessoa leria o pedido alheio. O par
+número + telefone é o que autoriza a leitura sem exigir login (`RN-CRM-001`).
 
 ### Erros
 
@@ -168,6 +201,32 @@ vazar custo seria mais grave, porque qualquer pessoa o acessa.
 > **Quando** o cardápio for consultado, ele não aparece,
 > **e** se seu id for enviado num pedido, a operação é recusada com 422.
 
+### CA-8 — Total do pedido é a soma dos itens (`RN-VEN-039`, `RN-VEN-009`)
+
+> **Dado** um pedido com dois itens — 2 × R$ 28,00 e 1 × R$ 18,00,
+> **Quando** o total for lido,
+> **Então** o valor é R$ 74,00,
+> **e** o total de cada item é quantidade × preço praticado, sem desconto, taxa de serviço
+> nem taxa de entrega — nenhuma delas incide nesta fatia.
+
+### CA-9 — Composição congelada a partir da produção (`RN-VEN-040`)
+
+> **Dado** um pedido em `Em produção`,
+> **Quando** houver tentativa de acrescentar um item,
+> **Então** a operação é recusada,
+> **e** o mesmo pedido em `Aberto` ou `Confirmado` aceita o item.
+>
+> A fronteira é a produção, não a confirmação: entre confirmar e produzir ainda há fila, e
+> nesse intervalo o restaurante consegue acomodar um "esqueci a batata".
+
+### CA-10 — Documento e telefone sem máscara (`RN-GER-013`, `RN-CRM-001`)
+
+> **Dado** um cadastro com CNPJ `12.345.678/0001-99` e telefone `(11) 98765-4321`,
+> **Quando** os valores forem persistidos,
+> **Então** o banco guarda `12345678000199` e `11987654321`,
+> **e** um segundo pedido com o telefone digitado como `11 98765 4321` resolve para o
+> **mesmo** cliente, em vez de criar um duplicado.
+
 ## 6. Modelo de dados tocado
 
 | Tabela | Constraints principais |
@@ -178,7 +237,11 @@ vazar custo seria mais grave, porque qualquer pessoa o acessa.
 | `produto` | `UNIQUE (unidade_id, nome)`; `CHECK (preco > 0)` |
 | `cliente` | `UNIQUE (unidade_id, telefone)` — `RN-CRM-001` |
 | `pedido` | `UNIQUE (unidade_id, data_operacional, numero)`; `data_operacional` gerada; canal e status como `ENUM` |
-| `item_pedido` | `CHECK (quantidade > 0)`; `preco_praticado NOT NULL`; total como coluna gerada |
+| `item_pedido` | `CHECK (quantidade > 0)`; `CHECK (preco_praticado >= 0)`; `preco_praticado NOT NULL` |
+
+**Chave primária declarada `ValueGeneratedNever`** para toda entidade, no `DbContext`: o `Id`
+é gerado pela aplicação (`Guid.CreateVersion7()`), e dizer isso ao EF Core é o que faz um
+filho novo em agregado já rastreado sair como `INSERT`. Ver a §10 — foi o que o CA-9 revelou.
 
 **Migration:** `Fundacao`.
 
@@ -187,6 +250,53 @@ vazar custo seria mais grave, porque qualquer pessoa o acessa.
 Nenhum. O cardápio público não aplica taxa de serviço (`RN-VEN-014` não incide em delivery)
 nem desconto.
 
+## 7-A. Acompanhamento ao vivo — acrescentado em 17/08/2026
+
+A tela de acompanhamento do cliente **se atualiza sozinha**: enquanto o pedido pode mudar de
+estado, ela consulta `GET /{slug}/pedidos/{numero}` e a régua avança sem ninguém apertar nada.
+
+### Por que polling, e não SSE nem WebSocket
+
+ADR-0006 — **uma VPS, Nginx na frente.** Conexão persistente exigiria configuração de proxy, teto
+de conexões simultâneas e um caminho próprio de reconexão, para entregar **segundos** de diferença
+em um fluxo que leva **minutos**. Polling é um `GET` na rota que a tela já usava, que já é pública
+e anônima (`RN-VEN-037`) e já exige o telefone junto do número.
+
+> Quando houver mais de uma máquina ou fila de pedidos grande o suficiente para o intervalo
+> incomodar, a troca é justificada. Hoje seria complexidade sem cliente pedindo.
+
+### As quatro coisas que fazem isto ser educado
+
+| Cuidado | Por quê |
+|---------|---------|
+| **Para em estado terminal** | `faseDe(status)` devolve `fim` (Entregue, Finalizado) ou `morto` (Cancelado). A aba esquecida aberta pararia de bater no servidor para sempre — e reusar `faseDe` em vez de listar os estados é o que impede esta tela de divergir de `RN-VEN-018` quando o ciclo mudar |
+| **Pausa com a aba escondida** | Celular no bolso não precisa perguntar nada. Ao voltar, consulta **na hora**: quem volta para a aba quer ver agora, não em 10 s |
+| **Nunca sobrepõe requisição** | Rede lenta empilhando pedidos transforma um polling manso em enxurrada, justamente no cliente com sinal ruim |
+| **Recua quando falha** | Erro consecutivo dobra o intervalo até 1 min. Se a API cair, cada cliente esperando **deixa de somar carga** exatamente quando ela é o problema |
+
+**Intervalo: 10 s.** O ciclo leva minutos, então 1 s não dá nada ao cliente e custa caro ao
+servidor — numa noite de 30 pedidos simultâneos seriam 30 requisições por segundo de gente só
+esperando. **Não é `PAR-*`:** parâmetro existe para o que o restaurante configura, e cadência de
+polling é restrição técnica igual em toda unidade.
+
+### Falha de rede não apaga a tela
+
+O pedido exibido continua sendo **o último bom**, com um aviso discreto e um botão "tentar agora".
+Trocar a comanda por uma mensagem de erro tiraria do cliente a informação que ele **já tinha**.
+
+### O que o design system permite aqui
+
+`CHAPA-06` — o sinal de "vivo" é a **listra âmbar**, não bolinha pulsando nem emoji. `CHAPA-08` —
+nada pisca: um indicador que pulsa a cada segundo é ruído numa tela que a pessoa fica olhando.
+`CHAPA-07` — o pedido ficar **Pronto** não ganha comemoração; confete é do fechamento de caixa,
+uma vez por dia.
+
+### O que o teste garante
+
+O polling vale exatamente o que a rota entregar. `AcompanhamentoPublicoTests` percorre **o ciclo
+inteiro** conferindo que cada avanço aparece na consulta do cliente — sem isso, a tela se
+atualizaria para mostrar sempre a mesma coisa, e o defeito pareceria ser do frontend.
+
 ## 8. Fora de escopo — a dívida declarada
 
 Cada item abaixo é **simplificação consciente**, com a spec que a resolve:
@@ -194,6 +304,9 @@ Cada item abaixo é **simplificação consciente**, com a spec que a resolve:
 | Simplificação nesta fatia | Regra que fica devendo | Resolve em |
 |---------------------------|------------------------|-----------|
 | Preço direto em `produto`, sem vigência | `RN-VEN-010` | Onda 1 |
+| **Total do item não é coluna gerada** — `RN-VEN-009` está previsto no catálogo como `GEN` e é calculado no domínio (`ItemPedido.Total`, com `Ignore` no mapeamento). Funciona e está testado, mas a soma vive na aplicação, não no modelo — contra a ordem de preferência do ADR-0009 | `RN-VEN-009` mecanismo `GEN` | Onda 4 — junto com ajustes e desconto, que mudam a fórmula (`RN-VEN-028`) |
+| **Quantidade de insumo em 4 casas decimais não existe** — a convenção do `DbContext` aplica `numeric(12,2)` a *todo* `decimal`, e o comentário que menciona `numeric(14,4)` descreve a intenção, não o código. Enquanto não houver value object `Quantidade`, o primeiro item de ficha técnica gravaria `0,1563` como `0,16` **sem erro** | `RN-GER-004` | `SPEC-GER-001` — **antes** da onda 2 |
+| `unidade_id` atribuído a mão no handler, sem interceptor | `RN-GER-009` completo | `SPEC-GER-001` |
 | Perfil como `enum`, sem tabela de permissões granulares | `RN-GER-010` completo | `SPEC-GER-004` |
 | Parâmetros sem tabela nem vigência | 9 regras `PAR` | `SPEC-GER-003` |
 | Sem trilha de auditoria | `RN-GER-001`, `RN-GER-011` | `SPEC-GER-005` |
@@ -219,14 +332,55 @@ Cada item abaixo é **simplificação consciente**, com a spec que a resolve:
 | Controllers | `src/GrelhaHub.Api/Controllers/` |
 | Front do restaurante | `frontend/src/features/admin/` |
 | Front público | `frontend/src/features/publico/` |
-| Testes | `tests/GrelhaHub.Domain.Tests/Vendas/` |
+| Testes de domínio | `tests/GrelhaHub.Domain.Tests/{Gerais,Vendas}/` |
+| Testes de integração | `tests/GrelhaHub.Integration.Tests/Vendas/CardapioPublicoTests.cs`, `PedidoPublicoTests.cs` |
+| Harness de integração | `tests/GrelhaHub.Integration.Tests/Infraestrutura/` |
 
 ## 10. Definição de pronto
 
 - [x] Regras novas catalogadas **antes** do código (`RN-VEN-036` a `038`)
 - [x] Fluxo ponta a ponta: cadastro → cardápio público → pedido → acompanhamento
+- [x] Acompanhamento **ao vivo** (§7-A): polling com parada em estado terminal, pausa com aba
+      escondida, sem sobreposição e com recuo no erro — 5 testes em `AcompanhamentoPublicoTests`
 - [x] Testes com o ID da regra no `DisplayName`
-- [x] `dotnet build -c Release` e `dotnet test` verdes
-- [ ] CA-1 a CA-7 como teste de integração contra PostgreSQL real — **pendente**: os testes
-      atuais são de domínio; a integração entra com `SPEC-GER-001`
+- [x] `dotnet build -c Release` e `dotnet test` verdes — **44 testes**: 26 de domínio e 18 de
+      integração
 - [x] Dívida declarada na §8
+- [x] Rastreabilidade do [catálogo §16](../03-catalogo-de-regras-de-negocio.md#16-rastreabilidade-regra--spec) preenchida
+- [x] **`RN-VEN-039`, `RN-VEN-040` e `RN-GER-013` catalogadas *depois* do código** — corrigido
+      no catálogo v1.3, e os IDs renomeados no código e nos testes. `grep` por cada um
+      encontra a implementação e o teste
+- [x] **CA-1 a CA-8 e CA-10 como teste de integração contra PostgreSQL real** — 18 testes em
+      `GrelhaHub.Integration.Tests`, com contêiner Testcontainers, API real e nenhum dublê
+- [x] **CA-9 fechado por reidratação, não por rota.** Nenhuma rota acrescenta item a pedido
+      existente — mas o que havia de específico de integração era outro: provar que o agregado
+      **relido do PostgreSQL** ainda impõe a invariante. O EF materializa `Pedido` por
+      construtor privado e *backing field* (`_itens`, `PropertyAccessMode.Field`); um
+      mapeamento errado ali daria um agregado que não valida, e o teste de domínio — que
+      sempre constrói em memória — nunca veria
+- [x] `npm run lint && npm run build` verdes — verificado em 17/08/2026 após `npm ci`
+      (204 pacotes, 0 vulnerabilidades); `tsc -b` sem erro e bundle de 302 kB / 98,8 kB gzip
+
+> ### O que o CA-9 encontrou — e por que valeu insistir nele
+>
+> Ao persistir o item acrescentado a um pedido **lido do banco**, o EF Core emitiu
+> `UPDATE item_pedido ... WHERE id = @id` em uma linha que nunca existiu, e falhou com
+> `DbUpdateConcurrencyException` — "esperava afetar 1 linha, afetou 0", que **parece conflito
+> de concorrência e não é**.
+>
+> Causa: `Entidade.Id` já vem preenchido por `Guid.CreateVersion7()`, mas o modelo não dizia
+> isso ao EF. A convenção para chave `Guid` é `ValueGeneratedOnAdd`, e ao encontrar um filho
+> novo em agregado **já rastreado** com chave não-vazia, o EF conclui "isto já existe" e marca
+> `Modified`.
+>
+> **O defeito era latente:** o único caminho que chama `AdicionarItem` hoje cria o pedido
+> junto, então o grafo inteiro entra como `Added` e os `INSERT` saem certos. O lançamento de
+> item da onda 4 bateria nele de frente — com uma exceção que aponta para o lugar errado.
+>
+> Corrigido em `GrelhaHubDbContext.AplicarChaveGeradaPelaAplicacao`, que declara
+> `ValueGeneratedNever` para toda entidade. **Não exige migration:** `dotnet ef migrations
+> has-pending-model-changes` reporta nenhuma mudança de modelo — o ajuste é de rastreamento em
+> memória, não de schema, e o banco de produção não é tocado.
+>
+> Este é o argumento de banca para o ADR-0009 em uma frase: o teste de domínio passava, o
+> código parecia certo, e só o PostgreSQL real mostrou que a gravação estava errada.
