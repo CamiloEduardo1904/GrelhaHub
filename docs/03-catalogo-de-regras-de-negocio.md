@@ -4,7 +4,7 @@
 |-------|-------|
 | Versão | **2.1** |
 | Data | Agosto/2026 |
-| Situação | Em validação — **176 regras**: 150 em hipótese, 26 decididas pelo time |
+| Situação | Em validação — **180 regras**: 154 em hipótese, 26 decididas pelo time |
 | Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + 10 regras descobertas na implementação (`IMP`) + 22 decisões de produto do time (`DEC`) |
 | Auditoria do cruzamento | [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md) |
 | Papel no projeto | **Fonte de verdade.** Toda spec de implementação transcreve regras daqui. Nenhuma regra de negócio nasce no código |
@@ -51,7 +51,7 @@
 
 ## 1. Estado do catálogo
 
-Das 176 regras, **150 estão em estado de hipótese** — 134 herdadas das fontes e 16 descobertas
+Das 180 regras, **154 estão em estado de hipótese** — 134 herdadas das fontes e 20 descobertas
 durante a implementação (origem `IMP`) — e as outras 19 são decisões de produto, estado `DEC`.
 As herdadas foram derivadas do
 conhecimento do domínio (operação de hamburgueria) e da estrutura dos dez módulos de ERP
@@ -284,6 +284,21 @@ Os três módulos de prioridade máxima — **Vendas, Produção e Estoque** —
 | RN-GER-036 `DEC` ⚠⚠ | **A unidade cadastra o horário de funcionamento por dia da semana** — abre, fecha, ou **fechado no dia**. É deste cadastro que sai a **virada do dia operacional** de `RN-GER-006`: a virada é o **fechamento que atravessa a meia-noite** mais tarde da semana (fecha 03h00 → vira às 03h00); se nenhum dia atravessa, a virada é **00h00** e o dia operacional coincide com o civil. Sem horário cadastrado, vale `PAR-GER-001`. ⚠⚠ **Mudar o horário não reclassifica o passado:** cada pedido carrega a virada e o fuso aplicados no instante em que nasceu, pela mesma razão de `RN-VEN-008` copiar o preço praticado — relatório fechado que muda sozinho é pior do que relatório errado, porque ninguém percebe. | F R | `unidade`, `unidade_horario`, `pedido` | MOD GEN APP | **DEC** | S |
 | RN-GER-037 `DEC` | **A unidade tem endereço** — CEP, logradouro, número, complemento, bairro, cidade e UF —, exibido no cardápio público abaixo do nome. Guardado em **campos separados**, não em linha de texto: a primeira pergunta de logística que pedir bairro (`RN-LOG-*`) teria de desmontar texto livre. CEP só com dígitos (`RN-GER-013`). ⚠ **Tudo opcional:** as unidades anteriores a esta regra não têm endereço, e exigi-lo obrigaria a inventar um ou a impedi-las de operar. A consulta automática por CEP é **conveniência da tela** e nunca condição para gravar — serviço de terceiro fora do ar não pode travar cadastro. | F R | `unidade` | MOD APP | **DEC** | S |
 | RN-VEN-048 `DEC` | **O cardápio público fecha fora do horário de funcionamento** (`RN-GER-036`): a vitrine informa que a casa está fechada, diz quando abre, e **não aceita pedido**. A recusa é do servidor, não da tela — esconder o botão não impede um `POST`. ⚠ **Unidade sem horário cadastrado é considerada aberta**: ausência de cadastro não pode desligar a venda de quem já vendia. | R F | `unidade`, `unidade_horario`, `pedido` | APP | **DEC** | S |
+
+### Painel de operação — a visão 360 da casa
+
+> Decisão de produto, 18/08/2026. A casa via **os pedidos de hoje** e nada mais: nenhum número
+> agregado, nenhum histórico, nenhuma comparação. Quem responde pelo faturamento não tinha onde
+> olhar. As regras abaixo nascem `IMP` — vieram da implementação, e **nenhuma foi validada com
+> cliente**: o que é faturamento para o dono do restaurante é a primeira pergunta da próxima
+> entrevista, e está na fila.
+
+| ID | Regra | Tipo | Entidades | Impl. | Estado | MVP |
+|----|-------|:----:|-----------|-------|:------:|:---:|
+| RN-GER-038 `IMP` | **Ver o painel de operação é permissão própria** (`operacao.visualizar`), separada de `pedido.visualizar`. Quem atende o telefone precisa ver o pedido da mesa 4; o faturamento da semana é outra pergunta, e responde a quem responde pelo resultado. Concedida a **Administrador e Gerente**; a plataforma alcança pelo bypass de `RN-GER-014`. ⚠ Separar as duas é o que impede o painel de virar a porta lateral de `RN-GER-012`: agregado de venda é o passo anterior a margem, e conceder junto com `pedido.visualizar` daria a todo atendente o número que a regra de custo protege. | R | `permissao`, `perfil` | APP | HIP | S |
+| RN-VEN-049 `IMP` ⚠⚠ | **Faturamento do painel é a soma dos pedidos FINALIZADOS**, agrupados por `data_operacional` (`RN-GER-006`) — nunca por data de criação. Cancelado (`RN-VEN-018`) e excluído logicamente (`RN-VEN-041`) **não entram**. ⚠⚠ **Pedido em andamento também não entra no faturamento, e isso não é omissão**: contar o que ainda pode ser cancelado dá um número que **encolhe sozinho** depois — e número que anda para trás sem ninguém mexer destrói a confiança no painel inteiro. O que está no salão aparece **em contador separado**, com o seu próprio rótulo: some do faturamento, não da tela. | C R | `pedido` | APP VW | HIP | S |
+| RN-VEN-050 `IMP` | **O painel responde por PERÍODO de dia operacional**, com início e fim, e o padrão é o dia operacional corrente. Período invertido é recusado (`RN-GER-006`). ⚠ O painel **não inventa faixa**: dia sem pedido aparece com zero e não some do gráfico — série temporal com dias faltando faz o olho ler queda onde houve fechamento, e a diferença entre "vendeu nada" e "não abriu" não está no dado que temos hoje. | C R | `pedido` | APP | HIP | S |
+| RN-VEN-051 `IMP` | **Ticket médio é faturamento dividido por pedidos finalizados no mesmo recorte**, e é `NULL` — não zero — quando não há pedido finalizado. Zero afirma "o ticket foi zero"; ausência afirma "não houve venda", e são leituras diferentes para quem compara semanas. Moeda em `RN-GER-003`. | C | `pedido` | APP | HIP | S |
 
 > ### ⚠⚠ RN-GER-006 — a regra mais subestimada do catálogo
 >
@@ -835,6 +850,7 @@ esta tabela é o índice inverso. Ver [`06-guia-de-specs.md`](06-guia-de-specs.m
 
 | **2.4** | **18/08/2026** | **Recuperação de acesso, e a cadência do acompanhamento.** Quatro regras `IMP` fechando o beco que a §8 da `SPEC-GER-007` registrou no dia anterior: senha esquecida só se resolvia com outra pessoa, e **acima do acesso de plataforma não há ninguém**. **RN-GER-032** ⚠ — o e-mail sai de endereço próprio e **nunca entra na transação**: falha de envio é registrada e não desfaz usuário criado nem senha redefinida; ausência de SMTP é estado válido, como em `RN-GER-014`. **RN-GER-033** ⚠⚠ — token opaco, uso único, validade curta e guardado **apenas como hash**, pela mesma razão da senha em `RNF-005`; emitir um novo invalida os anteriores. **RN-GER-034** ⚠ — a solicitação responde igual exista ou não a conta, mesma doutrina de `RN-GER-027` no login. **RN-GER-035** — senha escolhida pelo dono encerra a troca obrigatória; escolhida por terceiro, a reativa (`RN-GER-028`). Decidido em ADR-0016: SMTP do próprio domínio, com a fila em memória — a volatilidade é aceita porque **todo e-mail nosso é reemitível**. `RN-VEN-047` ganhou a segunda cadência (15 s nas dez primeiras consultas, 25 s depois). Total: **169 regras** |
 
+| **2.6** | **18/08/2026** | **Painel de operação — a visão 360 que a casa não tinha.** Quatro regras `IMP`, todas por descobrir na implementação e **nenhuma validada com cliente**. **RN-GER-038** — ver o painel é permissão própria (`operacao.visualizar`), separada de `pedido.visualizar`: agregado de venda é o passo anterior a margem, e conceder junto daria a todo atendente o número que `RN-GER-012` protege. **RN-VEN-049** ⚠⚠ — faturamento é a soma dos pedidos **finalizados** por `data_operacional`; o que está no salão vai em contador separado, porque número que encolhe sozinho depois destrói a confiança no painel inteiro. **RN-VEN-050** — o painel responde por período e **não inventa faixa**: dia sem pedido aparece com zero, já que série com dia faltando faz o olho ler queda onde houve fechamento. **RN-VEN-051** — ticket médio é `NULL` e não zero quando não houve venda. Total: **180 regras** |
 | **2.5** | **18/08/2026** | ⚠⚠ **A virada do dia operacional deixou de ser constante do sistema** — decisão do dono do produto, e revisão de uma das sete regras estruturais. `RN-GER-006` passa a apontar para a **virada cadastrada da unidade**; até aqui eram `04h00` fixos dentro da expressão da coluna gerada, e essa fixação era a razão técnica de não haver como cadastrar. **RN-GER-036** (`DEC`) ⚠⚠ — a casa cadastra o horário por dia da semana, e a virada é **derivada**: o fechamento que atravessa a meia-noite mais tarde da semana; quem fecha antes dela tem dia operacional igual ao civil. ⚠ **O passado não se reclassifica**: cada pedido carrega a virada e o fuso aplicados, pela mesma razão de `RN-VEN-008` copiar o preço praticado — relatório fechado que muda sozinho é pior que relatório errado, porque ninguém percebe. **RN-GER-037** (`DEC`) — endereço em campos separados, exibido na vitrine; consulta por CEP é conveniência da tela e nunca condição para gravar. **RN-VEN-048** (`DEC`) — fora do horário a vitrine informa e **não aceita pedido**, com a recusa no servidor; casa sem horário cadastrado continua vendendo. Total: **176 regras** |
 
 ### Regras revogadas na consolidação

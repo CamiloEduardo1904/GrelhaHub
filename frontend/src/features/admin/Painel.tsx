@@ -12,9 +12,12 @@ import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../servi
 import { CadastroDeOperacao } from '../plataforma/CadastroDeOperacao';
 import { Cardapio } from './Cardapio';
 import { encerrarSessao, lerSessao, pode } from './sessao';
+import { comoConsulta, periodoDeHoje, type Periodo } from '../../services/periodo';
+import { FiltroDePeriodo } from './FiltroDePeriodo';
+import { Operacao } from './Operacao';
 import { Usuarios } from './Usuarios';
 
-type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe' | 'loja';
+type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe' | 'loja' | 'operacao';
 
 /**
  * A aba de equipe só existe para quem consegue ver usuário (`RN-GER-010`). Esconder é
@@ -29,6 +32,10 @@ const ABAS: { chave: Aba; nome: string; permissao?: string }[] = [
   // RN-GER-036 / RN-GER-037 — o cadastro da própria casa. A aba só aparece para quem tem
   // `unidade.visualizar`: aba que abre em 403 é pior do que aba ausente.
   { chave: 'loja', nome: 'Loja', permissao: 'unidade.visualizar' },
+
+  // RN-GER-038 — o painel de operacao tem permissao PROPRIA, separada de pedido.visualizar:
+  // o atendente ve o pedido da mesa 4 e nao ve o faturamento da semana.
+  { chave: 'operacao', nome: 'Operação', permissao: 'operacao.visualizar' },
 ];
 
 export function Painel() {
@@ -41,11 +48,20 @@ export function Painel() {
   const [cardapio, setCardapio] = useState<CategoriaInterna[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
+  /**
+   * `RN-GER-006` ⚠⚠ — o recorte da lista é de **dia operacional**, e abre no dia corrente.
+   *
+   * O filtro já existia na API desde a fatia vertical; o que faltava era a tela. Quem operava só
+   * enxergava hoje: para conferir o pedido de ontem à noite — que é o caso mais comum de ligação
+   * de cliente — não havia caminho nenhum.
+   */
+  const [periodo, setPeriodo] = useState<Periodo>(() => periodoDeHoje());
+
   const carregar = useCallback(async () => {
     try {
       const [meu, listaPedidos, listaCardapio] = await Promise.all([
         api.get<MeuRestaurante>('/v1/restaurante/meu'),
-        api.get<PedidoResumo[]>('/v1/pedidos'),
+        api.get<PedidoResumo[]>(`/v1/pedidos?${comoConsulta(periodo)}`),
         api.get<CategoriaInterna[]>('/v1/cardapio'),
       ]);
       setRestaurante(meu.data);
@@ -55,7 +71,7 @@ export function Painel() {
     } catch (e) {
       setErro(mensagemDeErro(e));
     }
-  }, []);
+  }, [periodo]);
 
   useEffect(() => {
     void carregar();
@@ -123,8 +139,14 @@ export function Painel() {
         {erro && <p className="erro">{erro}</p>}
 
         {aba === 'pedidos' && (
-          <Pedidos pedidos={pedidos} restaurante={restaurante} aoAgir={agir} />
+          <>
+            <FiltroDePeriodo periodo={periodo} aoMudar={setPeriodo} />
+            <Pedidos pedidos={pedidos} restaurante={restaurante} aoAgir={agir} />
+          </>
         )}
+
+        {/* RN-GER-038 — a aba só existe para quem tem a permissão, e a rota recusa de todo jeito. */}
+        {aba === 'operacao' && <Operacao />}
 
         {aba === 'cardapio' && <Cardapio categorias={cardapio} aoMudar={carregar} />}
 
@@ -163,7 +185,7 @@ function Pedidos({
     return (
       <div className="vazio">
         <Grelha etapa={-1} de={6} alta />
-        <p>Nenhum pedido no dia operacional de hoje.</p>
+        <p>Nenhum pedido no período escolhido.</p>
         <p className="secundario">
           Abra o link público do seu cardápio em outra aba e faça um pedido para vê-lo
           aparecer aqui.

@@ -15,6 +15,7 @@ using GrelhaHub.Application.Features.Gerais.Usuarios;
 using GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 using GrelhaHub.Application.Features.Vendas.CancelarEExcluirPedido;
 using GrelhaHub.Application.Features.Vendas.ListarPedidos;
+using GrelhaHub.Application.Features.Vendas.ResumoDaOperacao;
 using GrelhaHub.Application.Features.Gerais.Acesso;
 using GrelhaHub.Application.Features.Gerais.Plataforma;
 using GrelhaHub.Domain.Vendas;
@@ -432,6 +433,23 @@ public sealed class PedidosController(ISender sender) : ControllerBase
         [FromQuery] Guid? unidadeId,
         CancellationToken ct) =>
         Ok(await sender.Send(new ListarPedidosQuery(status, de, ate, unidadeId), ct));
+
+    /// <summary>
+    /// <c>RN-GER-038</c> — o painel de operação. <b>Permissão própria</b>, não
+    /// <c>pedido.visualizar</c>: o faturamento da semana é outra pergunta que a do pedido da mesa 4.
+    /// <para>
+    /// Rota sob <c>/pedidos</c> porque é do pedido que ela responde, e o recorte é o mesmo — mesmo
+    /// período de <b>dia operacional</b> (<c>RN-VEN-050</c>), mesma unidade opcional para a
+    /// plataforma (<c>RN-GER-014</c>).
+    /// </para>
+    /// </summary>
+    [HttpGet("resumo")]
+    public async Task<ActionResult<ResumoDaOperacaoDto>> Resumo(
+        [FromQuery] DateOnly? de,
+        [FromQuery] DateOnly? ate,
+        [FromQuery] Guid? unidadeId,
+        CancellationToken ct) =>
+        Ok(await sender.Send(new ResumoDaOperacaoQuery(de, ate, unidadeId), ct));
 
     /// <summary>
     /// <c>RN-VEN-018</c> — a confirmação é o gatilho de baixa de estoque e ordem de produção.

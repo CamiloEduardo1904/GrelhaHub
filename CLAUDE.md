@@ -40,7 +40,7 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 176 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 180 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 16 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
@@ -186,7 +186,7 @@ npm run lint && npm run build
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **176 regras catalogadas: 150 em `HIP`, 26 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **180 regras catalogadas: 154 em `HIP`, 26 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
@@ -206,7 +206,7 @@ não existe.
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **276 testes** — 76 de domínio + 7 de aplicação + 193 de integração |
+| `dotnet test -c Release` | ✔ **289 testes** — 76 de domínio + 13 de aplicação + 200 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

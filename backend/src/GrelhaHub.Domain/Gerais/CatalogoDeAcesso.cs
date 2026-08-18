@@ -59,6 +59,15 @@ public static class CatalogoDeAcesso
 
         // RN-GER-012 — a permissão que decide se custo, CMV e margem SAEM do servidor.
         new("custo.visualizar", "Ver custo, CMV e margem", CodigoDeModulo.Vendas),
+
+        // RN-GER-038 — o painel de operação, SEPARADO de `pedido.visualizar`.
+        //
+        // ⚠ A separação é o ponto. Quem atende o telefone precisa ver o pedido da mesa 4; o
+        // faturamento da semana é outra pergunta e responde a quem responde pelo resultado.
+        // Junto com `pedido.visualizar`, o agregado de venda — que é o passo anterior a margem —
+        // chegaria a todo atendente por uma porta lateral que `RN-GER-012` fecha na porta da
+        // frente.
+        new("operacao.visualizar", "Ver o painel de operação e o faturamento", CodigoDeModulo.Vendas),
     ];
 
     /// <summary>
@@ -96,6 +105,10 @@ public static class CatalogoDeAcesso
             "cardapio.visualizar", "cardapio.gerenciar",
             "pedido.visualizar", "pedido.avancar", "pedido.cancelar",
             "custo.visualizar",
+
+            // RN-GER-038 — o gerente responde pelo resultado do dia; é dele a pergunta que o
+            // painel de operação responde.
+            "operacao.visualizar",
         ]),
 
         // Sem cancelar, sem excluir, sem custo: RN-GER-012 é restrição de dado, e o atendente

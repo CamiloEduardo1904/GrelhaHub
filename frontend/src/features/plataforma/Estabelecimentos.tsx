@@ -4,6 +4,7 @@ import { IconeLapis, IconeMais, IconeOlho } from '../../components/Icone';
 import { api, mensagemDeErro } from '../../services/api';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import { CadastroDeOperacao } from './CadastroDeOperacao';
+import { Operacao } from '../admin/Operacao';
 import { OperacaoDaCasa } from './OperacaoDaCasa';
 import { SessaoDeSuporteDaCasa } from './SessaoDeSuporteDaCasa';
 import {
@@ -24,7 +25,7 @@ import {
  * desta área ficou ilegível.
  */
 
-type Aba = 'operacao' | 'dados' | 'modulos';
+type Aba = 'operacao' | 'painel' | 'dados' | 'modulos';
 
 export function Estabelecimentos() {
   const [lista, setLista] = useState<Estabelecimento[]>([]);
@@ -174,7 +175,12 @@ function DetalheDaCasa({
   const [aba, setAba] = useState<Aba>('operacao');
 
   const ABAS: { chave: Aba; nome: string }[] = [
-    { chave: 'operacao', nome: 'Operação' },
+    { chave: 'operacao', nome: 'Horário e endereço' },
+
+    // RN-GER-038 — o painel da casa, visto pela plataforma. Ela alcança pelo bypass de
+    // RN-GER-014, e o recorte vai na consulta: `unidadeId` diz de QUAL casa, e o servidor
+    // ignora o parâmetro para quem não é plataforma (RN-GER-016).
+    { chave: 'painel', nome: 'Painel' },
     { chave: 'dados', nome: 'Dados e situação' },
     { chave: 'modulos', nome: `Módulos · ${casa.modulos.length}` },
   ];
@@ -209,7 +215,13 @@ function DetalheDaCasa({
       {/* A operação é LEITURA e não passa pela sessão de suporte (RN-GER-015 guarda a escrita). */}
       {aba === 'operacao' && <OperacaoDaCasa casa={casa} />}
 
-      {aba !== 'operacao' && (
+      {aba === 'painel' && <Operacao unidadeId={casa.id} />}
+
+      {/* ⚠ Enumerado, e não `aba !== 'operacao'`. A sessão de suporte guarda a ESCRITA
+          (`RN-GER-015`); as duas abas de leitura — horário e painel — não a exigem. Com a
+          negação, a aba nova entrava aqui por padrão e pediria sessão de suporte para ver um
+          gráfico: é o tipo de condição que envelhece errado a cada aba acrescentada. */}
+      {(aba === 'dados' || aba === 'modulos') && (
         <>
           <SessaoDeSuporteDaCasa casa={casa} sessao={sessao} aoMudar={aoMudar} />
 

@@ -130,7 +130,7 @@ public static class ModeloDeEmailDeAcesso
                               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0">
                                 <tr>
                                   <td bgcolor="{Brasa}" style="background:{Brasa};border:2px solid {Carvao};box-shadow:3px 3px 0 {Carvao}">
-                                    <a href="{link}" style="display:block;{AlturaDoBotao};font-family:{Mono};font-size:13px;font-weight:bold;letter-spacing:0.1em;text-transform:uppercase;color:#ffffff;text-decoration:none">{acao}</a>
+                                    <a href="{link}" style="display:block;{AlturaDoBotao};font-family:{Mono};font-size:13px;font-weight:bold;letter-spacing:0.1em;text-transform:uppercase;color:{Carvao};text-decoration:none">{acao}</a>
                                   </td>
                                 </tr>
                               </table>
