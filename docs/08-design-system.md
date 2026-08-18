@@ -288,14 +288,34 @@ produziria uma virada de dia operacional de 24 horas de deslocamento (`RN-GER-00
 
 ### `<MenuDePerfis />`
 
-O perfil do usuário e **o que ele concede** — `RN-GER-010`, `RN-GER-024`. Substituiu o `<select>`:
-escolher perfil é conceder acesso, e a palavra "Gerente" num `<option>` não diz o que está sendo
-entregue. Cada perfil é um cartão com a lista de permissões em português, mais o código de cada uma
-— é o código que aparece na mensagem de erro do servidor, e ligar um ao outro é o que permite ao
-suporte responder sem adivinhar.
+O perfil do usuário e **o que ele concede** — `RN-GER-010`, `RN-GER-024`. Cada perfil é um cartão
+com a lista de permissões em português, mais o código de cada uma — é o código que aparece na
+mensagem de erro do servidor, e ligar um ao outro é o que permite ao suporte responder sem
+adivinhar.
 
 As permissões **vêm do servidor**. Cópia no TypeScript divergiria do `CatalogoDeAcesso` na primeira
 permissão nova, e a tela passaria a prometer o que o servidor recusa.
+
+> #### ⚠ Onde ele entra, e onde NÃO entra — revisado em 18/08/2026
+>
+> O componente nasceu substituindo o `<select>` **nas duas telas de criação de usuário**, com o
+> argumento de que "Gerente" num `<option>` não diz o que está sendo entregue e quem atribui assina
+> em branco. O argumento continua de pé — mas **não vale igual nos dois lados do produto**, e essa
+> parte faltava:
+>
+> | Tela | Controle | Por quê |
+> |------|----------|---------|
+> | Plataforma criando usuário **de uma casa** (`UsuariosDaPlataforma`) | **`<MenuDePerfis>`** | Quem escolhe está concedendo acesso numa operação que **não é a dele**, para gente que ele não conhece, sob sessão de suporte. É aqui que assinar em branco custa caro |
+> | Restaurante criando usuário da própria casa (`Usuarios`) | **`<select>` simples** | Quem escolhe é o administrador da casa, que convive com os perfis todo dia. Seis cartões e até quinze permissões abertas empurravam o resto do formulário para fora da tela para dizer o que ele já sabe |
+> | Equipe da plataforma (`EquipeDaPlataforma`) | nenhum | Usuário de plataforma não tem unidade nem perfil (`RN-GER-030`) |
+>
+> **Esconder o detalhe não afrouxa nada, e é o que torna a troca aceitável:** `RN-GER-024` recusa no
+> servidor com a regra citada, e a lista que chega ao restaurante já vem filtrada por `delegavel`,
+> calculado pela `MatrizDeDelegacao` do **domínio**. O que muda é quanto a tela **explica**, não o
+> que ela **permite** — e explicação em excesso, na tela de quem já sabe, custa a tela inteira.
+>
+> Decisão do dono do produto. Se um dia o restaurante ganhar perfil personalizado — em que o nome
+> deixa de dizer o conteúdo —, esta linha volta a ser discutida.
 
 ---
 

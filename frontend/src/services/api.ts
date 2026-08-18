@@ -75,11 +75,35 @@ api.interceptors.response.use(
  * aparece, com o ID da regra quando houver.
  */
 export function mensagemDeErro(erro: unknown): string {
-  const axiosErro = erro as AxiosError<{ detail?: string; title?: string; regra?: string }>;
+  const axiosErro = erro as AxiosError<{
+    detail?: string;
+    title?: string;
+    regra?: string;
+    errors?: Record<string, string[]>;
+  }>;
+
   const dados = axiosErro.response?.data;
 
   if (dados?.detail) {
     return dados.regra ? `${dados.detail} (${dados.regra})` : dados.detail;
+  }
+
+  /**
+   * ⚠ `ProblemDetails` de VALIDAÇÃO guarda as mensagens em `errors`, uma lista por campo — e o
+   * `title` dele é a frase genérica do ASP.NET, em INGLÊS: "One or more validation errors
+   * occurred.".
+   *
+   * Era essa frase que chegava ao usuário. Numa tela em português, sem dizer qual campo, sem dizer
+   * o quê: o pior erro possível, porque parece defeito do sistema quando é o formulário
+   * incompleto. As mensagens de verdade — as dos validators, já em português — estavam logo
+   * abaixo, no campo que este bloco passou a ler.
+   */
+  const doCampo = Object.values(dados?.errors ?? {})
+    .flat()
+    .filter((m) => typeof m === 'string' && m.trim() !== '');
+
+  if (doCampo.length > 0) {
+    return doCampo.join(' ');
   }
 
   return dados?.title ?? 'Não foi possível concluir a operação.';

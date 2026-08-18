@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Grelha } from '../../components/Grelha';
 import { IconeChave, IconeDesligar, IconeLapis, IconeMais } from '../../components/Icone';
 import { api, mensagemDeErro } from '../../services/api';
+import { MenuDePerfis, type PerfilDaUnidade } from '../admin/MenuDePerfis';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import type { UsuarioDaUnidade } from '../../services/tipos';
 import { SessaoDeSuporteDaCasa } from './SessaoDeSuporteDaCasa';
@@ -16,14 +17,10 @@ import { sessaoVigente, type Estabelecimento, type SessaoDeSuporte } from './tip
  *
  * O filtro por loja usa `?unidadeId=` — o mesmo parâmetro que só a plataforma pode informar
  * (`RN-GER-016`: para o restaurante ele é ignorado).
+ *
+ * O tipo do perfil vem de `MenuDePerfis`, e não de uma cópia local: a cópia daqui não tinha
+ * `permissoes`, e foi o que fez esta tela oferecer perfil sem dizer o que ele concede.
  */
-
-interface PerfilDaUnidade {
-  id: string;
-  nome: string;
-  descricao: string;
-  delegavel: boolean;
-}
 
 export function UsuariosDaPlataforma() {
   const [casas, setCasas] = useState<Estabelecimento[]>([]);
@@ -483,8 +480,25 @@ function FormularioDeUsuario({
     };
   }, [unidadeId]);
 
-  const cpfErrado = apenasDigitos(form.cpf).length === 11 && !cpfValido(form.cpf);
+  const cpfCompleto = apenasDigitos(form.cpf).length === 11;
+  const cpfErrado = cpfCompleto && !cpfValido(form.cpf);
   const temSessao = unidadeId !== '' && sessaoVigente(sessoes, unidadeId) !== null;
+
+  /**
+   * O que ainda falta, nomeado — igual a `Usuarios.tsx`.
+   *
+   * ⚠ Aqui a checagem do PERFIL é obrigatória, e não conveniência: `<MenuDePerfis>` é um grupo de
+   * `<button>`, então o navegador não tem o que validar. Sem esta linha, enviar sem escolher
+   * perfil só falha no servidor — e era exatamente o caminho do defeito relatado.
+   */
+  const faltando = [
+    unidadeId === '' && 'estabelecimento',
+    form.nome.trim() === '' && 'nome',
+    form.sobrenome.trim() === '' && 'sobrenome',
+    !cpfCompleto && 'CPF',
+    form.email.trim() === '' && 'e-mail',
+    form.perfilNome === '' && 'perfil',
+  ].filter((f): f is string => typeof f === 'string');
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
@@ -574,21 +588,6 @@ function FormularioDeUsuario({
           </label>
 
           <label>
-            Perfil
-            <select
-              value={form.perfilNome}
-              onChange={(e) => setForm((a) => ({ ...a, perfilNome: e.target.value }))}
-              required
-            >
-              <option value="">Escolha…</option>
-              {perfis.map((p) => (
-                <option key={p.id} value={p.nome}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             E-mail
             <input
               type="email"
@@ -598,6 +597,30 @@ function FormularioDeUsuario({
             />
           </label>
         </div>
+
+        {/* RN-GER-010 — aqui SIM o perfil vem com o que ele concede, e não como `<select>`.
+            Decisão do dono do produto em 18/08/2026 (§3 do design system): é a plataforma
+            escolhendo perfil para uma operação que não é a dela, e "Gerente" num `<option>` não
+            diz o que está sendo entregue a um cliente. Do outro lado do produto — o
+            administrador do restaurante, em `Usuarios.tsx` — basta o nome: ele convive com os
+            perfis todo dia.
+
+            ⚠ Sem filtro por `delegavel`: a plataforma não passa pela matriz de delegação
+            (`RN-GER-024`), como diz a nota no rodapé deste formulário. O que a limita é a
+            sessão de suporte (`RN-GER-015`), e é ela que desabilita o fieldset inteiro. */}
+        <MenuDePerfis
+          perfis={perfis}
+          // A rota da plataforma recebe `perfilNome`, e o menu trabalha com `id` — o perfil é
+          // resolvido contra a unidade no servidor. A tradução fica aqui, nas duas pontas.
+          selecionado={perfis.find((p) => p.nome === form.perfilNome)?.id ?? ''}
+          aoSelecionar={(perfilId) =>
+            setForm((a) => ({
+              ...a,
+              perfilNome: perfis.find((p) => p.id === perfilId)?.nome ?? '',
+            }))
+          }
+          desabilitado={!unidadeId || !temSessao}
+        />
 
         {/* RN-GER-032 — sem campo de senha: o convite por e-mail define. Ver Usuarios.tsx. */}
         <p className="ajuda">
@@ -617,10 +640,17 @@ function FormularioDeUsuario({
       <button
         type="submit"
         className="btn bloco"
-        disabled={enviando || cpfErrado || !unidadeId || !temSessao}
+        disabled={enviando || cpfErrado || faltando.length > 0 || !temSessao}
       >
         {enviando ? 'Criando…' : 'Criar usuário'}
       </button>
+
+      {/* A sessão de suporte tem mensagem própria, acima. Aqui só o que o formulário deve. */}
+      {temSessao && faltando.length > 0 && (
+        <p className="ajuda">
+          Falta preencher: <strong>{faltando.join(', ')}</strong>.
+        </p>
+      )}
     </form>
   );
 }

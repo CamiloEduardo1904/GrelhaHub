@@ -4,7 +4,7 @@ import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import type { UsuarioDaUnidade } from '../../services/tipos';
-import { MenuDePerfis, type PerfilDaUnidade } from './MenuDePerfis';
+import type { PerfilDaUnidade } from './MenuDePerfis';
 import { lerSessao, pode } from './sessao';
 
 /**
@@ -231,6 +231,27 @@ function FormularioDeUsuario({
   const cpfCompleto = apenasDigitos(form.cpf).length === 11;
   const cpfErrado = cpfCompleto && !cpfValido(form.cpf);
 
+  /**
+   * O que ainda falta, **nomeado**.
+   *
+   * ⚠ Botão desabilitado sem dizer por quê é um beco: a pessoa clica, nada acontece, e ela não
+   * tem como descobrir o que fazer. A lista abaixo do botão é a saída — a mesma pergunta da
+   * definição de pronto do guia de specs, aplicada a um botão em vez de a uma regra.
+   *
+   * O FORMATO do e-mail continua com o `type="email"` do navegador e com o validator do
+   * servidor: repetir a regra aqui em regex seria uma terceira definição do que é e-mail
+   * válido, e a que diverge primeiro é sempre a do cliente.
+   */
+  const faltando = [
+    form.nome.trim() === '' && 'nome',
+    form.sobrenome.trim() === '' && 'sobrenome',
+    !cpfCompleto && 'CPF',
+    form.email.trim() === '' && 'e-mail',
+    form.perfilId === '' && 'perfil',
+  ].filter((f): f is string => typeof f === 'string');
+
+  const podeEnviar = faltando.length === 0 && !cpfErrado;
+
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
@@ -284,16 +305,33 @@ function FormularioDeUsuario({
             E-mail
             <input type="email" {...campo('email')} required autoComplete="off" />
           </label>
-        </div>
 
-        {/* RN-GER-010 — o menu de perfis, com o que cada um concede. Substituiu o `<select>`:
-            escolher perfil é conceder acesso, e a palavra "Gerente" num `<option>` não diz o
-            que está sendo entregue. */}
-        <MenuDePerfis
-          perfis={perfis}
-          selecionado={form.perfilId}
-          aoSelecionar={(perfilId) => setForm((atual) => ({ ...atual, perfilId }))}
-        />
+          {/* Um `<select>` simples, e não o `<MenuDePerfis>` com as permissões abertas — decisão
+              do dono do produto em 18/08/2026, registrada no §3 do design system.
+
+              O detalhamento continua existindo onde ele foi pedido: na tela da PLATAFORMA
+              cadastrando usuário para uma casa, que é quem escolhe perfil para uma operação que
+              não é a dela. Aqui quem escolhe é o administrador da própria casa, que convive com
+              os perfis todo dia.
+
+              ⚠ Esconder o detalhe não afrouxa nada: `RN-GER-024` recusa no servidor, e a lista
+              já vem filtrada por `delegavel`, calculado pela `MatrizDeDelegacao` do domínio. */}
+          <label>
+            Perfil
+            <select
+              value={form.perfilId}
+              onChange={(e) => setForm((atual) => ({ ...atual, perfilId: e.target.value }))}
+              required
+            >
+              <option value="">Escolha…</option>
+              {perfis.map((perfil) => (
+                <option key={perfil.id} value={perfil.id}>
+                  {perfil.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         {/* RN-GER-032 / RN-GER-033 — NÃO se digita senha aqui, e a ausência do campo é o ponto.
             O usuário recebe um link de uso único por e-mail e define a própria senha: a senha que
@@ -313,9 +351,15 @@ function FormularioDeUsuario({
         pessoa não é senha (<code>RF-SEG-005</code>).
       </p>
 
-      <button type="submit" className="btn bloco" disabled={enviando || cpfErrado}>
+      <button type="submit" className="btn bloco" disabled={enviando || !podeEnviar}>
         {enviando ? 'Criando…' : 'Criar usuário'}
       </button>
+
+      {faltando.length > 0 && (
+        <p className="ajuda">
+          Falta preencher: <strong>{faltando.join(', ')}</strong>.
+        </p>
+      )}
     </form>
   );
 }
