@@ -125,3 +125,43 @@ public sealed class SessaoDeSuporteConfiguration : IEntityTypeConfiguration<Sess
         builder.Ignore(s => s.EstaAberta);
     }
 }
+
+/// <summary>
+/// <c>RN-GER-033</c> ⚠⚠ — o link de uso único. ADR-0016.
+/// <para>
+/// <b>Sem <c>unidade_id</c>, exceção declarada a <c>RN-GER-009</c>:</b> o token pertence ao
+/// usuário, e o de plataforma não tem unidade. Ver <see cref="TokenDeAcesso"/>.
+/// </para>
+/// </summary>
+public sealed class TokenDeAcessoConfiguration : IEntityTypeConfiguration<TokenDeAcesso>
+{
+    public void Configure(EntityTypeBuilder<TokenDeAcesso> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("token_acesso");
+        builder.HasKey(t => t.Id);
+
+        builder.Property(t => t.Tipo).IsRequired().HasConversion<string>().HasMaxLength(30);
+
+        // ÚNICO: o hash é o que a consulta de resgate procura, e dois registros com o mesmo hash
+        // seriam o mesmo link valendo duas vezes — o oposto de "uso único".
+        builder.Property(t => t.Hash).IsRequired().HasMaxLength(128).HasColumnName("hash_token");
+        builder.HasIndex(t => t.Hash).IsUnique().HasDatabaseName("ux_token_acesso_hash");
+
+        builder.Property(t => t.ExpiraEm).IsRequired().HasColumnName("dh_expiracao");
+        builder.Property(t => t.CriadoEm).IsRequired().HasColumnName("dh_criacao");
+        builder.Property(t => t.UsadoEm).HasColumnName("dh_uso");
+        builder.Property(t => t.InvalidadoEm).HasColumnName("dh_invalidacao");
+
+        builder.HasOne(t => t.Usuario)
+            .WithMany()
+            .HasForeignKey(t => t.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Emitir token novo invalida os anteriores do mesmo tipo (RN-GER-033): é esta consulta.
+        builder.HasIndex(t => new { t.UsuarioId, t.Tipo, t.UsadoEm, t.InvalidadoEm })
+            .HasDatabaseName("ix_token_acesso_vigente");
+
+    }
+}

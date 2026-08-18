@@ -45,6 +45,20 @@ import type { StatusPedido } from '../../services/tipos';
  */
 const INTERVALO_MS = 15_000;
 
+/**
+ * `PAR-VEN-006` e `PAR-VEN-007` — depois de 10 consultas, o intervalo passa para 25 s.
+ *
+ * Dois minutos e meio na tela querem dizer que o cliente está esperando algo que demora: pedido em
+ * produção, fila de sexta à noite. Espaçar dali em diante corta quase metade das requisições da
+ * noite cheia sem que ninguém perceba a diferença — e é **preferível a encurtar o acompanhamento**,
+ * que era como a versão anterior "resolvia" o custo (parava sozinha e deixava a tela mentindo).
+ *
+ * O contador é de consultas **feitas**, não de tempo decorrido: aba escondida não consulta, então
+ * não conta — quem voltar depois de meia hora ainda recebe as primeiras dez no ritmo curto.
+ */
+const CONSULTAS_ANTES_DE_AFROUXAR = 10;
+const INTERVALO_LONGO_MS = 25_000;
+
 /** Teto do recuo. Um minuto entre tentativas ainda recupera sozinho quando a API volta. */
 const INTERVALO_MAXIMO_MS = 60_000;
 
@@ -96,6 +110,11 @@ export function usePedidoAoVivo(
   // recriado a cada resposta e o intervalo real deixa de ser o intervalo.
   const emVoo = useRef(false);
   const falhasSeguidas = useRef(0);
+
+  // RN-VEN-047 — consultas FEITAS nesta tela, para saber quando afrouxar o intervalo. Ref e não
+  // estado: mudar isto não pode reiniciar o efeito, senão o timer é recriado a cada resposta e o
+  // intervalo real deixa de ser o intervalo.
+  const consultasFeitas = useRef(0);
   const aoAtualizarRef = useRef(aoAtualizar);
   const statusAtual = useRef<StatusPedido | null>(null);
 
@@ -128,6 +147,7 @@ export function usePedidoAoVivo(
       }
 
       emVoo.current = true;
+      consultasFeitas.current += 1;
 
       try {
         const { data } = await api.get<PedidoPublico>(`/publico/${slug}/pedidos/${numero}`, {
@@ -167,11 +187,15 @@ export function usePedidoAoVivo(
     }
 
     function agendar() {
-      // Recuo exponencial no erro, reiniciado no primeiro sucesso.
-      const espera = Math.min(
-        INTERVALO_MS * 2 ** falhasSeguidas.current,
-        INTERVALO_MAXIMO_MS,
-      );
+      // RN-VEN-047 — 15 s nas primeiras dez consultas, 25 s daí em diante.
+      const base =
+        consultasFeitas.current < CONSULTAS_ANTES_DE_AFROUXAR
+          ? INTERVALO_MS
+          : INTERVALO_LONGO_MS;
+
+      // Recuo exponencial no erro, reiniciado no primeiro sucesso. Multiplica a base VIGENTE:
+      // quem já afrouxou e perdeu a rede recua a partir de 25 s, não volta para 15 s.
+      const espera = Math.min(base * 2 ** falhasSeguidas.current, INTERVALO_MAXIMO_MS);
 
       // Um temporizador por corrente. Sem isto, `agendar` chamado por dois caminhos no mesmo
       // instante — o retorno da consulta e a volta para a aba — deixaria dois timers correndo, e

@@ -232,7 +232,10 @@ public sealed class CriarUsuarioDePlataformaValidator : AbstractValidator<CriarU
 }
 
 public sealed class CriarUsuarioDePlataformaHandler(
-    IAppDbContext db, IContextoDeExecucao contexto, IHashDeSenha hash)
+    IAppDbContext db,
+    IContextoDeExecucao contexto,
+    IHashDeSenha hash,
+    Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioDePlataformaCommand, UsuarioDePlataformaDto>
 {
     public async Task<UsuarioDePlataformaDto> Handle(
@@ -279,6 +282,9 @@ public sealed class CriarUsuarioDePlataformaHandler(
 
         db.Usuarios.Add(usuario);
         await db.SaveChangesAsync(cancellationToken);
+
+        // RN-GER-032 / RN-GER-033 — convite de primeiro acesso, enfileirado depois de gravar.
+        await convites.EmitirAsync(usuario, TipoDeToken.Convite, cancellationToken);
 
         return new UsuarioDePlataformaDto(
             usuario.Id, request.UnidadeId, usuario.NomeCompleto, usuario.Email, perfil.Nome);

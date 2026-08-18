@@ -155,6 +155,48 @@ existe guarda o dono de quando nasceu — daí o comando acima.
 > A sonda **escreve e apaga** um arquivo. Conferir se o diretório existe não pegaria nada: ele
 > existia, montado, e sem permissão para quem precisava escrever.
 
+## Correio — RN-GER-032, ADR-0016
+
+A caixa do domínio, na Hostinger. **SPF, DKIM e DMARC já publicados** — é o que faz o link de
+recuperação chegar na entrada em vez do spam.
+
+```bash
+cd /opt/grelhahub
+
+cat >> .env <<'FIM'
+EMAIL_HOST=smtp.hostinger.com
+EMAIL_PORTA=587
+EMAIL_USUARIO=sistema@grelhahub.com
+EMAIL_SENHA=a-senha-DA-CAIXA
+EMAIL_REMETENTE=noreply@grelhahub.com
+EMAIL_NOME_REMETENTE=GrelhaHub
+EMAIL_BASE_DO_SITE=https://grelhahub.com
+FIM
+
+docker compose config | grep Email__     # os sete precisam aparecer
+docker compose up -d api
+```
+
+| Campo | Valor | Observação |
+|-------|-------|------------|
+| Host | `smtp.hostinger.com` | |
+| Porta | **587** | STARTTLS. 465 é SSL implícito, e o código escolhe pelo número — trocar um pelo outro **trava a conexão sem erro legível** |
+| Usuário | `sistema@grelhahub.com` | ⚠ a senha é a **da caixa**, não a do hPanel |
+| Remetente | `noreply@grelhahub.com` | Alias da mesma caixa |
+| `EMAIL_BASE_DO_SITE` | `https://grelhahub.com` | ⚠ Monta o link do e-mail. Vem **daqui**, nunca do cabeçalho `Host` da requisição — link montado com o que o cliente mandou é o furo clássico da troca de senha |
+
+**Sem `EMAIL_HOST`, nada é enviado — e isso é estado válido** (`RN-GER-032`). Cada e-mail que
+deixou de sair fica no log com destinatário e assunto, e **nenhuma operação falha por causa disso**:
+usuário criado continua criado. Confira com:
+
+```bash
+docker compose logs api | grep "RN-GER-032"
+```
+
+> ⚠ **A fila de envio é em memória** (ADR-0016). Reiniciar o contêiner descarta o que não saiu.
+> Aceito porque todo e-mail nosso é reemitível — o usuário pede outro link. Se um dia entrar aqui
+> um e-mail que não se possa pedir de novo, o ADR precisa ser revisto **antes**.
+
 ## Backup — RNF-017
 
 > ⚠⚠ **`pg_dump` sozinho DEIXOU de ser backup completo.** Desde a `SPEC-VEN-002` (ADR-0015) as

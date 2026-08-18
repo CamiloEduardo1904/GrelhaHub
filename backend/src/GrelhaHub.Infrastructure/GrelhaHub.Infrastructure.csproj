@@ -12,6 +12,11 @@
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="Microsoft.AspNetCore.Identity" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+
+    <!-- ADR-0016 — SMTP pelo MailKit; Hosting.Abstractions é o BackgroundService que consome a
+         fila de envio, e mora aqui porque a fila é detalhe de infraestrutura. -->
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>

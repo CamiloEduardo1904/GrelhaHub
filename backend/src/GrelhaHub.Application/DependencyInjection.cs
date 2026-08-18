@@ -29,6 +29,11 @@ public static class DependencyInjection
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly);
 
+        // RN-GER-033 / ADR-0016 — a emissão de link é usada por três handlers (esqueci a senha,
+        // criar usuário de restaurante, criar usuário de plataforma). Serviço e não handler, para
+        // que a invalidação dos tokens anteriores exista em um lugar só.
+        services.AddScoped<Features.Gerais.Acesso.EmissorDeLinkDeAcesso>();
+
         // A ordem importa e é esta:
         //
         // 1. MÓDULO — o restaurante contratou isto? Não contratou, não existe (RN-GER-017).

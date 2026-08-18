@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GrelhaHub.Integration.Tests.Infraestrutura;
 
@@ -49,6 +50,16 @@ internal sealed class ApiDeTestes(string stringDeConexao, string chaveJwt) : Web
 
         builder.UseSetting("ConnectionStrings:GrelhaHub", stringDeConexao);
         builder.UseSetting("Jwt:Chave", chaveJwt);
+
+        // ADR-0016 — O CORREIO É O ÚNICO DUBLÊ DA SUÍTE, e a exceção é declarada: a alternativa
+        // seria um servidor SMTP no contêiner para provar uma regra que não é sobre SMTP. O que os
+        // testes precisam do e-mail é o CONTEÚDO — o link com o token, que só existe na mensagem
+        // (RN-GER-033 guarda apenas o hash). O caminho continua real até a fila.
+        builder.ConfigureServices(servicos =>
+        {
+            servicos.RemoveAll<Application.Common.Interfaces.IEnviadorDeEmail>();
+            servicos.AddSingleton<Application.Common.Interfaces.IEnviadorDeEmail>(CaixaDeSaida);
+        });
     }
 
     /// <summary>
@@ -64,4 +75,10 @@ internal sealed class ApiDeTestes(string stringDeConexao, string chaveJwt) : Web
     /// reimplementação sua.
     /// </summary>
     public IServiceScope CriarEscopo() => Services.CreateScope();
+
+    /// <summary>
+    /// A caixa de saída desta execução — estática pelo mesmo motivo da raiz de arquivos: um teste
+    /// dispara o e-mail por um host e lê a mensagem pelo mesmo lugar.
+    /// </summary>
+    public static readonly CaixaDeSaidaDeTeste CaixaDeSaida = new();
 }

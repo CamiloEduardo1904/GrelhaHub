@@ -114,7 +114,10 @@ public sealed class CriarUsuarioDeSuporteValidator : AbstractValidator<CriarUsua
 }
 
 public sealed class CriarUsuarioDeSuporteHandler(
-    IAppDbContext db, IContextoDeExecucao contexto, IHashDeSenha hash)
+    IAppDbContext db,
+    IContextoDeExecucao contexto,
+    IHashDeSenha hash,
+    Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioDeSuporteCommand, UsuarioDeSuporteDto>
 {
     public async Task<UsuarioDeSuporteDto> Handle(
@@ -146,6 +149,9 @@ public sealed class CriarUsuarioDeSuporteHandler(
 
         db.Usuarios.Add(usuario);
         await db.SaveChangesAsync(cancellationToken);
+
+        // RN-GER-032 / RN-GER-033 — o colega de suporte recebe o mesmo convite de primeiro acesso.
+        await convites.EmitirAsync(usuario, TipoDeToken.Convite, cancellationToken);
 
         return new UsuarioDeSuporteDto(
             usuario.Id, usuario.Nome, usuario.Email, usuario.Ativo,

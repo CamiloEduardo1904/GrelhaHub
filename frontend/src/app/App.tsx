@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Entrar } from '../features/admin/Entrar';
 import { TrocarSenha } from '../features/admin/TrocarSenha';
+import { DefinirSenha, EsqueciMinhaSenha } from '../features/admin/RecuperarAcesso';
 import { Painel } from '../features/admin/Painel';
 import { ExigeSessao } from '../features/admin/ExigeSessao';
 import { Cardapio } from '../features/publico/Cardapio';
@@ -36,6 +37,14 @@ export function App() {
         {/* RF-SEG-005 — fora de `ExigeSessao` de propósito: o guardião manda PARA cá quando a
             troca está pendente, e envolvê-la nele criaria um redirecionamento em círculo. */}
         <Route path="/trocar-senha" element={<TrocarSenha />} />
+
+        {/* RN-GER-033 / RN-GER-034 — recuperação de acesso, anônima por natureza: quem esqueceu
+            a senha não tem como provar quem é. As duas rotas de definição levam à MESMA tela; são
+            dois caminhos porque é o que o e-mail promete em cada caso — convite e redefinição —,
+            e link que abre tela com outro nome parece erro de quem recebeu. */}
+        <Route path="/esqueci-minha-senha" element={<EsqueciMinhaSenha />} />
+        <Route path="/definir-senha" element={<DefinirSenha />} />
+        <Route path="/redefinir-senha" element={<DefinirSenha />} />
 
         {/* NAO existe rota publica de cadastro de restaurante, e a ausencia e decisao:
             ninguem ganha uma conta sem contrato assinado. Quem cria estabelecimento e o

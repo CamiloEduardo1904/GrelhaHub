@@ -510,6 +510,58 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("sessao_suporte", (string)null);
                 });
 
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_criacao");
+
+                    b.Property<DateTimeOffset>("ExpiraEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_expiracao");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("hash_token");
+
+                    b.Property<DateTimeOffset?>("InvalidadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_invalidacao");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo");
+
+                    b.Property<DateTimeOffset?>("UsadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_uso");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_token_acesso");
+
+                    b.HasIndex("Hash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_token_acesso_hash");
+
+                    b.HasIndex("UsuarioId", "Tipo", "UsadoEm", "InvalidadoEm")
+                        .HasDatabaseName("ix_token_acesso_vigente");
+
+                    b.ToTable("token_acesso", (string)null);
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Unidade", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1011,6 +1063,18 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sessao_suporte_usuarios_usuario_id");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_token_acesso_usuarios_usuario_id");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.UnidadeModulo", b =>

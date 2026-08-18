@@ -22,6 +22,11 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+
+    <!-- ADR-0016 — SMTP. `System.Net.Mail.SmtpClient` é desaconselhado pela Microsoft para
+         código novo, e o MailKit é o substituto que a própria documentação indica. -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.4" />
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
   </ItemGroup>
 

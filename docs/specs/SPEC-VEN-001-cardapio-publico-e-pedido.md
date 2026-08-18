@@ -111,7 +111,10 @@ número + telefone é o que autoriza a leitura sem exigir login (`RN-CRM-001`).
 
 ### A cadência do acompanhamento — `RN-VEN-047` ⚠
 
-A tela do cliente consulta essa rota a cada **`PAR-VEN-005`** segundos (15) e **só para quando o
+A tela do cliente consulta essa rota a cada **`PAR-VEN-005`** segundos (15) nas primeiras
+**`PAR-VEN-006`** consultas (10) e a cada **`PAR-VEN-007`** (25) daí em diante — quem está há dois
+minutos e meio na tela espera algo que demora, e espaçar corta quase metade das requisições da
+noite cheia sem que ninguém perceba. **Só para quando o
 pedido chega a Finalizado ou Cancelado**. Polling, e não SSE nem WebSocket: uma VPS com Nginx na
 frente (ADR-0006), para entregar segundos de diferença num fluxo que leva minutos.
 

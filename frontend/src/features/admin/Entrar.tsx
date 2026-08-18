@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
 import { mensagemDeErro } from '../../services/api';
 import { autenticar, lerSessao } from './sessao';
@@ -89,6 +89,12 @@ export function Entrar() {
         <button type="submit" className="btn bloco" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
+        {/* RN-GER-034 — a porta da recuperação. Sem ela, a regra existiria sem caminho na
+            interface: o quinto caso da série que a definição de pronto manda perguntar. */}
+        <Link className="btn calada" to="/esqueci-minha-senha">
+          Esqueci minha senha
+        </Link>
+
         {/* Sem "criar conta": a conta do restaurante e criada pela plataforma, com o contrato. */}
       </form>
     </div>

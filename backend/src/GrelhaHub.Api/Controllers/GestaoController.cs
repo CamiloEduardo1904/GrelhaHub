@@ -15,6 +15,7 @@ using GrelhaHub.Application.Features.Gerais.Usuarios;
 using GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 using GrelhaHub.Application.Features.Vendas.CancelarEExcluirPedido;
 using GrelhaHub.Application.Features.Vendas.ListarPedidos;
+using GrelhaHub.Application.Features.Gerais.Acesso;
 using GrelhaHub.Domain.Vendas;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -45,6 +46,43 @@ public sealed class AutenticacaoController(ISender sender) : ControllerBase
     // O handler `CadastrarRestauranteCommand` **continua existindo**: ele é o caminho único de
     // criação de unidade, chamado pela rota de plataforma. Reabrir o auto-serviço um dia é
     // acrescentar um controller, não reescrever a criação.
+
+    /// <summary>
+    /// <c>RN-GER-034</c> ⚠ — pede o link de redefinição de senha.
+    /// <para>
+    /// <b>Responde <c>202</c> sempre</b>, exista ou não a conta, esteja ela ativa ou não. É a mesma
+    /// escolha de <c>RN-GER-027</c> no login: quem sonda não descobre por aqui quem é cliente. Não é
+    /// <c>200</c> porque nada foi concluído — a resposta é "recebido; se houver conta, o e-mail
+    /// sai", e o código diz isso melhor do que qualquer corpo de mensagem.
+    /// </para>
+    /// </summary>
+    [HttpPost("esqueci-minha-senha")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EsqueciMinhaSenha(
+        SolicitarRedefinicaoDeSenhaCommand comando, CancellationToken ct)
+    {
+        await sender.Send(comando, ct);
+
+        return Accepted();
+    }
+
+    /// <summary>
+    /// <c>RN-GER-033</c> / <c>RN-GER-035</c> — consome o link e define a senha.
+    /// <para>
+    /// Serve ao convite de primeiro acesso e à redefinição: para o sistema é a mesma operação —
+    /// provar posse do e-mail e escolher uma senha —, e o que difere entre os dois já está gravado
+    /// no token.
+    /// </para>
+    /// </summary>
+    [HttpPost("definir-senha")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DefinirSenha(
+        DefinirSenhaComTokenCommand comando, CancellationToken ct)
+    {
+        await sender.Send(comando, ct);
+
+        return NoContent();
+    }
 }
 
 /// <summary>Dados do restaurante autenticado.</summary>

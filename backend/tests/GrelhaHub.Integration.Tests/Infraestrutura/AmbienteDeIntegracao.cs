@@ -78,6 +78,10 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
         _ = _api.Server;
 
         await SemearPlataformaAsync();
+
+        // ADR-0016 — a caixa de saída também é resíduo entre testes: uma mensagem da rodada
+        // anterior faria `UltimoToken` devolver um link que já não vale.
+        ApiDeTestes.CaixaDeSaida.Limpar();
     }
 
     public async Task DisposeAsync()

@@ -62,6 +62,32 @@ public static class DependencyInjection
 
         services.AddSingleton<IArmazenamentoDeArquivo, Arquivos.ArmazenamentoEmDisco>();
 
+        // ADR-0016 — o correio. Mesma leitura por indexador do bloco acima.
+        services.Configure<Email.OpcoesDeEmail>(opcoes =>
+        {
+            var secao = configuration.GetSection(Email.OpcoesDeEmail.Secao);
+
+            opcoes.Host = secao["Host"] ?? opcoes.Host;
+            opcoes.Usuario = secao["Usuario"] ?? opcoes.Usuario;
+            opcoes.Senha = secao["Senha"] ?? opcoes.Senha;
+            opcoes.Remetente = secao["Remetente"] ?? opcoes.Remetente;
+            opcoes.NomeDoRemetente = secao["NomeDoRemetente"] ?? opcoes.NomeDoRemetente;
+            opcoes.BaseDoSite = secao["BaseDoSite"] ?? opcoes.BaseDoSite;
+
+            if (int.TryParse(secao["Porta"], out var porta))
+            {
+                opcoes.Porta = porta;
+            }
+        });
+
+        // A fila é SINGLETON e o serviço que a consome também: são o mesmo canal, e dois canais
+        // seriam uma fila que ninguém lê.
+        services.AddSingleton<Email.FilaDeEmail>();
+        services.AddSingleton<IEnviadorDeEmail, Email.EnviadorDeEmail>();
+        services.AddHostedService<Email.ServicoDeEnvioDeEmail>();
+
+        services.AddSingleton<ITokensDeAcesso, Email.TokensDeAcesso>();
+
         services.AddSingleton<IHashDeSenha, HashDeSenha>();
         services.AddScoped<IGeradorDeToken, GeradorDeTokenJwt>();
 

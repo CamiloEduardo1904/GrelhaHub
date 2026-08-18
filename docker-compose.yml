@@ -78,6 +78,17 @@ services:
       Plataforma__Nome: ${PLATAFORMA_NOME:-Suporte GrelhaHub}
       Plataforma__Email: ${PLATAFORMA_EMAIL:-}
       Plataforma__SenhaInicial: ${PLATAFORMA_SENHA_INICIAL:-}
+
+      # RN-GER-032 / ADR-0016 — o correio. Mesma cadeia do JWT e da plataforma: valor no .env
+      # da VPS, nome de configuração aqui. Ausência é estado válido — sem host, nada é enviado
+      # e cada e-mail que deixou de sair fica no log.
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Porta: ${EMAIL_PORTA:-587}
+      Email__Usuario: ${EMAIL_USUARIO:-}
+      Email__Senha: ${EMAIL_SENHA:-}
+      Email__Remetente: ${EMAIL_REMETENTE:-}
+      Email__NomeDoRemetente: ${EMAIL_NOME_REMETENTE:-GrelhaHub}
+      Email__BaseDoSite: ${EMAIL_BASE_DO_SITE:-https://${DOMINIO}}
     volumes:
       # ⚠ A API ESCREVE aqui; o nginx le. É o unico estado da aplicacao fora do banco, e a
       # consequencia esta declarada no ADR-0015: `pg_dump` sozinho DEIXOU de ser backup completo.

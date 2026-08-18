@@ -121,7 +121,11 @@ public sealed class CriarUsuarioValidator : AbstractValidator<CriarUsuarioComman
     }
 }
 
-public sealed class CriarUsuarioHandler(IAppDbContext db, IContextoDeExecucao contexto, IHashDeSenha hash)
+public sealed class CriarUsuarioHandler(
+    IAppDbContext db,
+    IContextoDeExecucao contexto,
+    IHashDeSenha hash,
+    Acesso.EmissorDeLinkDeAcesso convites)
     : IRequestHandler<CriarUsuarioCommand, UsuarioDto>
 {
     public async Task<UsuarioDto> Handle(CriarUsuarioCommand request, CancellationToken cancellationToken)
@@ -211,6 +215,10 @@ public sealed class CriarUsuarioHandler(IAppDbContext db, IContextoDeExecucao co
 
         db.Usuarios.Add(usuario);
         await db.SaveChangesAsync(cancellationToken);
+
+        // RN-GER-032 / RN-GER-033 — o convite de primeiro acesso. DEPOIS de gravar, e sem `await`
+        // sobre o correio: o envio é enfileirado e não pode desfazer o usuário que já existe.
+        await convites.EmitirAsync(usuario, TipoDeToken.Convite, cancellationToken);
 
         return new UsuarioDto(
             usuario.Id, usuario.UnidadeId, usuario.Nome, usuario.Sobrenome, cpf.Formatado(),

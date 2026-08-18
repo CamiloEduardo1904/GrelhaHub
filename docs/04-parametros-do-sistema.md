@@ -19,13 +19,33 @@ migration.
 | `PAR-VEN-002` | Percentual da taxa de serviço | **10%** | `numeric(5,2)` | RN-VEN-014 |
 | `PAR-VEN-003` `CRZ` | Fricção na falta de saldo de insumo — o alerta é sempre exibido | **avisar** | `enum(bloquear, avisar, permitir)` | RN-VEN-021, RN-VEN-035 |
 | `PAR-VEN-004` | Máximo de produtos **ativos** por categoria | **50** | `integer` | RN-VEN-046 |
-| `PAR-VEN-005` | Intervalo do acompanhamento do pedido pelo cliente | **15 s** | `integer` | RN-VEN-047 |
 | `PAR-EST-001` | Validade mínima aceita no recebimento | **7 dias** | `integer` | RN-EST-008 |
 | `PAR-EST-002` | Dias de estoque de segurança | **3 dias** | `integer` | RN-COM-009 |
 | `PAR-COM-001` | Valor mínimo que exige cotação | **R$ 500,00** | `numeric(12,2)` | RN-COM-005 |
 | `PAR-CRM-001` | Multiplicador do intervalo médio para "em risco" | **1,5** | `numeric(4,2)` | RN-CRM-008 |
 | `PAR-FIS-001` | Prazo legal para cancelamento fiscal | **30 min** | `interval` | RN-FIS-003 |
 
+---
+
+
+### 1.1 Decididos, e ainda **não** parametrizados
+
+⚠ **Estes valores estão no código, como constante, nomeando o código do parâmetro que copiam.**
+Não entram na tabela acima de propósito: aquela tabela é semeada por migration e lida em
+`parametro_valor`, e uma linha lá que ninguém lê seria pior do que uma constante — alguém trocaria
+o número no banco e nada aconteceria.
+
+| Código | Decisão | Valor | Onde está hoje | O que falta para promover |
+|--------|---------|-------|----------------|---------------------------|
+| PAR-VEN-005 | Intervalo inicial do acompanhamento do pedido | 15 s | `usePedidoAoVivo.ts` | Rota **anônima** que devolva parâmetro — a tela do cliente não autentica |
+| PAR-VEN-006 | Consultas antes de afrouxar | 10 | `usePedidoAoVivo.ts` | idem |
+| PAR-VEN-007 | Intervalo depois de afrouxar | 25 s | `usePedidoAoVivo.ts` | idem |
+| PAR-GER-002 | Validade do link de redefinição | 60 min | `EmissorDeLinkDeAcesso` | Parâmetro de **escopo global**: `parametro_valor` é por unidade, e a solicitação é anônima — no instante do pedido ainda não se sabe de que unidade é a pessoa, e o usuário de plataforma não tem nenhuma |
+| PAR-GER-003 | Validade do convite de primeiro acesso | 72 h | `EmissorDeLinkDeAcesso` | idem |
+
+Os dois obstáculos são reais e diferentes: um é **de rota** (público não autenticado), o outro é
+**de escopo** (o parâmetro é por unidade). Enquanto não forem resolvidos, quem mudar o número muda
+a constante — e o código do parâmetro no comentário é o que faz o `grep` encontrar o lugar.
 ---
 
 ## 2. `PAR-VEN-003` — falta de saldo de insumo

@@ -25,6 +25,7 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0013](0013-acesso-de-plataforma.md) ⚠⚠ | Acesso de plataforma: o suporte enxerga todas as unidades | Aceito — **revisa o ADR-0005** |
 | [0014](0014-modularidade-comercial.md) | Modularidade comercial: módulo habilitado por unidade | Aceito |
 | [0015](0015-armazenamento-de-imagem.md) | Imagem em volume de disco, servida pelo Nginx — não `bytea`, não objeto remoto | Aceito |
+| [0016](0016-envio-de-email-transacional.md) | E-mail transacional por SMTP próprio, enfileirado em memória — o envio nunca entra na transação | Aceito |
 
 ## Decisões ainda em aberto
 
