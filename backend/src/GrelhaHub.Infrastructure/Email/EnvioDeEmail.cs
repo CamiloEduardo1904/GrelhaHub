@@ -37,17 +37,20 @@ public sealed class OpcoesDeEmail
     public string BaseDoSite { get; set; } = string.Empty;
 
     /// <summary>
-    /// O rodapé legal do e-mail — razão social e CNPJ de quem assina o produto.
+    /// O CNPJ do rodapé legal — o mesmo do rodapé da vitrine
+    /// (<c>frontend/src/features/site/conteudo.ts</c>).
     /// <para>
-    /// Os padrões abaixo são os mesmos do rodapé da vitrine
-    /// (<c>frontend/src/features/site/conteudo.ts</c>). Ficam aqui como padrão, e não como
-    /// obrigatório no <c>.env</c>, porque e-mail sem rodapé legal é pior do que e-mail com o
-    /// rodapé de ontem: uma mensagem transacional sem quem a envia parece phishing.
+    /// Fica no <c>appsettings</c> como padrão, e não como obrigatório no <c>.env</c>, porque
+    /// e-mail sem rodapé legal é pior do que e-mail com o rodapé de ontem: mensagem transacional
+    /// sem identificação de quem a envia parece phishing.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Propriedade nova aqui exige uma linha em <c>DependencyInjection</c>.</b> A leitura da
+    /// seção é manual, por indexador — foi assim que este campo nasceu vazio em produção e o
+    /// rodapé saiu como "· CNPJ" sem número nenhum. <c>OpcoesDeEmailTests</c> passou a recusar
+    /// esse esquecimento.
     /// </para>
     /// </summary>
-    public string Empresa { get; set; } = string.Empty;
-
-    /// <inheritdoc cref="Empresa" />
     public string Cnpj { get; set; } = string.Empty;
 
     /// <summary>
@@ -108,8 +111,6 @@ public sealed partial class EnviadorDeEmail(
     public bool Configurado => _opcoes.Completo;
 
     public string BaseDoSite => _opcoes.BaseDoSite.TrimEnd('/');
-
-    public string Empresa => _opcoes.Empresa;
 
     public string Cnpj => _opcoes.Cnpj;
 

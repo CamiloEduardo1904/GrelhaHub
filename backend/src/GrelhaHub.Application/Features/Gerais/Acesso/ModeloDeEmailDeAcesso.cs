@@ -87,7 +87,6 @@ public static class ModeloDeEmailDeAcesso
         TipoDeToken tipo,
         string link,
         string validade,
-        string empresa,
         string cnpj)
     {
         var convite = tipo == TipoDeToken.Convite;
@@ -151,9 +150,8 @@ public static class ModeloDeEmailDeAcesso
 
                     <tr>
                       <td style="padding:24px 6px 0">
-                        <p style="margin:0;font-family:{Sans};font-size:13px;line-height:1.55;color:{Tinta}">Esta mensagem é automática e foi enviada por um sistema. <strong>Não responda a este endereço</strong> — a caixa não é lida por ninguém.</p>
-                        <div style="margin:14px 0 0;font-family:{Mono};font-size:11px;line-height:1.7;letter-spacing:0.08em;text-transform:uppercase;color:{TintaFraca}">{empresa} &middot; CNPJ {cnpj}</div>
-                        <div style="margin:2px 0 0;font-family:{Mono};font-size:11px;line-height:1.7;letter-spacing:0.08em;text-transform:uppercase;color:{TintaFraca}">GrelhaHub &middot; Todos os direitos reservados</div>
+                        <p style="margin:0;font-family:{Sans};font-size:13px;line-height:1.55;font-weight:bold;color:{Tinta}">Esta mensagem é automática e foi enviada por um sistema. Não responda a este endereço.</p>
+                        <div style="margin:14px 0 0;font-family:{Mono};font-size:11px;line-height:1.7;letter-spacing:0.08em;text-transform:uppercase;color:{TintaFraca}">{cnpj} - GrelhaHub &middot; Todos os direitos reservados</div>
                       </td>
                     </tr>
 
@@ -177,11 +175,9 @@ public static class ModeloDeEmailDeAcesso
             Se não foi você quem pediu, ignore este e-mail: nada muda até o link ser usado.
 
             --
-            Esta mensagem é automática e foi enviada por um sistema.
-            Não responda a este endereço - a caixa não é lida por ninguém.
+            Esta mensagem é automática e foi enviada por um sistema. Não responda a este endereço.
 
-            {empresa} - CNPJ {cnpj}
-            GrelhaHub - Todos os direitos reservados.
+            {cnpj} - GrelhaHub - Todos os direitos reservados.
             """;
 
         return new MensagemDeEmail(para, assunto, html, texto);

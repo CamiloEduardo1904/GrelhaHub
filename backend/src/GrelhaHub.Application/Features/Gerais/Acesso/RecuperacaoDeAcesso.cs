@@ -90,7 +90,7 @@ public sealed class EmissorDeLinkDeAcesso(
             : $"{ValidadeDaRedefinicao.TotalMinutes:0} minutos";
 
         return ModeloDeEmailDeAcesso.Montar(
-            usuario.Email, usuario.Nome, tipo, link, validade, email.Empresa, email.Cnpj);
+            usuario.Email, usuario.Nome, tipo, link, validade, email.Cnpj);
     }
 }
 

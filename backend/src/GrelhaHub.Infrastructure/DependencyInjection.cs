@@ -63,6 +63,15 @@ public static class DependencyInjection
         services.AddSingleton<IArmazenamentoDeArquivo, Arquivos.ArmazenamentoEmDisco>();
 
         // ADR-0016 — o correio. Mesma leitura por indexador do bloco acima.
+        //
+        // ⚠⚠ A LISTA ABAIXO É MANUAL, e é por isso que ela merece atenção: propriedade nova em
+        // `OpcoesDeEmail` NÃO chega aqui sozinha. Quem esquecer a linha ganha um valor vazio em
+        // produção, sem erro, sem aviso e sem falha de teste — o rodapé do e-mail saiu com
+        // "· CNPJ" e nada depois, em 18/08/2026, exatamente assim. O dublê da suíte tem os
+        // valores escritos nele, então o teste continuava verde.
+        //
+        // `OpcoesDeEmailTests` cobre esse buraco: ele varre as propriedades da classe por
+        // reflexão e falha quando uma delas não é lida da configuração.
         services.Configure<Email.OpcoesDeEmail>(opcoes =>
         {
             var secao = configuration.GetSection(Email.OpcoesDeEmail.Secao);
@@ -73,6 +82,7 @@ public static class DependencyInjection
             opcoes.Remetente = secao["Remetente"] ?? opcoes.Remetente;
             opcoes.NomeDoRemetente = secao["NomeDoRemetente"] ?? opcoes.NomeDoRemetente;
             opcoes.BaseDoSite = secao["BaseDoSite"] ?? opcoes.BaseDoSite;
+            opcoes.Cnpj = secao["Cnpj"] ?? opcoes.Cnpj;
 
             if (int.TryParse(secao["Porta"], out var porta))
             {

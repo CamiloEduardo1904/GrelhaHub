@@ -16,13 +16,12 @@ namespace GrelhaHub.Application.Tests.Acesso;
 /// </summary>
 public sealed class ModeloDeEmailDeAcessoTests
 {
-    private const string Empresa = "CDP TECH SOLUTIONS";
     private const string Cnpj = "63.533.872/0001-35";
     private const string Link = "https://grelhahub.com/definir-senha?token=abc-123_XYZ";
 
     private static Application.Common.Interfaces.MensagemDeEmail Montar(TipoDeToken tipo) =>
         ModeloDeEmailDeAcesso.Montar(
-            "alguem@casa.teste", "Camilo", tipo, Link, "72 horas", Empresa, Cnpj);
+            "alguem@casa.teste", "Camilo", tipo, Link, "72 horas", Cnpj);
 
     [Theory(DisplayName = "ADR-0016 — o rodapé legal vai nos DOIS corpos, HTML e texto")]
     [InlineData(TipoDeToken.Convite)]
@@ -35,7 +34,6 @@ public sealed class ModeloDeEmailDeAcessoTests
         // recebem, e some do radar com facilidade justamente por não ser o que se olha.
         foreach (var corpo in new[] { mensagem.CorpoHtml, mensagem.CorpoTexto })
         {
-            corpo.Should().Contain(Empresa);
             corpo.Should().Contain(Cnpj);
             corpo.Should().Contain("Todos os direitos reservados");
             corpo.Should().Contain("automática", "mensagem transacional precisa se declarar automática");
