@@ -12,5 +12,10 @@ public interface IHashDeSenha
 /// <summary>ADR-0003 — autenticação stateless por JWT.</summary>
 public interface IGeradorDeToken
 {
-    (string Token, DateTimeOffset ExpiraEm) Gerar(Usuario usuario);
+    /// <summary>
+    /// <c>RN-GER-010</c> — as permissoes entram como claim. Passadas por parametro e nao lidas da
+    /// entidade de proposito: o token so carrega o que quem o emite carregou explicitamente, e um
+    /// Include esquecido produziria token SEM permissao em vez de permissao a mais.
+    /// </summary>
+    (string Token, DateTimeOffset ExpiraEm) Gerar(Usuario usuario, IEnumerable<string> permissoes);
 }

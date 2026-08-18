@@ -1,18 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
 import { Selo } from '../../components/Selo';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import { CICLO, etapaDe, ROTULO_STATUS } from '../../services/ciclo';
-import type { StatusPedido } from '../../services/tipos';
-
-interface PedidoPublico {
-  numero: number;
-  status: StatusPedido;
-  total: number;
-  criadoEm: string;
-  itens: { produto: string; quantidade: number; precoPraticado: number; total: number }[];
-}
+import { usePedidoAoVivo, type PedidoPublico } from './usePedidoAoVivo';
 
 export function Acompanhar() {
   const { slug = '' } = useParams();
@@ -23,6 +15,18 @@ export function Acompanhar() {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [buscando, setBuscando] = useState(false);
+
+  // O pedido se atualiza sozinho enquanto o cliente olha a tela. O hook só liga depois da busca:
+  // antes dela não há número nem telefone conferidos, e a rota é anônima (RN-VEN-037).
+  const aoAtualizar = useCallback((novo: PedidoPublico) => setPedido(novo), []);
+
+  const { acompanhando, atualizadoEm, semConexao, atualizarAgora } = usePedidoAoVivo(
+    slug,
+    numero,
+    telefone,
+    pedido,
+    aoAtualizar,
+  );
 
   async function buscar(evento: FormEvent) {
     evento.preventDefault();
@@ -122,6 +126,13 @@ export function Acompanhar() {
               <span className="rotulo">Total</span>
               <span className="valor">{moeda.format(pedido.total)}</span>
             </p>
+
+            <EstadoAoVivo
+              acompanhando={acompanhando}
+              atualizadoEm={atualizadoEm}
+              semConexao={semConexao}
+              atualizarAgora={atualizarAgora}
+            />
           </section>
         )}
 
@@ -129,6 +140,59 @@ export function Acompanhar() {
           Voltar ao cardápio
         </a>
       </div>
+    </div>
+  );
+}
+
+/**
+ * O rodapé de acompanhamento.
+ *
+ * **CHAPA-06** — nada de emoji nem de bolinha pulsando: o sinal de que a tela está viva é a
+ * listra âmbar, que é o mecanismo que o design system já tem. **CHAPA-07** — o pedido ficar
+ * Pronto não ganha comemoração; confete é do fechamento de caixa, uma vez por dia.
+ */
+function EstadoAoVivo({
+  acompanhando,
+  atualizadoEm,
+  semConexao,
+  atualizarAgora,
+}: {
+  acompanhando: boolean;
+  atualizadoEm: Date | null;
+  semConexao: boolean;
+  atualizarAgora: () => void;
+}) {
+  if (!acompanhando) {
+    // Estado terminal. Dizer que parou é melhor do que a tela parecer congelada: o cliente que vê
+    // "Entregue" sem mais nada fica olhando esperando algo acontecer.
+    return (
+      <p className="ao-vivo encerrado">
+        <span className="rotulo">Acompanhamento encerrado</span>
+      </p>
+    );
+  }
+
+  return (
+    <div className="ao-vivo">
+      <span className="ao-vivo-marca">
+        {/* CHAPA-02 — uma barra âmbar. Aqui ela marca "esta tela está acompanhando". */}
+        <Grelha etapa={semConexao ? -1 : 0} de={1} morta={semConexao} />
+        <span className="rotulo">
+          {semConexao ? 'Sem conexão' : 'Acompanhando'}
+        </span>
+      </span>
+
+      {atualizadoEm && !semConexao && (
+        <span className="secundario dado">
+          {atualizadoEm.toLocaleTimeString('pt-BR')}
+        </span>
+      )}
+
+      {semConexao && (
+        <button type="button" className="btn calada" onClick={atualizarAgora}>
+          Tentar agora
+        </button>
+      )}
     </div>
   );
 }

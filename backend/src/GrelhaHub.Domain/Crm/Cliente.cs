@@ -31,8 +31,9 @@ public sealed class Cliente : Entidade, IPertenceAUnidade
     }
 
     /// <summary>
-    /// Guarda apenas dígitos: o mesmo telefone digitado como "(11) 98765-4321" e
-    /// "11987654321" precisa resolver para o mesmo cliente, senão <c>RN-CRM-001</c> não vale.
+    /// <c>RN-GER-013</c> — guarda apenas dígitos, sem máscara: o mesmo telefone digitado como
+    /// "(11) 98765-4321" e "11987654321" precisa resolver para o mesmo cliente, senão
+    /// <c>RN-CRM-001</c> não vale.
     /// </summary>
     public static string NormalizarTelefone(string telefone)
     {

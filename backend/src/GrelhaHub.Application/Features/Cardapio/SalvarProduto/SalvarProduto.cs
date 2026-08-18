@@ -1,13 +1,18 @@
 using FluentValidation;
 using GrelhaHub.Application.Common.Exceptions;
 using GrelhaHub.Application.Common.Interfaces;
+using GrelhaHub.Domain.Common;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using ProdutoDomain = GrelhaHub.Domain.Cardapio.Produto;
+using GrelhaHub.Application.Common.Modulos;
+using GrelhaHub.Domain.Gerais;
 
 namespace GrelhaHub.Application.Features.Cardapio.SalvarProduto;
 
 /// <summary>Cria ou atualiza um produto. <c>Id</c> nulo cria.</summary>
+[ExigeModulo(CodigoDeModulo.Vendas)]
+[ExigePermissao("cardapio.gerenciar")]
 public sealed record SalvarProdutoCommand(
     Guid? Id,
     Guid CategoriaId,
@@ -31,7 +36,8 @@ public sealed class SalvarProdutoValidator : AbstractValidator<SalvarProdutoComm
     }
 }
 
-public sealed class SalvarProdutoHandler(IAppDbContext db, IContextoDeExecucao contexto)
+public sealed class SalvarProdutoHandler(
+    IAppDbContext db, IContextoDeExecucao contexto, IParametros parametros)
     : IRequestHandler<SalvarProdutoCommand, Guid>
 {
     public async Task<Guid> Handle(SalvarProdutoCommand request, CancellationToken cancellationToken)
@@ -44,10 +50,45 @@ public sealed class SalvarProdutoHandler(IAppDbContext db, IContextoDeExecucao c
             throw new RegraDeNegocioException("Categoria não encontrada.");
         }
 
+        var nome = request.Nome.Trim();
+
+        // RN-VEN-044 — nome único NA UNIDADE. `uq_produto_nome (unidade_id, nome)` existe desde a
+        // migration `Fundacao` e já recusava o duplicado; sem esta conferência o usuário recebia
+        // 500 com o texto de violação de índice, que pelo ADR-0009 é defeito da aplicação.
+        //
+        // ⚠ Não substitui o índice — há corrida entre este SELECT e o INSERT. Ele é a mensagem
+        // legível; o índice é a garantia.
+        //
+        // Sensível a caixa, igual ao índice: as duas camadas dizem a mesma coisa sobre a mesma
+        // regra. A limitação está na SPEC-VEN-003 §8.
+        var duplicado = await db.Produtos
+            .AsNoTracking()
+            .AnyAsync(p => p.Id != request.Id && p.Nome == nome, cancellationToken);
+
+        if (duplicado)
+        {
+            throw new RegraDeNegocioException("Já existe um produto com este nome.");
+        }
+
+        // RN-VEN-046 — teto de produtos ativos na categoria, `PAR-VEN-004`.
+        //
+        // Confere quando o produto ENTRA na categoria: na criação, e na edição que o move de uma
+        // categoria para outra. Editar nome ou preço sem trocar de categoria não conta — se
+        // contasse, uma categoria que já passou do teto (porque o parâmetro foi reduzido depois)
+        // travaria a correção do próprio dado que precisa ser corrigido.
+        var categoriaAtual = await CategoriaAtualAsync(request, cancellationToken);
+
+        if (categoriaAtual != request.CategoriaId)
+        {
+            await TetoDeProdutos.ConferirOuFalharAsync(
+                db, parametros, request.CategoriaId, request.Id, cancellationToken);
+        }
+
         if (request.Id is null)
         {
             var novo = new ProdutoDomain(
-                contexto.UnidadeId, request.CategoriaId, request.Nome, request.Descricao, request.Preco);
+                contexto.UnidadeId, request.CategoriaId, nome, request.Descricao,
+                Dinheiro.De(request.Preco));
 
             db.Produtos.Add(novo);
             await db.SaveChangesAsync(cancellationToken);
@@ -59,9 +100,32 @@ public sealed class SalvarProdutoHandler(IAppDbContext db, IContextoDeExecucao c
 
         // RN-VEN-008 — alterar o preço aqui NÃO altera pedidos já emitidos: o item guarda
         // uma cópia do preço praticado.
-        produto.Atualizar(request.Nome, request.Descricao, request.Preco, request.CategoriaId);
+        produto.Atualizar(
+            nome, request.Descricao, Dinheiro.De(request.Preco), request.CategoriaId);
 
         await db.SaveChangesAsync(cancellationToken);
         return produto.Id;
+    }
+
+    /// <summary>
+    /// A categoria em que o produto está <b>hoje</b>, ou <c>null</c> quando ele está sendo criado.
+    /// <para>
+    /// Serve a uma pergunta só: o produto está <b>entrando</b> nesta categoria? É o que separa
+    /// "criar o 51º produto" de "corrigir o preço do 30º".
+    /// </para>
+    /// </summary>
+    private async Task<Guid?> CategoriaAtualAsync(
+        SalvarProdutoCommand request, CancellationToken cancellationToken)
+    {
+        if (request.Id is null)
+        {
+            return null;
+        }
+
+        return await db.Produtos
+            .AsNoTracking()
+            .Where(p => p.Id == request.Id)
+            .Select(p => (Guid?)p.CategoriaId)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 }

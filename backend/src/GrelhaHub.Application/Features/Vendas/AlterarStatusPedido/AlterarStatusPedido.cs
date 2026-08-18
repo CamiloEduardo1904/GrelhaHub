@@ -3,14 +3,24 @@ using GrelhaHub.Application.Common.Exceptions;
 using GrelhaHub.Application.Common.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using GrelhaHub.Application.Common.Modulos;
+using GrelhaHub.Domain.Gerais;
 
 namespace GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 
+/// <summary>
+/// As duas acoes que avancam o pedido no ciclo.
+/// <para>
+/// <b>Cancelar saiu daqui</b> e virou <c>CancelarPedidoCommand</c>: exige a permissao
+/// <c>pedido.cancelar</c>, e um comando com enum de acao nao consegue declarar duas permissoes
+/// diferentes — a verificacao teria de voltar para dentro do handler, que e o que RN-GER-010
+/// manda evitar.
+/// </para>
+/// </summary>
 public enum AcaoDePedido
 {
     Confirmar = 1,
     Avancar = 2,
-    Cancelar = 3,
 }
 
 /// <summary>
@@ -20,7 +30,9 @@ public enum AcaoDePedido
 /// handler orquestra, a entidade guarda a invariante (ADR-0009).
 /// </para>
 /// </summary>
-public sealed record AlterarStatusPedidoCommand(Guid PedidoId, AcaoDePedido Acao, string? Motivo)
+[ExigeModulo(CodigoDeModulo.Vendas)]
+[ExigePermissao("pedido.avancar")]
+public sealed record AlterarStatusPedidoCommand(Guid PedidoId, AcaoDePedido Acao)
     : IRequest<string>;
 
 public sealed class AlterarStatusPedidoValidator : AbstractValidator<AlterarStatusPedidoCommand>
@@ -29,16 +41,12 @@ public sealed class AlterarStatusPedidoValidator : AbstractValidator<AlterarStat
     {
         RuleFor(x => x.PedidoId).NotEmpty();
 
-        // RN-VEN-014 — o cancelamento exige motivo.
-        RuleFor(x => x.Motivo)
-            .NotEmpty()
-            .MinimumLength(3)
-            .When(x => x.Acao == AcaoDePedido.Cancelar)
-            .WithMessage("Informe o motivo do cancelamento.");
+        // O motivo saiu junto com o cancelar: avancar no ciclo nao pede justificativa. A regra do
+        // motivo obrigatorio vive em CancelarPedidoValidator, onde ela se aplica.
     }
 }
 
-public sealed class AlterarStatusPedidoHandler(IAppDbContext db, IContextoDeExecucao contexto)
+public sealed class AlterarStatusPedidoHandler(IAppDbContext db)
     : IRequestHandler<AlterarStatusPedidoCommand, string>
 {
     public async Task<string> Handle(AlterarStatusPedidoCommand request, CancellationToken cancellationToken)
@@ -58,16 +66,6 @@ public sealed class AlterarStatusPedidoHandler(IAppDbContext db, IContextoDeExec
 
                 case AcaoDePedido.Avancar:
                     pedido.AvancarStatus();
-                    break;
-
-                case AcaoDePedido.Cancelar:
-                    // RN-VEN-014 — cancelamento é operação de gerência.
-                    if (!contexto.EhGerencia)
-                    {
-                        throw new NaoAutorizadoException("Apenas a gerência pode cancelar um pedido.");
-                    }
-
-                    pedido.Cancelar(request.Motivo!);
                     break;
 
                 default:

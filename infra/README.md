@@ -53,17 +53,47 @@ sudo crontab -e
 
 ## Backup — RNF-017
 
-Antes de qualquer apresentação:
+> ⚠⚠ **`pg_dump` sozinho DEIXOU de ser backup completo.** Desde a `SPEC-VEN-002` (ADR-0015) as
+> imagens de produto e as logos vivem em um **volume de disco**, fora do banco. Restaurar apenas o
+> dump devolve um sistema com o cardápio inteiro e **todas as fotos quebradas** — as colunas
+> apontam para arquivos que não existem mais. São **duas** cópias, e as duas precisam do mesmo
+> instante.
+
+Antes de qualquer apresentação, os dois:
 
 ```bash
+# 1. O banco
 docker compose exec -T db pg_dump -U grelhahub grelhahub | gzip > backup-$(date +%F).sql.gz
+
+# 2. As imagens (ADR-0015)
+docker run --rm \
+  -v grelhahub_arquivos:/dados:ro \
+  -v "$PWD":/saida \
+  alpine tar czf /saida/arquivos-$(date +%F).tar.gz -C /dados .
 ```
 
 Restaurar:
 
 ```bash
 gunzip -c backup-2026-08-17.sql.gz | docker compose exec -T db psql -U grelhahub -d grelhahub
+
+docker run --rm \
+  -v grelhahub_arquivos:/dados \
+  -v "$PWD":/entrada \
+  alpine tar xzf /entrada/arquivos-2026-08-17.tar.gz -C /dados
 ```
+
+### Coleta de órfãos — manutenção, não automatismo
+
+`RN-GER-002` proíbe exclusão física, então **trocar a imagem de um produto não apaga a
+anterior** — a trilha de auditoria guarda o caminho antigo, e trilha apontando para arquivo
+apagado é trilha inútil. A consequência é que o volume cresce com arquivos que nenhuma coluna
+referencia.
+
+Isso **não** é resolvido por um `DELETE` no fim do `POST`. É rotina de manutenção, com
+retenção declarada, e ainda não existe: enquanto o volume for de centenas de megabytes, o custo
+de escrever a rotina é maior do que o do disco. Quando doer, o critério é "sem referência em
+`produto.url_imagem` nem em `unidade.url_logo` **e** sem menção em `log_auditoria`".
 
 ## Esta VPS — srv1626893.hstgr.cloud
 

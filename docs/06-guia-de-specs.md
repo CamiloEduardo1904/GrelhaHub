@@ -165,7 +165,36 @@ Uma spec só passa a `ENTREGUE` quando **todos** os itens abaixo estão verdadei
       ([`04-parametros`](04-parametros-do-sistema.md))
 - [ ] A tabela de rastreabilidade do [catálogo §16](03-catalogo-de-regras-de-negocio.md#16-rastreabilidade-regra--spec) foi atualizada
 - [ ] Se surgiu regra nova, ela está no catálogo — **não** apenas na spec
+- [ ] **Toda regra que BLOQUEIA o usuário tem, na interface, o caminho para cumpri-la**
+      — ver o aviso abaixo
 - [ ] `dotnet build` e `dotnet test` verdes
+
+> ### ⚠⚠ O modo de falha mais repetido deste projeto: gate sem porta
+>
+> Aconteceu **quatro vezes** até 17/08/2026 — todas corrigidas —, sempre igual: a regra é imposta no pipeline, tem teste
+> de integração, cita o ID na mensagem de erro — e **a tela não oferece como obedecer**. O usuário
+> lê o identificador da regra e não tem o que fazer com ele.
+>
+> | Regra | O beco | Situação |
+> |-------|--------|-----------|
+> | `RN-GER-015` | "Abra uma sessão de suporte" — sem nenhum lugar para abrir | Corrigido |
+> | `RN-GER-020` | Recusava o módulo sem dizer qual dependência faltava | Corrigido |
+> | `RF-SEG-005` | "Troque a sua senha antes de continuar" — sem tela de troca | Corrigido |
+> | `RN-VEN-043` | Categoria inativada **desaparecia da tela de gestão** — sem como reativá-la, com os produtos presos num grupo invisível | Corrigido |
+>
+> A causa é estrutural, não descuido: a definição de pronto media *"o gate é imposto e testado"*
+> e **nada media** *"o usuário consegue cumprir"*. O item acrescentado acima é a correção.
+>
+> **O quarto caso é o primeiro encontrado pelo próprio item, e não por alguém travado na tela.**
+> Ele não veio de um gate que recusa: veio de uma consulta que filtrava. A pergunta de revisão
+> — *para onde o usuário vai?* — não pergunta se existe mensagem de erro; pergunta se existe
+> caminho. Categoria escondida não dava erro nenhum: ela simplesmente sumia, e a única saída era
+> `UPDATE` na mão no banco de produção. **Beco sem mensagem é mais difícil de ver do que beco com
+> mensagem**, e é por isso que a varredura tem de percorrer o caminho de volta de toda operação
+> reversível — não só o de ida.
+>
+> A pergunta de revisão é uma só: **se esta regra recusar a operação, para onde o usuário vai?**
+> Se a resposta for "para o suporte", falta tela.
 
 ---
 
@@ -194,15 +223,46 @@ real não está em lugar nenhum — que é exatamente o que o Document First exi
 
 | Spec | Título | Situação | Regras |
 |------|--------|----------|--------|
-| [SPEC-GER-001](specs/SPEC-GER-001-unidade-e-convencoes-do-modelo.md) | Unidade e convenções do modelo | `PRONTA` | `RN-GER-002`, `003`, `004`, `005`, `009` |
-| [SPEC-GER-002](specs/SPEC-GER-002-dia-operacional.md) ⚠⚠ | Dia operacional | `PRONTA` | `RN-GER-006` |
-| [SPEC-GER-003](specs/SPEC-GER-003-parametros-com-vigencia.md) | Parâmetros com vigência | `PRONTA` | habilita as 9 regras `PAR` |
-| [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | Usuários, perfis e permissões | `PRONTA` | `RN-GER-010`, `012`, `RN-RH-006` |
-| [SPEC-GER-005](specs/SPEC-GER-005-trilha-de-auditoria.md) | Trilha de auditoria | `PRONTA` | `RN-GER-001`, `011`, `002` |
+| [SPEC-GER-001](specs/SPEC-GER-001-unidade-e-convencoes-do-modelo.md) | Unidade e convenções do modelo | **`ENTREGUE`** | `RN-GER-002`, `003`, `004`, `005`, `009` |
+| [SPEC-GER-002](specs/SPEC-GER-002-dia-operacional.md) ⚠⚠ | Dia operacional | **`ENTREGUE`** | `RN-GER-006` |
+| [SPEC-GER-003](specs/SPEC-GER-003-parametros-com-vigencia.md) | Parâmetros com vigência | **`ENTREGUE`** — CA-6 fechado pela `005` | habilita as 9 regras `PAR` |
+| [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | Usuários, perfis e permissões **+ acesso de plataforma** | **`ENTREGUE`** — CA-4 e CA-6 abertos por dependência de onda | `RN-GER-010`, `012`, `014`, `015`, `016`, `022`, `RN-RH-006`, `RN-VEN-041` |
+| [SPEC-GER-006](specs/SPEC-GER-006-modulos-por-unidade.md) | Módulos habilitados por unidade | **`ENTREGUE`** | `RN-GER-017` a `021` |
+| [SPEC-GER-005](specs/SPEC-GER-005-trilha-de-auditoria.md) | Trilha de auditoria | **`ENTREGUE`** 17/08/2026 | `RN-GER-001`, `011`, `002`, `012` |
+| [SPEC-GER-007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) ⚠⚠ | Pessoas, delegação de acesso e telas de administração | **`ENTREGUE`** 17/08/2026 | `RN-GER-023`, `024`, `025`, `013`, `010` |
 
 **Ordem de implementação:** 001 → 002 → 003 → 004 → 005. As duas primeiras entram na mesma
 migration de fundação; 004 precisa de 001; 005 precisa de 001 e 004 (a trilha referencia o
 usuário).
+
+### Fora da ordem — fatia vertical antecipada
+
+| Spec | Título | Situação | Regras |
+|------|--------|----------|--------|
+| [SPEC-VEN-001](specs/SPEC-VEN-001-cardapio-publico-e-pedido.md) | Cardápio público e pedido online | **`ENTREGUE`** 17/08/2026 | 26 regras — ver cabeçalho |
+| [SPEC-VEN-002](specs/SPEC-VEN-002-imagem-de-produto-e-logo.md) | Imagem do produto e logo da unidade | **`ENTREGUE`** 17/08/2026 — antecipada da onda 1 | `RN-VEN-042`, `RN-GER-026` |
+
+### Onda 1 — cadastro
+
+| Spec | Título | Situação | Regras |
+|------|--------|----------|--------|
+| [SPEC-VEN-003](specs/SPEC-VEN-003-cadastro-do-cardapio.md) | Cadastro do cardápio — categoria e produto | **`ENTREGUE`** 17/08/2026 | `RN-VEN-043`, `044`, `045`, `020`, `032` |
+
+Falta da onda: **preço com vigência** (`RN-VEN-010`), **insumo**, **unidade de medida e
+conversão**. A `SPEC-VEN-003` é a primeira, e é ela que fecha a lacuna de o cardápio não ter tela
+de cadastro nenhuma — nem para produto, cujo comando existia desde a `SPEC-VEN-001` sem chamador.
+
+Pedida pelo time para ver o sistema funcionando ponta a ponta e iniciar o repositório.
+Atravessa camadas que ainda não têm spec própria, e o faz de forma **simplificada**: a
+[§8 da spec](specs/SPEC-VEN-001-cardapio-publico-e-pedido.md#8-fora-de-escopo--a-dívida-declarada)
+lista cada simplificação e a onda que a resolve. O critério que ela respeita é implementar
+**menos** do que o catálogo exige, nunca **diferente**.
+
+> **O que essa antecipação custou, registrado para a banca:** três comportamentos foram
+> escritos no código antes de existirem no catálogo, e citaram por aproximação o ID de outra
+> regra. A auditoria de rastreabilidade os transformou em `RN-VEN-039`, `RN-VEN-040` e
+> `RN-GER-013` (catálogo v1.3). É a demonstração prática de por que a regra 1 do processo é a
+> única inegociável — e de que o desvio é detectável, desde que alguém audite.
 
 ### Três padrões que a onda 0 estabelece
 

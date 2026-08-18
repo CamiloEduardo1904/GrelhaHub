@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Comanda } from '../../components/Comanda';
+import { Dialogo } from '../../components/Dialogo';
+import { EnvioDeImagem } from '../../components/EnvioDeImagem';
 import { Grelha } from '../../components/Grelha';
-import { api, mensagemDeErro, moeda } from '../../services/api';
+import { api, mensagemDeErro } from '../../services/api';
 import { PROXIMA_ACAO, rotaDeAvanco } from '../../services/ciclo';
 import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../services/tipos';
-import { ehGerencia, encerrarSessao, lerSessao } from './sessao';
+import { Cardapio } from './Cardapio';
+import { encerrarSessao, lerSessao, pode } from './sessao';
+import { Usuarios } from './Usuarios';
 
-type Aba = 'pedidos' | 'cardapio' | 'link';
+type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe';
 
-const ABAS: { chave: Aba; nome: string }[] = [
+/**
+ * A aba de equipe só existe para quem consegue ver usuário (`RN-GER-010`). Esconder é
+ * conveniência — a rota é protegida no pipeline da API de qualquer forma.
+ */
+const ABAS: { chave: Aba; nome: string; permissao?: string }[] = [
   { chave: 'pedidos', nome: 'Pedidos' },
   { chave: 'cardapio', nome: 'Cardápio' },
+  { chave: 'equipe', nome: 'Equipe', permissao: 'usuario.visualizar' },
   { chave: 'link', nome: 'Link público' },
 ];
 
@@ -82,7 +91,11 @@ export function Painel() {
       </header>
 
       <nav className="abas" role="tablist" aria-label="Seções do painel">
-        {ABAS.map(({ chave, nome }) => (
+        {ABAS
+          // RN-GER-010 — a aba que o usuário não pode abrir não aparece. Conveniência: a rota
+          // continua protegida no pipeline da API.
+          .filter(({ permissao }) => !permissao || pode(sessao, permissao))
+          .map(({ chave, nome }) => (
           <button
             key={chave}
             type="button"
@@ -95,8 +108,8 @@ export function Painel() {
             <Grelha etapa={aba === chave ? 0 : -1} de={1} />
             {nome}
             {chave === 'pedidos' && pedidos.length > 0 && ` · ${pedidos.length}`}
-          </button>
-        ))}
+            </button>
+          ))}
       </nav>
 
       <main className="conteudo">
@@ -108,7 +121,11 @@ export function Painel() {
 
         {aba === 'cardapio' && <Cardapio categorias={cardapio} aoMudar={carregar} />}
 
-        {aba === 'link' && restaurante && <LinkPublico restaurante={restaurante} />}
+        {aba === 'equipe' && <Usuarios />}
+
+        {aba === 'link' && restaurante && (
+          <LinkPublico restaurante={restaurante} aoMudar={carregar} />
+        )}
       </main>
     </div>
   );
@@ -123,7 +140,12 @@ function Pedidos({
   restaurante: MeuRestaurante | null;
   aoAgir: (id: string, caminho: string, corpo?: unknown) => Promise<void>;
 }) {
-  const gerencia = ehGerencia(lerSessao());
+  // O pedido em cancelamento. `null` = diálogo fechado — e o estado guarda o PEDIDO, não um
+  // booleano, porque o diálogo mostra o número dele no título.
+  const [cancelando, setCancelando] = useState<PedidoResumo | null>(null);
+
+  const sessao = lerSessao();
+  const podeCancelar = pode(sessao, 'pedido.cancelar');
 
   if (pedidos.length === 0) {
     return (
@@ -163,16 +185,13 @@ function Pedidos({
                   </button>
                 )}
 
-                {/* RN-VEN-014 — cancelamento é de gerência e exige motivo.
+                {/* RN-GER-002 — cancelamento exige motivo; a permissão é `pedido.cancelar`.
                     Esconder aqui é usabilidade; o servidor recusa de todo jeito. */}
-                {gerencia && pedido.status !== 'Cancelado' && pedido.status !== 'Finalizado' && (
+                {podeCancelar && pedido.status !== 'Cancelado' && pedido.status !== 'Finalizado' && (
                   <button
                     type="button"
                     className="btn calada perigo"
-                    onClick={() => {
-                      const motivo = prompt('Motivo do cancelamento:');
-                      if (motivo) void aoAgir(pedido.id, 'cancelar', { motivo });
-                    }}
+                    onClick={() => setCancelando(pedido)}
                   >
                     Cancelar
                   </button>
@@ -182,68 +201,41 @@ function Pedidos({
           />
         ))}
       </div>
+
+      {cancelando && (
+        <Dialogo
+          titulo={`Cancelar o pedido nº ${cancelando.numero}?`}
+          descricao={
+            // RN-EST-018 / RN-EST-019 são de estoque e ainda não valem (onda 3), mas o motivo já
+            // entra na trilha hoje (SPEC-GER-005) — e é lido depois por gente.
+            'O pedido não é apagado: ele fica registrado como cancelado, com o motivo, ' +
+            'quem cancelou e quando.'
+          }
+          motivo={{
+            rotulo: 'Motivo do cancelamento',
+            minimo: 3,
+            exemplo: 'Cliente desistiu na porta',
+          }}
+          rotuloConfirmar="Cancelar pedido"
+          perigo
+          aoConfirmar={async (motivo) => {
+            await aoAgir(cancelando.id, 'cancelar', { motivo });
+            setCancelando(null);
+          }}
+          aoFechar={() => setCancelando(null)}
+        />
+      )}
     </>
   );
 }
 
-function Cardapio({
-  categorias,
+function LinkPublico({
+  restaurante,
   aoMudar,
 }: {
-  categorias: CategoriaInterna[];
+  restaurante: MeuRestaurante;
   aoMudar: () => Promise<void>;
 }) {
-  async function alternar(produtoId: string, disponivel: boolean) {
-    await api.patch(`/v1/cardapio/produtos/${produtoId}/disponibilidade`, { disponivel });
-    await aoMudar();
-  }
-
-  return (
-    <>
-      {categorias.map((categoria) => (
-        <section key={categoria.id} className="placa rolagem">
-          <table>
-            <caption>{categoria.nome}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Produto</th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Preço
-                </th>
-                <th scope="col">No cardápio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Cartoon para aqui. Dado é tabulação, contraste e nenhuma surpresa.
-                  Sem coluna de custo: RN-GER-012 — a API não devolve o campo. */}
-              {categoria.produtos.map((produto) => (
-                <tr key={produto.id} className={produto.disponivel ? '' : 'apagado'}>
-                  <td>
-                    <strong>{produto.nome}</strong>
-                    {produto.descricao && <p className="secundario">{produto.descricao}</p>}
-                  </td>
-                  <td className="num">{moeda.format(produto.preco)}</td>
-                  <td>
-                    <label className="alternador">
-                      <input
-                        type="checkbox"
-                        checked={produto.disponivel}
-                        onChange={(e) => void alternar(produto.id, e.target.checked)}
-                      />
-                      {produto.disponivel ? 'Sim' : 'Acabou'}
-                    </label>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-    </>
-  );
-}
-
-function LinkPublico({ restaurante }: { restaurante: MeuRestaurante }) {
   const [copiado, setCopiado] = useState(false);
   const link = `${location.origin}/c/${restaurante.slug}`;
 
@@ -255,6 +247,21 @@ function LinkPublico({ restaurante }: { restaurante: MeuRestaurante }) {
           Este é o endereço que você divulga. Ele é fixo e não muda.
         </p>
       </div>
+
+      <fieldset>
+        <legend>Logomarca</legend>
+
+        {/* RN-GER-026 — exibida no topo do cardápio público. Sem logo, aparece o nome fantasia:
+            a ausência é estado válido, não erro a corrigir com imagem genérica. */}
+        <EnvioDeImagem
+          rota="/v1/unidade/logo"
+          urlAtual={restaurante.urlLogo}
+          rotulo={`Logo de ${restaurante.nomeFantasia}`}
+          aoEnviar={aoMudar}
+        />
+
+        <p className="secundario">JPEG ou PNG, até 5 MB.</p>
+      </fieldset>
 
       <div className="link-box">
         <code>{link}</code>

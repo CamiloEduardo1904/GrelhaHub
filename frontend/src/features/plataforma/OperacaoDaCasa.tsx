@@ -1,0 +1,189 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Grelha } from '../../components/Grelha';
+import { Selo } from '../../components/Selo';
+import { api, mensagemDeErro, moeda } from '../../services/api';
+import { faseDe, ROTULO_STATUS } from '../../services/ciclo';
+import type { PedidoResumo, StatusPedido } from '../../services/tipos';
+import type { Estabelecimento } from './tipos';
+
+/**
+ * A operação de uma casa — pedidos por **dia operacional** e por fase do ciclo.
+ *
+ * ⚠⚠ **`RN-GER-006` manda aqui, e é a regra mais fácil de errar numa tela de filtro.** O intervalo
+ * é de **dia operacional**, das 04h00 às 03h59 — não de data de calendário. "De 10 a 12" são três
+ * dias operacionais, e não 72 horas corridas: o pedido da 01h30 do dia 13 pertence ao dia 12, que é
+ * como o restaurante conta a noite dele.
+ *
+ * Por isso o rótulo do campo diz **"dia operacional"** em vez de "data": quem filtra precisa saber
+ * que a madrugada não pertence ao dia do calendário. Um filtro que dissesse só "data" produziria um
+ * número diferente do painel do restaurante, e os dois estariam "certos".
+ */
+
+/**
+ * As fases, com os estados de `RN-VEN-018` que cada uma agrupa.
+ *
+ * A filtragem por fase é **no cliente**, e é decisão: a API filtra por status **exato**, e mapear
+ * fase → conjunto de estados no servidor duplicaria em C# o que `faseDe` já define. Volume de um
+ * intervalo de dias de uma casa é pequeno; se um dia doer, o filtro sobe para a rota.
+ */
+const FASES = [
+  { chave: 'todas', nome: 'Todos' },
+  { chave: 'aberto', nome: 'Aberto' },
+  { chave: 'andamento', nome: 'Em andamento' },
+  { chave: 'fim', nome: 'Finalizados' },
+  { chave: 'morto', nome: 'Cancelados' },
+] as const;
+
+type Fase = (typeof FASES)[number]['chave'];
+
+/** `AAAA-MM-DD` de hoje, para o valor inicial do campo. */
+function hoje(): string {
+  const agora = new Date();
+
+  return [
+    agora.getFullYear(),
+    String(agora.getMonth() + 1).padStart(2, '0'),
+    String(agora.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+export function OperacaoDaCasa({ casa }: { casa: Estabelecimento }) {
+  const [de, setDe] = useState(hoje);
+  const [ate, setAte] = useState(hoje);
+  const [fase, setFase] = useState<Fase>('todas');
+
+  const [pedidos, setPedidos] = useState<PedidoResumo[]>([]);
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+
+    try {
+      const { data } = await api.get<PedidoResumo[]>('/v1/pedidos', {
+        params: { unidadeId: casa.id, de, ate },
+      });
+
+      setPedidos(data);
+      setErro(null);
+    } catch (e) {
+      setErro(mensagemDeErro(e));
+    } finally {
+      setCarregando(false);
+    }
+  }, [casa.id, de, ate]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  const visiveis =
+    fase === 'todas' ? pedidos : pedidos.filter((p) => faseDe(p.status) === fase);
+
+  const total = visiveis.reduce((soma, p) => soma + p.total, 0);
+
+  return (
+    <div className="operacao">
+      <div className="operacao-filtros">
+        <label>
+          Do dia operacional
+          <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+        </label>
+
+        <label>
+          Até
+          <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+        </label>
+      </div>
+
+      {/* RN-GER-006 — dito por extenso, porque é o que faz o número desta tela bater com o do
+          painel do restaurante. */}
+      <p className="secundario">
+        O dia operacional vai das <strong>04h00 às 03h59</strong>: o pedido da madrugada pertence
+        ao dia anterior.
+      </p>
+
+      <nav className="chips" aria-label="Filtrar por fase do pedido">
+        {FASES.map(({ chave, nome }) => (
+          <button
+            key={chave}
+            type="button"
+            className="chip"
+            aria-pressed={fase === chave}
+            onClick={() => setFase(chave)}
+          >
+            {/* CHAPA-02 — uma barra âmbar no grupo: a fase escolhida. */}
+            <Grelha etapa={fase === chave ? 0 : -1} de={1} />
+            {nome}
+            {chave !== 'todas' && (
+              <span className="dado">
+                {' '}
+                {pedidos.filter((p) => faseDe(p.status) === chave).length}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {erro && <p className="erro">{erro}</p>}
+
+      <div className="rolagem">
+        <table>
+          <caption>
+            {visiveis.length} pedido{visiveis.length === 1 ? '' : 's'} · total{' '}
+            <span className="dado">{moeda.format(total)}</span>
+          </caption>
+          <thead>
+            <tr>
+              <th className="num col-estreita">Nº</th>
+              <th className="col-estreita">Dia oper.</th>
+              <th>Cliente</th>
+              <th>Canal</th>
+              <th>Estado</th>
+              <th className="num col-estreita">Itens</th>
+              <th className="num col-estreita">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visiveis.map((p) => (
+              <tr key={p.id}>
+                <td className="num col-estreita">{p.numero}</td>
+                <td className="dado col-estreita">
+                  {new Date(`${p.dataOperacional}T12:00:00`).toLocaleDateString('pt-BR')}
+                </td>
+                <td>{p.cliente ?? '—'}</td>
+                <td className="secundario">{p.canal}</td>
+                <td>
+                  <Selo status={p.status} />
+                </td>
+                <td className="num col-estreita">{p.quantidadeDeItens}</td>
+                <td className="num col-estreita">{moeda.format(p.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!carregando && visiveis.length === 0 && !erro && (
+        <div className="vazio">
+          <Grelha etapa={0} de={3} alta />
+          <p className="fraco">
+            {pedidos.length === 0
+              ? 'Nenhum pedido no período.'
+              : `Nenhum pedido ${rotuloDaFase(fase)} no período.`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function rotuloDaFase(fase: Fase): string {
+  if (fase === 'aberto') return `em ${ROTULO_STATUS.Aberto.toLowerCase()}`;
+  if (fase === 'andamento') return 'em andamento';
+  if (fase === 'fim') return 'finalizado';
+  if (fase === 'morto') return 'cancelado';
+  return '';
+}
+
+export type { StatusPedido };

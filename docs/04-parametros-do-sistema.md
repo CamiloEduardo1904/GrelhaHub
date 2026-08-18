@@ -18,6 +18,7 @@ migration.
 | `PAR-VEN-001` | Desconto máximo sem autorização | **10%** | `numeric(5,2)` | RN-VEN-013 |
 | `PAR-VEN-002` | Percentual da taxa de serviço | **10%** | `numeric(5,2)` | RN-VEN-014 |
 | `PAR-VEN-003` `CRZ` | Fricção na falta de saldo de insumo — o alerta é sempre exibido | **avisar** | `enum(bloquear, avisar, permitir)` | RN-VEN-021, RN-VEN-035 |
+| `PAR-VEN-004` | Máximo de produtos **ativos** por categoria | **50** | `integer` | RN-VEN-046 |
 | `PAR-EST-001` | Validade mínima aceita no recebimento | **7 dias** | `integer` | RN-EST-008 |
 | `PAR-EST-002` | Dias de estoque de segurança | **3 dias** | `integer` | RN-COM-009 |
 | `PAR-COM-001` | Valor mínimo que exige cotação | **R$ 500,00** | `numeric(12,2)` | RN-COM-005 |
@@ -93,3 +94,35 @@ parametro_valor     (id, parametro_id, unidade_id, valor, vigencia_inicio, vigen
 3. Parâmetro novo entra neste documento **antes** de ser usado, com valor inicial
    justificado e a regra que o consome.
 4. Toda alteração de valor em produção fica na trilha de auditoria (RN-GER-011).
+
+---
+
+## `PAR-VEN-004` — teto de produtos por categoria
+
+Pedido como *"uma flag de 50 produtos por categoria, ajustável via banco por enquanto"*. Virou
+**parâmetro**, e não coluna em `unidade`, por três motivos que a coluna não entrega:
+
+| `parametro_valor` dá | Coluna daria |
+|----------------------|--------------|
+| Recorte por unidade, com valor padrão global quando a unidade não tem o seu | Um número por unidade, e nada quando ninguém preencheu |
+| **Vigência** — o teto de dezembro não reescreve o de junho (`SPEC-GER-003`) | O valor de agora, sem passado |
+| Trilha de quem mudou, quando e de quanto para quanto (`SPEC-GER-005`) | `UPDATE` sem história |
+
+E o "ajustável via banco" continua sendo literalmente isso — um `INSERT` em `parametro_valor`:
+
+```sql
+-- Teto de 80 produtos por categoria, só para esta unidade, a partir de agora
+INSERT INTO parametro_valor (id, unidade_id, parametro_id, valor, vigencia_inicio)
+SELECT gen_random_uuid(), :unidade_id, p.id, '80', now()
+  FROM parametro p WHERE p.codigo = 'PAR-VEN-004';
+```
+
+> **Por que o limite conta apenas os produtos ativos.** `RN-VEN-045` proíbe exclusão: produto
+> retirado do cardápio continua na tabela para que o item de pedido histórico não perca a
+> referência. Contar o histórico faria a categoria **entupir permanentemente** — depois de 50
+> produtos retirados ao longo de dois anos, a seção "Lanches" não aceitaria mais nada, e a única
+> explicação disponível ao usuário seria um erro que ele não teria como resolver.
+
+**Não há tela para editar este parâmetro**, e a ausência é declarada: a `SPEC-GER-003` entregou a
+rota `PUT /v1/parametros/{codigo}`, que atende. Tela própria de configuração de cardápio é trabalho
+de outra spec.

@@ -372,7 +372,7 @@ ABERTO ──► EM_PREPARO ──► PRONTO ──► ENTREGUE ──► PAGO
 > estarem incorretas.
 >
 > **Fonte de verdade:** [`03-catalogo-de-regras-de-negocio.md`](03-catalogo-de-regras-de-negocio.md)
-> — 138 regras, com tipo, entidades, mecanismo de implementação, estado de validação e
+> — 159 regras, com tipo, entidades, mecanismo de implementação, estado de validação e
 > escopo no MVP.
 >
 > **Auditoria do cruzamento:** [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md)

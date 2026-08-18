@@ -25,7 +25,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Cardapio.Categoria", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -60,7 +59,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Cardapio.Produto", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -123,7 +121,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Crm.Cliente", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -157,15 +154,372 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("cliente", (string)null);
                 });
 
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("DataOperacional")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("date")
+                        .HasColumnName("data_operacional")
+                        .HasComputedColumnSql("(((dh_ocorrencia AT TIME ZONE 'America/Sao_Paulo') - interval '4 hours')::date)", true);
+
+                    b.Property<string>("Entidade")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entidade");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<DateTimeOffset>("OcorridoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_ocorrencia");
+
+                    b.Property<string>("Operacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("operacao");
+
+                    b.Property<Guid>("RegistroId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registro_id");
+
+                    b.Property<Guid?>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.Property<string>("ValoresAnteriores")
+                        .HasMaxLength(200)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("valores_anteriores");
+
+                    b.Property<string>("ValoresNovos")
+                        .HasMaxLength(200)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("valores_novos");
+
+                    b.HasKey("Id")
+                        .HasName("pk_log_auditoria");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_log_auditoria_usuario_id");
+
+                    b.HasIndex("UnidadeId", "UsuarioId", "DataOperacional")
+                        .HasDatabaseName("ix_log_usuario");
+
+                    b.HasIndex("UnidadeId", "Entidade", "RegistroId", "OcorridoEm")
+                        .IsDescending(false, false, false, true)
+                        .HasDatabaseName("ix_log_registro");
+
+                    b.ToTable("log_auditoria", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Modulo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("codigo");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("nome");
+
+                    b.Property<bool>("Nucleo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("nucleo");
+
+                    b.Property<short>("Ordem")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ordem");
+
+                    b.HasKey("Id")
+                        .HasName("pk_modulo");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("uq_modulo_codigo");
+
+                    b.ToTable("modulo", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.ModuloDependencia", b =>
+                {
+                    b.Property<Guid>("ModuloId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modulo_id");
+
+                    b.Property<Guid>("DependeDeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("depende_de_id");
+
+                    b.HasKey("ModuloId", "DependeDeId")
+                        .HasName("pk_modulo_dependencia");
+
+                    b.HasIndex("DependeDeId")
+                        .HasDatabaseName("ix_modulo_dependencia_depende_de_id");
+
+                    b.ToTable("modulo_dependencia", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Parametro", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("codigo");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Dominio")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("dominio");
+
+                    b.Property<string>("TipoValor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tipo_valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_parametro");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("uq_parametro_codigo");
+
+                    b.ToTable("parametro", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.ParametroValor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_criacao");
+
+                    b.Property<Guid?>("CriadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<Guid>("ParametroId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parametro_id");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("valor");
+
+                    b.Property<DateTimeOffset?>("VigenciaFim")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("vigencia_fim");
+
+                    b.Property<DateTimeOffset>("VigenciaInicio")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("vigencia_inicio");
+
+                    b.HasKey("Id")
+                        .HasName("pk_parametro_valor");
+
+                    b.HasIndex("ParametroId")
+                        .HasDatabaseName("ix_parametro_valor_parametro_id");
+
+                    b.HasIndex("UnidadeId", "ParametroId", "VigenciaInicio")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_parametro_valor_busca");
+
+                    b.ToTable("parametro_valor", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_parametro_valor_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
+                        });
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Perfil", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("nome");
+
+                    b.Property<bool>("Sistema")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("sistema");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_perfil");
+
+                    b.HasIndex("UnidadeId", "Nome")
+                        .IsUnique()
+                        .HasDatabaseName("uq_perfil_nome");
+
+                    b.ToTable("perfil", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.PerfilPermissao", b =>
+                {
+                    b.Property<Guid>("PerfilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("perfil_id");
+
+                    b.Property<Guid>("PermissaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("permissao_id");
+
+                    b.HasKey("PerfilId", "PermissaoId")
+                        .HasName("pk_perfil_permissao");
+
+                    b.HasIndex("PermissaoId")
+                        .HasDatabaseName("ix_perfil_permissao_permissao_id");
+
+                    b.ToTable("perfil_permissao", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Permissao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("codigo");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Modulo")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("modulo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_permissao");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("uq_permissao_codigo");
+
+                    b.ToTable("permissao", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.SessaoDeSuporte", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AbertaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_abertura");
+
+                    b.Property<DateTimeOffset?>("EncerradaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_encerramento");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("motivo");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sessao_suporte");
+
+                    b.HasIndex("UnidadeId", "AbertaEm")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_sessao_suporte_unidade");
+
+                    b.HasIndex("UsuarioId", "EncerradaEm", "AbertaEm")
+                        .HasDatabaseName("ix_sessao_suporte_aberta");
+
+                    b.ToTable("sessao_suporte", (string)null);
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Unidade", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
                     b.Property<bool>("Ativa")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
+                        .HasDefaultValue(true)
                         .HasColumnName("ativa");
 
                     b.Property<string>("Cnpj")
@@ -180,8 +534,10 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("FusoHorario")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
+                        .HasDefaultValue("America/Sao_Paulo")
                         .HasColumnName("fuso_horario");
 
                     b.Property<string>("NomeFantasia")
@@ -207,6 +563,11 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(11)")
                         .HasColumnName("telefone");
 
+                    b.Property<string>("UrlLogo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("url_logo");
+
                     b.HasKey("Id")
                         .HasName("pk_unidade");
 
@@ -222,14 +583,66 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_unidade_cnpj", "cnpj ~ '^[0-9]{14}$'");
 
+                            t.HasCheckConstraint("ck_unidade_razao_social", "length(trim(razao_social)) > 0");
+
                             t.HasCheckConstraint("ck_unidade_slug", "slug ~ '^[a-z0-9-]{3,60}$'");
+                        });
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.UnidadeModulo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_criacao");
+
+                    b.Property<Guid?>("CriadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<Guid>("ModuloId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modulo_id");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.Property<DateTimeOffset?>("VigenciaFim")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("vigencia_fim");
+
+                    b.Property<DateTimeOffset>("VigenciaInicio")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("vigencia_inicio");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unidade_modulo");
+
+                    b.HasIndex("ModuloId")
+                        .HasDatabaseName("ix_unidade_modulo_modulo_id");
+
+                    b.HasIndex("UnidadeId", "ModuloId", "VigenciaInicio")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_unidade_modulo_busca");
+
+                    b.ToTable("unidade_modulo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_unidade_modulo_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
                         });
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -237,9 +650,29 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("ativo");
 
+                    b.Property<string>("Cpf")
+                        .HasColumnType("char(11)")
+                        .HasColumnName("cpf");
+
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dh_criacao");
+
+                    b.Property<Guid?>("CriadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("criado_por");
+
+                    b.Property<bool>("DeveTrocarSenha")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("deve_trocar_senha");
+
+                    b.Property<bool>("EhPlataforma")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("eh_plataforma");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -253,9 +686,9 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nome");
 
-                    b.Property<int>("Perfil")
-                        .HasColumnType("integer")
-                        .HasColumnName("perfil");
+                    b.Property<Guid?>("PerfilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("perfil_id");
 
                     b.Property<string>("SenhaHash")
                         .IsRequired()
@@ -263,27 +696,41 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("senha_hash");
 
-                    b.Property<Guid>("UnidadeId")
+                    b.Property<string>("Sobrenome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sobrenome");
+
+                    b.Property<Guid?>("UnidadeId")
                         .HasColumnType("uuid")
                         .HasColumnName("unidade_id");
 
                     b.HasKey("Id")
                         .HasName("pk_usuario");
 
-                    b.HasIndex("Email")
-                        .HasDatabaseName("ix_usuario_email");
+                    b.HasIndex("Cpf")
+                        .IsUnique()
+                        .HasDatabaseName("uq_usuario_cpf");
 
-                    b.HasIndex("UnidadeId", "Email")
+                    b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("uq_usuario_email");
 
-                    b.ToTable("usuario", (string)null);
+                    b.HasIndex("PerfilId")
+                        .HasDatabaseName("ix_usuario_perfil_id");
+
+                    b.HasIndex("UnidadeId")
+                        .HasDatabaseName("ix_usuario_unidade_id");
+
+                    b.ToTable("usuario", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_usuario_cpf", "cpf IS NULL OR cpf ~ '^[0-9]{11}$'");
+                        });
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Vendas.ItemPedido", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -342,7 +789,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Vendas.Pedido", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -362,11 +808,23 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dh_criacao");
 
+                    b.Property<Guid?>("CriadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("criado_por");
+
                     b.Property<DateOnly>("DataOperacional")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("date")
                         .HasColumnName("data_operacional")
                         .HasComputedColumnSql("(((dh_criacao AT TIME ZONE 'America/Sao_Paulo') - interval '4 hours')::date)", true);
+
+                    b.Property<DateTimeOffset?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_exclusao");
+
+                    b.Property<Guid?>("ExcluidoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("excluido_por_usuario_id");
 
                     b.Property<DateTimeOffset?>("FinalizadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -376,6 +834,11 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("motivo_cancelamento");
+
+                    b.Property<string>("MotivoExclusao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("motivo_exclusao");
 
                     b.Property<int>("Numero")
                         .HasColumnType("integer")
@@ -449,14 +912,141 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cliente_unidades_unidade_id");
                 });
 
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Usuario", b =>
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
                 {
-                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", "Unidade")
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
+                        .WithMany()
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_log_auditoria_unidades_unidade_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_log_auditoria_usuarios_usuario_id");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.ModuloDependencia", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Modulo", "DependeDe")
+                        .WithMany()
+                        .HasForeignKey("DependeDeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_modulo_dependencia_modulo_depende_de_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Modulo", "Modulo")
+                        .WithMany()
+                        .HasForeignKey("ModuloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_modulo_dependencia_modulo_modulo_id");
+
+                    b.Navigation("DependeDe");
+
+                    b.Navigation("Modulo");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.ParametroValor", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Parametro", "Parametro")
+                        .WithMany()
+                        .HasForeignKey("ParametroId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_parametro_valor_parametro_parametro_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
                         .WithMany()
                         .HasForeignKey("UnidadeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
+                        .HasConstraintName("fk_parametro_valor_unidades_unidade_id");
+
+                    b.Navigation("Parametro");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Perfil", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
+                        .WithMany()
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_perfil_unidades_unidade_id");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.PerfilPermissao", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Perfil", null)
+                        .WithMany("Permissoes")
+                        .HasForeignKey("PerfilId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_perfil_permissao_perfis_perfil_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Permissao", "Permissao")
+                        .WithMany()
+                        .HasForeignKey("PermissaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_perfil_permissao_permissoes_permissao_id");
+
+                    b.Navigation("Permissao");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.SessaoDeSuporte", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
+                        .WithMany()
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sessao_suporte_unidades_unidade_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sessao_suporte_usuarios_usuario_id");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.UnidadeModulo", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Modulo", "Modulo")
+                        .WithMany()
+                        .HasForeignKey("ModuloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_unidade_modulo_modulo_modulo_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
+                        .WithMany()
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_unidade_modulo_unidade_unidade_id");
+
+                    b.Navigation("Modulo");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Usuario", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Perfil", "Perfil")
+                        .WithMany()
+                        .HasForeignKey("PerfilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_usuario_perfil_perfil_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", "Unidade")
+                        .WithMany()
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_usuario_unidade_unidade_id");
+
+                    b.Navigation("Perfil");
 
                     b.Navigation("Unidade");
                 });
@@ -466,7 +1056,7 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasOne("GrelhaHub.Domain.Vendas.Pedido", "Pedido")
                         .WithMany("Itens")
                         .HasForeignKey("PedidoId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_item_pedido_pedidos_pedido_id");
 
@@ -499,6 +1089,11 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Cardapio.Categoria", b =>
                 {
                     b.Navigation("Produtos");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Perfil", b =>
+                {
+                    b.Navigation("Permissoes");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Vendas.Pedido", b =>

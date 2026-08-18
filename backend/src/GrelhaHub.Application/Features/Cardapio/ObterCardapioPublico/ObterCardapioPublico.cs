@@ -2,6 +2,8 @@ using GrelhaHub.Application.Common.Exceptions;
 using GrelhaHub.Application.Common.Interfaces;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using GrelhaHub.Application.Common.Modulos;
+using GrelhaHub.Domain.Gerais;
 
 namespace GrelhaHub.Application.Features.Cardapio.ObterCardapioPublico;
 
@@ -9,12 +11,22 @@ namespace GrelhaHub.Application.Features.Cardapio.ObterCardapioPublico;
 /// Cardápio público do restaurante — <c>RN-VEN-036</c>, <c>RN-VEN-037</c>.
 /// Acessível <b>sem autenticação</b>.
 /// </summary>
+[SemModulo("pertence a VEN, mas o gate vive no handler: a unidade só é conhecida depois de resolver o slug, e RN-VEN-037 exige 404 e não 403 para quem está fora")]
+[SemPermissao("rota pública anônima — RN-VEN-037")]
 public sealed record ObterCardapioPublicoQuery(string Slug) : IRequest<CardapioPublicoResponse>;
 
 public sealed record CardapioPublicoResponse(
     string Slug,
     string NomeFantasia,
     string? Telefone,
+
+    /// <summary>
+    /// <c>RN-GER-026</c> — a logo. <b>Nula é resposta válida:</b> o cardápio sem logo exibe o nome
+    /// fantasia, e um placeholder de "sem imagem" na vitrine de um restaurante é pior do que o
+    /// nome escrito.
+    /// </summary>
+    string? UrlLogo,
+
     IReadOnlyList<CategoriaPublicaDto> Categorias);
 
 public sealed record CategoriaPublicaDto(Guid Id, string Nome, IReadOnlyList<ProdutoPublicoDto> Produtos);
@@ -25,9 +37,16 @@ public sealed record CategoriaPublicaDto(Guid Id, string Nome, IReadOnlyList<Pro
 /// grave, porque qualquer pessoa o acessa. Devolver e esconder no front continuaria
 /// visível em qualquer inspeção de rede.
 /// </summary>
-public sealed record ProdutoPublicoDto(Guid Id, string Nome, string? Descricao, decimal Preco);
+public sealed record ProdutoPublicoDto(
+    Guid Id,
+    string Nome,
+    string? Descricao,
+    decimal Preco,
 
-public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto)
+    /// <summary><c>RN-VEN-042</c> — caminho público da imagem. Nulo quando não há.</summary>
+    string? UrlImagem);
+
+public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto, IModulos modulos)
     : IRequestHandler<ObterCardapioPublicoQuery, CardapioPublicoResponse>
 {
     public async Task<CardapioPublicoResponse> Handle(ObterCardapioPublicoQuery request, CancellationToken cancellationToken)
@@ -44,21 +63,50 @@ public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExe
         // unidade apareça (RN-VEN-037). Sem isto, cada consulta pública precisaria filtrar a
         // unidade a mão — e o esquecimento vazaria o cardápio de outro restaurante.
         contexto.DefinirUnidadePublica(unidade.Id);
+        // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline.
+        //
+        // O behavior roda antes do handler, quando a unidade ainda não está no contexto: ela só
+        // é conhecida depois de resolver o slug. E a resposta certa é 404, não 403: para quem
+        // está do lado de fora, o restaurante simplesmente não tem cardápio online — 403
+        // anunciaria que existe algo ali que não foi contratado.
+        if (!await modulos.EstaHabilitadoAsync(unidade.Id, CodigoDeModulo.Vendas, em: null, cancellationToken))
+        {
+            throw new NaoEncontradoException("Restaurante não encontrado.");
+        }
 
+
+        // Filtro e ordenação no SQL; a conversão de Dinheiro para o decimal do contrato
+        // acontece em memória, porque o EF Core não traduz acesso a membro de propriedade com
+        // conversor de valor (SPEC-GER-001 §4).
         var categorias = await db.Categorias
             .AsNoTracking()
             .Where(c => c.Ativa && c.Produtos.Any(p => p.Ativo && p.Disponivel))
             .OrderBy(c => c.Ordem).ThenBy(c => c.Nome)
-            .Select(c => new CategoriaPublicaDto(
-                c.Id, c.Nome,
-                c.Produtos
+            .Select(c => new
+            {
+                c.Id,
+                c.Nome,
+                Produtos = c.Produtos
                     // RN-VEN-020 — produto inativo não aparece no cardápio.
                     .Where(p => p.Ativo && p.Disponivel)
                     .OrderBy(p => p.Nome)
-                    .Select(p => new ProdutoPublicoDto(p.Id, p.Nome, p.Descricao, p.Preco))
-                    .ToList()))
+                    .Select(p => new { p.Id, p.Nome, p.Descricao, p.Preco, p.UrlImagem })
+                    .ToList(),
+            })
             .ToListAsync(cancellationToken);
 
-        return new CardapioPublicoResponse(unidade.Slug, unidade.NomeFantasia, unidade.Telefone, categorias);
+        var publicas = categorias
+            .Select(categoria => new CategoriaPublicaDto(
+                categoria.Id,
+                categoria.Nome,
+                categoria.Produtos
+                    .Select(produto => new ProdutoPublicoDto(
+                        produto.Id, produto.Nome, produto.Descricao, produto.Preco.Valor,
+                        produto.UrlImagem))
+                    .ToList()))
+            .ToList();
+
+        return new CardapioPublicoResponse(
+            unidade.Slug, unidade.NomeFantasia, unidade.Telefone, unidade.UrlLogo, publicas);
     }
 }

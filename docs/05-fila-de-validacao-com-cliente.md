@@ -1,6 +1,6 @@
 # GrelhaHub — Fila de Validação com o Cliente
 
-> Ordem de prioridade para a primeira entrevista. **Não há tempo de validar 138 regras em
+> Ordem de prioridade para a primeira entrevista. **Não há tempo de validar 159 regras em
 > uma hora.** Estas vinte são as que, se estiverem erradas, comprometem o modelo inteiro.
 
 As perguntas 1 a 14 vêm do Catálogo v0.1. As perguntas 15 a 20 nasceram do cruzamento entre
@@ -37,6 +37,13 @@ levantamento efetivo, e é o que separa este projeto de um brainstorm interno.
 | 5 | **RN-EST-007** | *"Quando pega carne na geladeira, pega a mais velha ou a que está na frente?"* | Confirma ou derruba o FEFO. Se a resposta for "a da frente", o modelo mantém o lote mas o consumo é outro |
 | 6 | **RN-EST-011** | *"Se comprou carne a R$ 30 e depois a R$ 35, qual preço vocês consideram no custo do lanche?"* | Decide entre custo por lote e custo médio — **é o conflito C1 do cruzamento** |
 | 7 | **RN-EST-018** | *"Se o cliente desiste depois que o lanche já foi feito, o que acontece com o lanche?"* | Decide se o cancelamento devolve estoque ou gera perda — **conflito C2** |
+| 8 | **RN-VEN-018 × RN-EST-021** ⚠⚠ | *"Em que momento vocês consideram que o ingrediente saiu do estoque: quando aceitam o pedido, ou quando começam a montar o lanche?"* | **Conflito C10.** Decide se a baixa dispara na Confirmação (como `RN-VEN-018` determina hoje) ou na Produção. Muda uma das **sete estruturais** e o sentido de `RN-EST-019` — ver abaixo |
+| 9 | **RN-EST-023 × RN-EST-019** ⚠ | *"E se vocês aceitam o pedido e o cliente desiste dois minutos depois, antes de pôr na chapa — o ingrediente volta pro estoque?"* | Confirma a **devolução** na janela entre Confirmado e Em produção. Se a resposta for "nunca tirei do estoque ainda", a resposta real é à pergunta 8, e a baixa é na produção |
+
+> **As perguntas 8 e 9 são a mesma pergunta por dois caminhos, e isso é de propósito.** A 8 pergunta
+> o modelo; a 9 pergunta o caso concreto. Quem responde "na confirmação" na 8 e "nunca tirei ainda"
+> na 9 está dizendo que a baixa é na produção — e é a 9 que vale, porque descreve o que acontece na
+> loja. **Faça as duas.**
 
 ### Bloco de vendas
 
@@ -45,6 +52,7 @@ levantamento efetivo, e é o que separa este projeto de um brainstorm interno.
 | 8 | **RN-VEN-006, 007** | *"Duas mesas juntam. Como fica a conta?"* | Unificação de comanda e a `EXCLUDE` de uma comanda por mesa |
 | 9 | **RN-VEN-016** | *"Quando o cliente pede sem cebola ou com bacon extra, muda o preço? E o estoque?"* | Se o ajuste afeta consumo de insumo — o que liga composição do item à baixa |
 | 10 | **RN-VEN-021** | *"Já aconteceu de vender e descobrir que acabou o ingrediente?"* | Modo padrão de `PAR-VEN-003`. **A resposta esperada é sim** — ver pergunta 15 |
+| 10b | **RN-VEN-021 × RN-EST-009** ⚠ | *"Quando acaba no meio do movimento e vocês vendem mesmo assim, como o estoque fica no papel: negativo, zerado, ou vocês só acertam depois?"* | `RN-EST-009` proíbe saldo de lote negativo, então o modo *permitir* de `PAR-VEN-003` **não pode** significar negativo. Falta decidir o que ele significa: confirmar sem baixar, baixar só o que existe, ou baixar contra lote a receber. Sem isso, `RN-EST-021` não é implementável no modo permitir |
 | 11 | **RN-VEN-023, 024** | *"Como funciona quando a mesa quer dividir a conta?"* | Divisão por pessoa ou por item, e a regra de arredondamento |
 
 ### Bloco financeiro, compras e logística
@@ -70,6 +78,8 @@ conflito registrado.
 | 18 | RN-EST-017 | *"Vocês contam embalagem e sacola no custo do lanche do delivery?"* | Se descartável entra na ficha técnica — muda o CMV do canal delivery |
 | 19 | RN-VEN-030 | *"Como registram o troco hoje? Entra em algum controle?"* | Se o troco é registrado ou apenas dado — afeta o fechamento de caixa |
 | 20 | Divergência de escopo | *(com o professor, não com o cliente)* Os nove módulos precisam estar **modelados** ou **implementados e funcionando**? RN-FIS-001 significa emitir NFC-e de verdade? | O tamanho real do MVP. Ver [cruzamento §7](07-cruzamento-catalogo-x-levantamento.md#7-divergência-de-escopo--a-decisão-que-precisa-da-sua-confirmação) |
+| 21 | `RN-VEN-043`, `RN-VEN-044` — implementação | *"No cardápio de vocês, 'X-Tudo' e 'x-tudo' são o mesmo lanche cadastrado duas vezes, ou pode haver dois itens diferentes com o mesmo nome escrito de outro jeito?"* | Se a unicidade de nome é **insensível a caixa**. Hoje aplicação e banco são os dois sensíveis, de propósito (`SPEC-VEN-003` §4): os dois cadastros passam. Resposta "é o mesmo" custa um índice sobre `lower(nome)` e uma migration. **A pergunta existe porque a restrição estava no banco desde a migration `Fundacao` sem regra que a enunciasse** — ninguém sabia se era decisão ou hábito |
+| 22 | `RN-VEN-044` — implementação | *"Quando acaba um item no meio do movimento, quem marca isso no sistema: o gerente ou quem está no balcão?"* | Se "acabou hoje" merece permissão própria (`cardapio.disponibilidade`). Hoje exige `cardapio.gerenciar`, que é de gerência, e quem sabe que acabou é o Atendente — dívida declarada em `SPEC-VEN-003` §8 |
 
 ---
 

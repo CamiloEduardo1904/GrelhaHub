@@ -140,6 +140,13 @@ export function Cardapio() {
     <div className="publico">
       <header className="vitrine-capa">
         <Grelha etapa={2} de={5} alta />
+
+        {/* RN-GER-026 — a logo, quando existe. Sem ela, o nome fantasia É a marca: um
+            placeholder de "sem imagem" na vitrine de um restaurante é pior que o nome escrito. */}
+        {cardapio.urlLogo && (
+          <img className="logo-casa" src={cardapio.urlLogo} alt={cardapio.nomeFantasia} />
+        )}
+
         <h1>{cardapio.nomeFantasia}</h1>
         <p className="tagline">Do pedido à brasa</p>
       </header>
@@ -160,6 +167,23 @@ export function Cardapio() {
 
                   return (
                     <li key={produto.id} className="prato">
+                      {/* RN-VEN-042 — a foto do lanche. A maioria dos produtos não tem, e a
+                          linha não muda de altura por causa disso. */}
+                      {/* ADR-0015 — se o arquivo faltar, a linha fica SEM foto em vez de mostrar
+                          o ícone de imagem quebrada do navegador. Aqui quem olha é o cliente
+                          escolhendo o que comer: foto quebrada faz o restaurante parecer
+                          abandonado. */}
+                      {produto.urlImagem && (
+                        <img
+                          className="prato-foto"
+                          src={produto.urlImagem}
+                          alt={produto.nome}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
+
                       <div className="prato-info">
                         <strong>{produto.nome}</strong>
                         {produto.descricao && <p className="secundario">{produto.descricao}</p>}

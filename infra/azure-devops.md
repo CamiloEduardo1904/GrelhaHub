@@ -173,6 +173,29 @@ para o passo de build de imagem.
 contraria a premissa do ADR-0006. A VPS tem 8 GB e 2 vCPU, e o pico dura poucos minutos por
 deploy — aceitável aqui, não seria numa VPS de 2 GB.
 
+### Os testes de integração também precisam do Docker
+
+Desde 17/08/2026 o `dotnet test` sobe um **PostgreSQL efêmero** por execução, via
+Testcontainers, porque [ADR-0009](../docs/adr/0009-onde-as-regras-de-negocio-vivem.md) põe
+metade das regras em `CHECK`, coluna gerada e `UNIQUE` — mecanismos que o provider in-memory
+do EF Core não executa.
+
+A permissão necessária **já existe**: é o mesmo grupo `docker` que o build de imagem usa. Não
+há passo novo de configuração. O que muda na operação:
+
+- O contêiner de teste é `postgres:16-alpine`, com porta publicada em porta alta aleatória —
+  **não conflita** com o `grelhahub-db` de produção, que não muda de porta
+- O ciclo de vida é da própria ferramenta: o *reaper* (`testcontainers/ryuk`) remove o
+  contêiner no fim da execução, inclusive se o processo de teste morrer no meio
+- Consumo no pico: o `grelhahub-db` de produção ocupa ~28 MB em repouso; o de teste fica na
+  mesma ordem. Em 8 GB, não é o recurso que aperta
+- O pipeline pré-baixa a imagem e falha com mensagem legível se o daemon não responder —
+  sem isso, Docker ausente apareceria como uma dúzia de testes estourando por timeout, e quem
+  investigasse procuraria defeito na regra em vez de na infra
+
+**Se algum dia o agente virar contêiner** (Docker-in-Docker), este arranjo precisa ser
+revisto: o caminho do socket muda e o *reaper* deixa de conseguir montá-lo.
+
 ### Registrar
 
 O PAT precisa de **um escopo só**: *Agent Pools → Read & manage*. Não use "Full access":

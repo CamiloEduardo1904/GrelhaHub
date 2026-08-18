@@ -46,7 +46,7 @@ public class UnidadeTests
         Criar().FusoHorario.Should().Be("America/Sao_Paulo");
     }
 
-    [Fact(DisplayName = "RN-GER-003 — o CNPJ é armazenado apenas com dígitos")]
+    [Fact(DisplayName = "RN-GER-013 — CNPJ e telefone são armazenados apenas com dígitos")]
     public void Cnpj_GuardaSomenteDigitos()
     {
         var unidade = new Unidade(
