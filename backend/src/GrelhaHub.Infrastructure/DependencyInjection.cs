@@ -37,6 +37,21 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<GrelhaHubDbContext>());
 
+        // ADR-0019 — o lado da LEITURA, com modelo próprio.
+        //
+        // ⚠ Mesma connection string, contexto DIFERENTE, e é isso que separa: este não conhece
+        // agregado nenhum, só visões, e a interface que ele expõe não tem `SaveChangesAsync`. Um
+        // handler de `Query` recebe `ILeituraDb` e não tem como alcançar o outro lado — a
+        // separação deixa de depender de disciplina.
+        //
+        // ⚠ NÃO registra `GrelhaHubLeituraDbContext` como `IAppDbContext`, nem o contrário: são
+        // dois modelos do mesmo banco, e cruzá-los devolveria o acoplamento que o ADR-0019
+        // desfez. O `ArquiteturaDeCqrsTests` recusa a build se alguém tentar.
+        services.AddDbContext<GrelhaHubLeituraDbContext>(options =>
+            options.UseNpgsql(conexao).UseSnakeCaseNamingConvention());
+
+        services.AddScoped<ILeituraDb>(sp => sp.GetRequiredService<GrelhaHubLeituraDbContext>());
+
         services.AddSingleton<IRelogio, Relogio>();
 
         // SPEC-GER-003 — o cache atravessa requisições (singleton); o serviço depende do
