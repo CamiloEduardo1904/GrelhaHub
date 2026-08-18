@@ -27,6 +27,10 @@ internal sealed partial class CaixaDeSaidaDeTeste : IEnviadorDeEmail
 
     public string BaseDoSite => "https://testes.grelhahub.local";
 
+    public string Empresa => "CDP TECH SOLUTIONS";
+
+    public string Cnpj => "63.533.872/0001-35";
+
     public void Enfileirar(MensagemDeEmail mensagem) => _mensagens.Enqueue(mensagem);
 
     /// <summary>Limpa entre testes — o `LimparAsync` do ambiente chama isto.</summary>

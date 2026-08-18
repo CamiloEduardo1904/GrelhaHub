@@ -37,6 +37,20 @@ public sealed class OpcoesDeEmail
     public string BaseDoSite { get; set; } = string.Empty;
 
     /// <summary>
+    /// O rodapé legal do e-mail — razão social e CNPJ de quem assina o produto.
+    /// <para>
+    /// Os padrões abaixo são os mesmos do rodapé da vitrine
+    /// (<c>frontend/src/features/site/conteudo.ts</c>). Ficam aqui como padrão, e não como
+    /// obrigatório no <c>.env</c>, porque e-mail sem rodapé legal é pior do que e-mail com o
+    /// rodapé de ontem: uma mensagem transacional sem quem a envia parece phishing.
+    /// </para>
+    /// </summary>
+    public string Empresa { get; set; } = string.Empty;
+
+    /// <inheritdoc cref="Empresa" />
+    public string Cnpj { get; set; } = string.Empty;
+
+    /// <summary>
     /// <c>RN-GER-032</c> — sem configuração completa não há envio, e isso é estado válido.
     /// <para>
     /// ⚠ <b>A senha entra na conta.</b> Host, usuário e remetente vêm do <c>appsettings</c> e estão
@@ -94,6 +108,10 @@ public sealed partial class EnviadorDeEmail(
     public bool Configurado => _opcoes.Completo;
 
     public string BaseDoSite => _opcoes.BaseDoSite.TrimEnd('/');
+
+    public string Empresa => _opcoes.Empresa;
+
+    public string Cnpj => _opcoes.Cnpj;
 
     public void Enfileirar(MensagemDeEmail mensagem)
     {

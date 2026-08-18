@@ -44,4 +44,19 @@ public interface IEnviadorDeEmail
     /// </para>
     /// </summary>
     string BaseDoSite { get; }
+
+    /// <summary>
+    /// Quem assina o produto, para o rodapé legal — razão social e CNPJ.
+    /// <para>
+    /// ⚠ Vem de configuração e <b>não</b> de constante no modelo do e-mail, pelo mesmo motivo que
+    /// os dados da vitrine vivem em <c>conteudo.ts</c>: identidade jurídica muda por decisão
+    /// societária, não por deploy de funcionalidade — e quem a atualiza não deveria precisar
+    /// recompilar. Os valores são os MESMOS do rodapé da vitrine; divergir entre a página e o
+    /// e-mail é o tipo de defeito que só aparece quando alguém confere um contrato.
+    /// </para>
+    /// </summary>
+    string Empresa { get; }
+
+    /// <inheritdoc cref="Empresa" />
+    string Cnpj { get; }
 }

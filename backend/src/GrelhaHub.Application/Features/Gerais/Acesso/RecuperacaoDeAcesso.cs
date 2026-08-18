@@ -71,43 +71,26 @@ public sealed class EmissorDeLinkDeAcesso(
         email.Enfileirar(Montar(usuario, tipo, token));
     }
 
+    /// <summary>
+    /// O que este método decide, e o que ele delega.
+    /// <para>
+    /// Decide aqui o que depende do <b>domínio</b>: qual tela recebe o token e por quanto tempo ele
+    /// vale. A aparência vai inteira para <see cref="ModeloDeEmailDeAcesso"/> — separação que
+    /// existe para que a prévia do e-mail possa ser gerada sem banco nem SMTP, com o mesmo código
+    /// que sai para o cliente.
+    /// </para>
+    /// </summary>
     private MensagemDeEmail Montar(Usuario usuario, TipoDeToken tipo, string token)
     {
         var caminho = tipo == TipoDeToken.Convite ? "definir-senha" : "redefinir-senha";
         var link = $"{email.BaseDoSite}/{caminho}?token={token}";
 
-        var (assunto, chamada) = tipo == TipoDeToken.Convite
-            ? ("O seu acesso ao GrelhaHub", "Uma conta foi criada para você no GrelhaHub. Defina a sua senha:")
-            : ("Redefinir a sua senha do GrelhaHub", "Recebemos um pedido para redefinir a sua senha:");
-
-        var horas = tipo == TipoDeToken.Convite
+        var validade = tipo == TipoDeToken.Convite
             ? $"{ValidadeDoConvite.TotalHours:0} horas"
             : $"{ValidadeDaRedefinicao.TotalMinutes:0} minutos";
 
-        // HTML sem imagem, sem webfont e sem CSS externo: cliente de e-mail bloqueia os três, e o
-        // que sobra de um layout que depende deles é uma página quebrada. Estilo no atributo, que é
-        // o único que o Gmail preserva.
-        var html = $"""
-            <p>Olá, {usuario.Nome}.</p>
-            <p>{chamada}</p>
-            <p><a href="{link}" style="display:inline-block;padding:12px 20px;background:#d95b1e;color:#fff;text-decoration:none;font-weight:bold">Definir senha</a></p>
-            <p>O link vale por <strong>{horas}</strong> e só pode ser usado uma vez.</p>
-            <p style="color:#555">Se não foi você quem pediu, ignore este e-mail: nada muda até o link ser usado.</p>
-            <p style="color:#555">Se o botão não abrir, copie este endereço: {link}</p>
-            """;
-
-        var texto = $"""
-            Olá, {usuario.Nome}.
-
-            {chamada}
-
-            {link}
-
-            O link vale por {horas} e só pode ser usado uma vez.
-            Se não foi você quem pediu, ignore este e-mail: nada muda até o link ser usado.
-            """;
-
-        return new MensagemDeEmail(usuario.Email, assunto, html, texto);
+        return ModeloDeEmailDeAcesso.Montar(
+            usuario.Email, usuario.Nome, tipo, link, validade, email.Empresa, email.Cnpj);
     }
 }
 
