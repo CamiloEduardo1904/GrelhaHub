@@ -12,7 +12,7 @@ import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../servi
 import { CadastroDeOperacao } from '../plataforma/CadastroDeOperacao';
 import { Cardapio } from './Cardapio';
 import { encerrarSessao, lerSessao, pode } from './sessao';
-import { comoConsulta, periodoDeHoje, type Periodo } from '../../services/periodo';
+import { comoConsulta, iso, periodoDeHoje, type Periodo } from '../../services/periodo';
 import { FiltroDePeriodo } from './FiltroDePeriodo';
 import { Operacao } from './Operacao';
 import { Usuarios } from './Usuarios';
@@ -141,7 +141,7 @@ export function Painel() {
         {aba === 'pedidos' && (
           <>
             <FiltroDePeriodo periodo={periodo} aoMudar={setPeriodo} />
-            <Pedidos pedidos={pedidos} restaurante={restaurante} aoAgir={agir} />
+            <Pedidos pedidos={pedidos} aoAgir={agir} />
           </>
         )}
 
@@ -165,13 +165,63 @@ export function Painel() {
   );
 }
 
+/**
+ * Os pedidos, em blocos de **dia operacional** — `RN-GER-006` ⚠⚠.
+ *
+ * ⚠ Ordem decrescente: o dia mais recente primeiro, e dentro dele o número maior primeiro. Quem
+ * abre o painel durante o serviço quer o pedido que acabou de entrar, não o da semana passada.
+ */
+function agruparPorDiaOperacional(
+  pedidos: PedidoResumo[],
+): { dia: string; doDia: PedidoResumo[] }[] {
+  const porDia = new Map<string, PedidoResumo[]>();
+
+  for (const pedido of pedidos) {
+    const dia = pedido.dataOperacional;
+    porDia.set(dia, [...(porDia.get(dia) ?? []), pedido]);
+  }
+
+  return [...porDia.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([dia, doDia]) => ({
+      dia,
+      doDia: [...doDia].sort((a, b) => b.numero - a.numero),
+    }));
+}
+
+/**
+ * "Hoje", "Ontem", ou o dia da semana.
+ *
+ * ⚠ Compara com o dia do CALENDÁRIO de quem está olhando, e não com o dia operacional corrente da
+ * casa — que o cliente não conhece. Entre a meia-noite e a virada, "hoje" no relógio da pessoa
+ * ainda é o dia operacional de ontem, e é por isso que o rótulo nunca aparece sozinho: a data
+ * completa vem ao lado, em mono, e é ela que manda.
+ */
+function rotuloDoDia(dia: string): string {
+  const hoje = new Date();
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+
+  if (dia === iso(hoje)) return 'Hoje';
+  if (dia === iso(ontem)) return 'Ontem';
+
+  const [ano, mes, data] = dia.split('-').map(Number);
+  const quando = new Date(ano, mes - 1, data);
+
+  return quando.toLocaleDateString('pt-BR', { weekday: 'long' });
+}
+
+//  saiu daqui: o contador do dia vinha dele, e agora cada bloco conta o seu.
+/**
+ * ⚠ `restaurante` saiu das propriedades: o contador vinha de `pedidosDoDia`, que é do dia
+ * corrente. Com a lista podendo trazer vários dias, esse número passou a contradizer o que estava
+ * na tela — cada bloco conta o seu, e é o único jeito de o contador não mentir.
+ */
 function Pedidos({
   pedidos,
-  restaurante,
   aoAgir,
 }: {
   pedidos: PedidoResumo[];
-  restaurante: MeuRestaurante | null;
   aoAgir: (id: string, caminho: string, corpo?: unknown) => Promise<void>;
 }) {
   // O pedido em cancelamento. `null` = diálogo fechado — e o estado guarda o PEDIDO, não um
@@ -196,45 +246,64 @@ function Pedidos({
 
   return (
     <>
-      <p className="secundario">
-        {/* RN-GER-006 — o dia operacional vai das 04h00 às 03h59 do dia seguinte. */}
-        Dia operacional <strong className="dado">{pedidos[0]?.dataOperacional}</strong> ·{' '}
-        {restaurante?.pedidosDoDia ?? pedidos.length} pedido(s)
-      </p>
+      {/* ⚠⚠ AGRUPADO POR DIA OPERACIONAL, e o agrupamento é obrigatório — não é organização.
+          `numero` é único por (unidade, dia operacional): ele REINICIA a cada virada. Numa lista
+          de vários dias, a comanda #1 de hoje e a #1 de ontem apareciam lado a lado, idênticas,
+          sem nada dizendo que eram pedidos diferentes — o operador não tinha como saber qual
+          estava lendo. Foi o que o filtro de período revelou no dia em que entrou. */}
+      {agruparPorDiaOperacional(pedidos).map(({ dia, doDia }, indice) => (
+        <section key={dia} className="dia-de-pedidos">
+          <header className="divisor-dia">
+            {/* CHAPA-02 — uma barra âmbar por grupo: o dia mais recente da lista. */}
+            <Grelha etapa={indice === 0 ? 0 : -1} de={1} />
 
-      <div className="grade">
-        {pedidos.map((pedido) => (
-          <Comanda
-            key={pedido.id}
-            pedido={pedido}
-            acoes={
-              <>
-                {PROXIMA_ACAO[pedido.status] && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void aoAgir(pedido.id, rotaDeAvanco(pedido.status))}
-                  >
-                    {PROXIMA_ACAO[pedido.status]}
-                  </button>
-                )}
+            <h3>
+              <span className="divisor-titulo">{rotuloDoDia(dia)}</span>
+              <span className="dado divisor-data">{dia}</span>
+            </h3>
 
-                {/* RN-GER-002 — cancelamento exige motivo; a permissão é `pedido.cancelar`.
-                    Esconder aqui é usabilidade; o servidor recusa de todo jeito. */}
-                {podeCancelar && pedido.status !== 'Cancelado' && pedido.status !== 'Finalizado' && (
-                  <button
-                    type="button"
-                    className="btn calada perigo"
-                    onClick={() => setCancelando(pedido)}
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </>
-            }
-          />
-        ))}
-      </div>
+            <span className="divisor-resumo dado">
+              {doDia.length} pedido{doDia.length === 1 ? '' : 's'}
+            </span>
+          </header>
+
+          <div className="grade">
+            {doDia.map((pedido) => (
+              <Comanda
+                key={pedido.id}
+                pedido={pedido}
+                acoes={
+                  <>
+                    {PROXIMA_ACAO[pedido.status] && (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => void aoAgir(pedido.id, rotaDeAvanco(pedido.status))}
+                      >
+                        {PROXIMA_ACAO[pedido.status]}
+                      </button>
+                    )}
+
+                    {/* RN-GER-002 — cancelamento exige motivo; a permissão é `pedido.cancelar`.
+                        Esconder aqui é usabilidade; o servidor recusa de todo jeito. */}
+                    {podeCancelar &&
+                      pedido.status !== 'Cancelado' &&
+                      pedido.status !== 'Finalizado' && (
+                        <button
+                          type="button"
+                          className="btn calada perigo"
+                          onClick={() => setCancelando(pedido)}
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                  </>
+                }
+              />
+            ))}
+          </div>
+        </section>
+      ))}
 
       {cancelando && (
         <Dialogo

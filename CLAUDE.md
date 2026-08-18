@@ -46,6 +46,7 @@ Não implemente "provisoriamente".
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
+| `docs/arquitetura/` | Modelo de dados com diagrama, backend e frontend — extraído do modelo real |
 
 **Nunca responda de memória sobre uma regra** — `grep` pelo ID. As regras mudam de estado a
 cada entrevista.
@@ -200,6 +201,17 @@ Backend, frontend, migration `Fundacao` e pipeline de deploy. 26 regras com cód
 **56 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
 que não baixa estoque hoje não significa que a regra mudou**, significa que o estoque ainda
 não existe.
+
+Em 18/08/2026 entrou o **painel de operação** (`RN-GER-038`, `RN-VEN-049` a `051`): faturamento por
+dia operacional, ticket médio, o que está no salão e mais vendidos, com filtro de período — que
+ganhou tela também na lista de pedidos, onde o backend já suportava `de`/`ate` desde a fatia
+vertical. ⚠ **A lista é agrupada por dia operacional, e o agrupamento é obrigatório:** `numero` é
+único por (unidade, dia operacional) e REINICIA a cada virada — sem o divisor, a comanda #1 de hoje
+e a #1 de ontem aparecem lado a lado, idênticas. Foi o que o filtro revelou no dia em que entrou.
+
+A arquitetura ganhou documento próprio em [`docs/arquitetura/`](docs/arquitetura/) — modelo de
+dados com diagrama e dicionário completo, backend e frontend, **extraídos do modelo real** e
+escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 
 ### O que está verde e o que não está
 

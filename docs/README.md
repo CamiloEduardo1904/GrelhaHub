@@ -10,10 +10,12 @@
 
 | Se você é… | Leia nesta ordem |
 |------------|------------------|
-| **Novo no projeto** | [Contexto](../GRELHAHUB-context.md) → [Levantamento](01-documento-de-levantamento.md) → [Glossário](02-glossario.md) |
+| **Novo no projeto** | [Arquitetura](arquitetura/) → [Contexto](../GRELHAHUB-context.md) → [Glossário](02-glossario.md) |
+| **Vai apresentar o sistema** | [Arquitetura](arquitetura/) — modelo de dados com diagrama, backend e frontend, escritos para quem não é da área |
 | **Vai implementar** | [Guia de specs](06-guia-de-specs.md) → [Catálogo de regras](03-catalogo-de-regras-de-negocio.md) → [ADRs](adr/) |
 | **Vai fazer tela** | [Design System Chapa](08-design-system.md) → [proposta navegável](design/proposta-chapa.html) |
-| **Vai modelar o banco** | [Catálogo §15 — regras estruturais](03-catalogo-de-regras-de-negocio.md#15-as-sete-regras-estruturais) → [Levantamento §12 — entidades](01-documento-de-levantamento.md#12-entidades-candidatas-ponte-para-a-sprint-3--4) → [ADR-0008](adr/0008-estoque-como-livro-razao.md), [0010](adr/0010-custeio-por-lote-com-fefo.md), [0011](adr/0011-dia-operacional.md) |
+| **Vai mexer no banco** | [Modelo de dados](arquitetura/01-modelo-de-dados.md) — diagrama, chaves e tipos, extraídos do modelo real |
+| **Vai modelar coisa nova** | [Catálogo §15 — regras estruturais](03-catalogo-de-regras-de-negocio.md#15-as-sete-regras-estruturais) → [Levantamento §12 — entidades](01-documento-de-levantamento.md#12-entidades-candidatas-ponte-para-a-sprint-3--4) → [ADR-0008](adr/0008-estoque-como-livro-razao.md), [0010](adr/0010-custeio-por-lote-com-fefo.md), [0011](adr/0011-dia-operacional.md) |
 | **Vai entrevistar o cliente** | [Fila de validação](05-fila-de-validacao-com-cliente.md) |
 | **Quer entender uma decisão** | [Índice de ADRs](adr/README.md) |
 
@@ -46,6 +48,18 @@
 | [06 — Guia de specs](06-guia-de-specs.md) | Como a regra vira spec e a spec vira código; ordem das ondas de implementação; definição de pronto |
 | [**08 — Design System Chapa**](08-design-system.md) ★ | Tokens, componentes e as 8 regras `CHAPA-*`. **Base oficial da interface** |
 | [07 — Cruzamento](07-cruzamento-catalogo-x-levantamento.md) | Auditoria do cruzamento entre as duas fontes: 14 convergências, 9 conflitos resolvidos, 71 lacunas, 17 complementos |
+
+### Arquitetura — como o sistema é feito
+
+| Documento | O que contém |
+|-----------|--------------|
+| [**Arquitetura**](arquitetura/) ★ | Mapa da pasta, o sistema em um parágrafo e o vocabulário |
+| [01 — Modelo de dados](arquitetura/01-modelo-de-dados.md) | Diagrama de relacionamentos e o dicionário completo: chaves, tipos, índices, restrições. **Extraído do modelo real** |
+| [02 — Backend](arquitetura/02-backend.md) | As quatro camadas, o caminho de uma requisição, onde cada regra é imposta |
+| [03 — Frontend](arquitetura/03-frontend.md) | Telas, quem vê o quê, e como a identidade visual chega até elas |
+
+> Escritos em dois níveis: a **Parte 1** de cada capítulo é para apresentar ao time sem jargão;
+> a **Parte 2** é o detalhe para quem vai mexer.
 
 ### Decisões e specs
 
