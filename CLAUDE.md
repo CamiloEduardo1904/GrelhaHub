@@ -40,7 +40,7 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 168 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 169 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 14 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
@@ -186,7 +186,7 @@ npm run lint && npm run build
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **168 regras catalogadas: 146 em `HIP`, 22 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **169 regras catalogadas: 147 em `HIP`, 22 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`): o usuário de plataforma cria, lista e inativa outro — o caminho que `RN-GER-016` previa e que só existia pela carga inicial.
 

@@ -4,7 +4,7 @@
 |-------|-------|
 | Versão | **2.1** |
 | Data | Agosto/2026 |
-| Situação | Em validação — **168 regras**: 146 em hipótese, 22 decididas pelo time |
+| Situação | Em validação — **169 regras**: 147 em hipótese, 22 decididas pelo time |
 | Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + 10 regras descobertas na implementação (`IMP`) + 22 decisões de produto do time (`DEC`) |
 | Auditoria do cruzamento | [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md) |
 | Papel no projeto | **Fonte de verdade.** Toda spec de implementação transcreve regras daqui. Nenhuma regra de negócio nasce no código |
@@ -51,7 +51,7 @@
 
 ## 1. Estado do catálogo
 
-Das 168 regras, **146 estão em estado de hipótese** — 134 herdadas das fontes e 12 descobertas
+Das 169 regras, **147 estão em estado de hipótese** — 134 herdadas das fontes e 13 descobertas
 durante a implementação (origem `IMP`) — e as outras 19 são decisões de produto, estado `DEC`.
 As herdadas foram derivadas do
 conhecimento do domínio (operação de hamburgueria) e da estrutura dos dez módulos de ERP
@@ -182,7 +182,7 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 | Módulo | Regras | Prioridade de validação | Escopo predominante |
 |--------|-------:|-------------------------|---------------------|
 | **GER** — Gerais e transversais | 31 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
-| **VEN** — Vendas e Comercial | 46 | **MÁXIMA** | Núcleo |
+| **VEN** — Vendas e Comercial | 47 | **MÁXIMA** | Núcleo |
 | **PRO** — Produção | 13 | **MÁXIMA** | Núcleo |
 | **EST** — Estoque | 23 | **MÁXIMA** | Núcleo |
 | **COM** — Compras | 9 | ALTA | Modelo |
@@ -191,7 +191,7 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 | **LOG** — Logística e Frota | 9 | MÉDIA | Núcleo |
 | **RH** — Recursos Humanos | 6 | BAIXA | Modelo |
 | **FIS** — Fiscal | 6 | BAIXA | **Fase 2 — por último** |
-| **Total** | **168** | | |
+| **Total** | **169** | | |
 
 > **Ordem de ataque decidida (17/08/2026).** O módulo **FIS** fica **por último**: é o único
 > cujo valor depende de homologação externa (SEFAZ, certificado digital), e nada nos outros
@@ -375,6 +375,7 @@ Os três módulos de prioridade máxima — **Vendas, Produção e Estoque** —
 | RN-VEN-044 `IMP` ⚠ | O **produto** tem nome único na unidade e preço maior que zero (`RN-VEN-032`). Ele carrega **dois estados independentes**, e confundi-los é o erro previsível: **`ativo`** é cadastral — o produto saiu do cardápio e não volta nesta temporada (`RN-VEN-020`); **`disponível`** é do turno — "acabou hoje", e amanhã volta. Inativar exige decisão de quem cadastra; marcar como indisponível é operação de quem está no salão. | F R | `produto` | UQ CK APP | **HIP** | S |
 | RN-VEN-045 `IMP` | **Categoria e produto não são excluídos, apenas inativados.** Produto excluído levaria consigo o item de pedidos históricos (`RN-VEN-020`), e categoria excluída deixaria produto órfão. `RN-GER-002` não cobre estes dois: ele fala de registro **transacional**, e cadastro é outra coisa — por isso a regra é própria. | R | `categoria`, `produto`, `item_pedido` | FK APP | **HIP** | S |
 | RN-VEN-046 `IMP` | Cada categoria aceita no máximo **`PAR-VEN-004` produtos ativos** — 50 por padrão, ajustável por unidade. O limite conta **apenas os ativos**: como `RN-VEN-045` proíbe exclusão, contar o histórico faria a categoria entupir para sempre a cada produto retirado. Recusar não é proteção de banco — é a leitura do cliente: cardápio com centenas de itens numa seção não é cardápio, é catálogo, e quem escolhe desiste antes. | F R | `produto`, `categoria` | APP PAR | **HIP** | S |
+| RN-VEN-047 `IMP` ⚠ | **O acompanhamento do pedido pelo cliente consulta o estado a cada `PAR-VEN-005` segundos** — 15 por padrão — **e só cessa quando o pedido chega a `Finalizado` ou `Cancelado`.** São os dois únicos estados de onde `RN-VEN-018` não prevê saída; **`Entregue` não encerra**, porque dali ainda se vai para `Finalizado`, e parar ali deixa o cliente com a última tela errada sem nada indicando isso. ⚠ **Enquanto não houver estado terminal, o acompanhamento não pode cessar**: aba escondida, falha de rede ou consulta demorada **suspendem** a consulta, nunca a corrente — quem suspende retoma. Acompanhamento que morre em silêncio é indistinguível, na tela, de pedido que parou de andar. | R F | `pedido` | APP PAR | **HIP** | S |
 
 ---
 
@@ -677,6 +678,7 @@ implementada; uma spec sem regra é comportamento não autorizado.
 | `RN-VEN-044` `IMP` ⚠ | [SPEC-VEN-003](specs/SPEC-VEN-003-cadastro-do-cardapio.md) | **Entregue** — nome único, preço positivo, e **`ativo` (cadastral) separado de `disponível` (do turno)**, com rota própria para cada um | `CadastroDoCardapioTests` ✔ CA-8 a CA-11 — CA-11 é o que prova a independência |
 | `RN-VEN-045` `IMP` | [SPEC-VEN-003](specs/SPEC-VEN-003-cadastro-do-cardapio.md) | **Entregue** — **não existe rota de exclusão**, e a ausência é a implementação. Inativar preserva o item de pedido histórico | `CadastroDoCardapioTests` ✔ CA-13 |
 | `RN-VEN-046` `IMP` | [SPEC-VEN-003](specs/SPEC-VEN-003-cadastro-do-cardapio.md) | **Entregue** — teto de `PAR-VEN-004` produtos **ativos** por categoria (50 por padrão), imposto nos **dois** caminhos de entrada por `TetoDeProdutos`: criar/mover e **reativar** | `CadastroDoCardapioTests` ✔ CA-17 a CA-21 — CA-20 é o contorno pela reativação |
+| `RN-VEN-047` `IMP` ⚠ | [SPEC-VEN-001](specs/SPEC-VEN-001-cardapio-publico-e-pedido.md) | **Entregue** — 15 s (`PAR-VEN-005`), cessa só em Finalizado ou Cancelado, e suspender nunca solta a corrente | ⚠ **Sem teste automatizado — o frontend não tem harness.** O comportamento vive em `usePedidoAoVivo.ts`, e `pedidoEncerrado` é função pura à espera de um runner. Dívida registrada |
 | **10 regras `PAR`** | [SPEC-GER-003](specs/SPEC-GER-003-parametros-com-vigencia.md) | **Habilitadas** — os 10 parâmetros existem, com vigência e leitura na data do evento. `PAR-VEN-004` é o primeiro a ser **consumido por regra de cadastro** (`RN-VEN-046`) | `ParametrosTests` ✔ 11 casos, incluindo CA-7 (documento × código × banco) |
 
 ### Fatia vertical — `SPEC-VEN-001`
@@ -809,6 +811,8 @@ esta tabela é o índice inverso. Ver [`06-guia-de-specs.md`](06-guia-de-specs.m
 | **2.1** | **17/08/2026** | **Teto de produtos por categoria.** `RN-VEN-046` (`IMP`) — no máximo **`PAR-VEN-004`** produtos **ativos** por categoria, 50 por padrão, ajustável por unidade pela tabela `parametro_valor`. Pedida pelo dono do produto como "flag de 50 por categoria, ajustável via banco": virou **parâmetro** e não coluna, porque é valor configurável da operação e `parametro_valor` já entrega vigência, recorte por unidade e trilha (`SPEC-GER-003`) — coluna nova daria só o número. ⚠ **Conta apenas os ativos**: `RN-VEN-045` proíbe exclusão, então contar o histórico entupiria a categoria para sempre. Total: **166 regras** |
 
 | **2.2** | **18/08/2026** | **A plataforma passa a administrar os seus próprios usuários** — e a regra nasceu de uma falha de operação, não de um pedido de tela. `RN-GER-016` já dizia que usuário de plataforma é criado "por outro usuário de plataforma ou pela carga inicial", e **só a carga inicial existia**: quando esta instalação subiu sem nenhum usuário de plataforma — variável de ambiente não repassada pelo compose —, não havia caminho pela interface, e a recuperação exigiu acesso ao servidor. **RN-GER-030** (`IMP`) — criar e listar usuário de plataforma, sem unidade, sem perfil e sem CPF, com troca de senha obrigatória; **sem** sessão de suporte, pela mesma linha comercial × suporte de `RN-GER-029` (a sessão é aberta *para uma unidade*, e aqui não há unidade nenhuma). **RN-GER-031** (`IMP`) ⚠ — inativação por outro usuário de plataforma, nunca de si mesmo, e **recusa de inativar o último ativo**: sem isso um clique reproduziria de propósito o estado que custou um dia de diagnóstico. Total: **168 regras** |
+
+| **2.3** | **18/08/2026** | **O acompanhamento do pedido parava antes do fim.** `RN-VEN-047` (`IMP`) ⚠ — a consulta roda a cada `PAR-VEN-005` segundos (15) e **só cessa em Finalizado ou Cancelado**. Duas coisas estavam erradas e nenhuma dava erro na tela. **Primeira:** o critério de parada era a *fase* `fim`, que agrupa **Entregue** com Finalizado — agrupamento certo para filtrar, errado para parar de perguntar; a tela do cliente congelava um estado antes do fim. **Segunda:** com a aba escondida o temporizador disparava e **não reagendava** — a corrente dependia de o `visibilitychange` voltar, e quando ele não veio (aba congelada, cache de retorno) o acompanhamento morreu em silêncio. ⚠ A regra enuncia a propriedade que faltava: **suspender não é cessar**, porque entre "parou de perguntar" e "o pedido parou de andar" a tela é idêntica. Parâmetro novo: `PAR-VEN-005`. Total: **169 regras** |
 
 ### Regras revogadas na consolidação
 

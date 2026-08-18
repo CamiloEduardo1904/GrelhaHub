@@ -19,6 +19,7 @@ migration.
 | `PAR-VEN-002` | Percentual da taxa de serviço | **10%** | `numeric(5,2)` | RN-VEN-014 |
 | `PAR-VEN-003` `CRZ` | Fricção na falta de saldo de insumo — o alerta é sempre exibido | **avisar** | `enum(bloquear, avisar, permitir)` | RN-VEN-021, RN-VEN-035 |
 | `PAR-VEN-004` | Máximo de produtos **ativos** por categoria | **50** | `integer` | RN-VEN-046 |
+| `PAR-VEN-005` | Intervalo do acompanhamento do pedido pelo cliente | **15 s** | `integer` | RN-VEN-047 |
 | `PAR-EST-001` | Validade mínima aceita no recebimento | **7 dias** | `integer` | RN-EST-008 |
 | `PAR-EST-002` | Dias de estoque de segurança | **3 dias** | `integer` | RN-COM-009 |
 | `PAR-COM-001` | Valor mínimo que exige cotação | **R$ 500,00** | `numeric(12,2)` | RN-COM-005 |

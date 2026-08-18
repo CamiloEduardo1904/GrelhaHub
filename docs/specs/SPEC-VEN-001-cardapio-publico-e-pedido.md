@@ -109,6 +109,27 @@ O `telefone` é obrigatório no acompanhamento: o número do pedido é sequencia
 operacional e, sozinho, seria adivinhável — qualquer pessoa leria o pedido alheio. O par
 número + telefone é o que autoriza a leitura sem exigir login (`RN-CRM-001`).
 
+### A cadência do acompanhamento — `RN-VEN-047` ⚠
+
+A tela do cliente consulta essa rota a cada **`PAR-VEN-005`** segundos (15) e **só para quando o
+pedido chega a Finalizado ou Cancelado**. Polling, e não SSE nem WebSocket: uma VPS com Nginx na
+frente (ADR-0006), para entregar segundos de diferença num fluxo que leva minutos.
+
+Dois defeitos foram corrigidos em 18/08/2026, e **nenhum dos dois produzia erro na tela** — é o que
+os torna dignos de estar escritos aqui:
+
+| Defeito | Por que passou despercebido |
+|---------|------------------------------|
+| Parava no **Entregue** | O critério era a *fase* `fim`, que agrupa Entregue com Finalizado. Agrupamento certo para **filtrar**, errado para **parar de perguntar**: de Entregue ainda se vai para Finalizado |
+| Morria com a aba escondida | O temporizador disparava, via `document.hidden` e **retornava sem reagendar**. A corrente dependia do `visibilitychange`; quando ele não veio — aba congelada pelo navegador, volta pelo cache de retorno —, o acompanhamento simplesmente deixou de existir |
+
+> **A propriedade que a regra enuncia é "suspender não é cessar".** Entre *parou de perguntar* e *o
+> pedido parou de andar*, a tela é **idêntica**: mesmo estado, nenhuma mensagem, nenhum erro. Não há
+> como o cliente distinguir, então o sistema não pode deixar acontecer.
+
+⚠ **Sem teste automatizado**: o frontend não tem harness. `pedidoEncerrado` é função pura à espera
+de um runner, e a dívida está no §8.
+
 ### Erros
 
 | Situação | Código | Mensagem | Regra |

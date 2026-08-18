@@ -163,8 +163,9 @@ function EstadoAoVivo({
   atualizarAgora: () => void;
 }) {
   if (!acompanhando) {
-    // Estado terminal. Dizer que parou é melhor do que a tela parecer congelada: o cliente que vê
-    // "Entregue" sem mais nada fica olhando esperando algo acontecer.
+    // RN-VEN-047 — encerrado: Finalizado ou Cancelado. Dizer que parou é melhor do que a tela
+    // parecer congelada — e a tela congelada é justamente o que não se distingue de "parou de
+    // perguntar". Entregue NÃO cai aqui: dali ainda se vai para Finalizado.
     return (
       <p className="ao-vivo encerrado">
         <span className="rotulo">Acompanhamento encerrado</span>

@@ -41,6 +41,21 @@ export function faseDe(status: StatusPedido): Fase {
   return 'andamento';
 }
 
+/**
+ * `RN-VEN-047` — o pedido **acabou de andar**: não há transição saindo daqui (`RN-VEN-018`).
+ *
+ * ⚠ **Não é a mesma coisa que `faseDe(...) === 'fim'`, e a diferença já custou uma tela errada.**
+ * A fase `fim` agrupa **Entregue e Finalizado** para efeito de *filtro* — quem filtra "finalizados"
+ * quer os dois. Mas de **Entregue ainda se sai**: falta o Finalizar. O acompanhamento do cliente
+ * usava a fase como critério de parada e desligava no Entregue; a tela congelava num estado que
+ * ainda ia mudar, sem nada indicando que tinha parado de perguntar.
+ *
+ * Duas perguntas parecidas, respostas diferentes. Por isso são duas funções.
+ */
+export function pedidoEncerrado(status: StatusPedido): boolean {
+  return status === 'Finalizado' || status === 'Cancelado';
+}
+
 /** Índice do estado na régua. −1 para Cancelado, que não tem posição. */
 export function etapaDe(status: StatusPedido): number {
   return CICLO.indexOf(status);

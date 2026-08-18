@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
-import { faseDe } from '../../services/ciclo';
+import { pedidoEncerrado } from '../../services/ciclo';
 import type { StatusPedido } from '../../services/tipos';
 
 /**
@@ -14,22 +14,36 @@ import type { StatusPedido } from '../../services/tipos';
  *
  * As quatro coisas que fazem isto ser educado com o servidor e com o celular do cliente:
  *
- * 1. **Para em estado terminal.** Entregue, Finalizado e Cancelado não mudam mais — continuar
- *    perguntando seria bater no servidor para sempre, e a aba fica aberta esquecida
- * 2. **Pausa com a aba escondida.** Um celular no bolso não precisa perguntar nada. Ao voltar,
- *    consulta **na hora**, em vez de esperar o próximo intervalo
+ * 1. **Para em estado encerrado, e só nele.** `RN-VEN-047`: Finalizado e Cancelado. ⚠ **Entregue
+ *    não encerra** — dali ainda se vai para Finalizado
+ * 2. **Suspende com a aba escondida — sem soltar a corrente.** Um celular no bolso não precisa
+ *    perguntar nada, mas o relógio continua batendo. Ao voltar, consulta **na hora**
  * 3. **Nunca sobrepõe requisição.** Rede lenta somando pedidos em fila é o que transforma um
  *    polling manso em enxurrada
  * 4. **Recua quando falha.** Erro consecutivo dobra o intervalo até um teto: se a API cair, cada
  *    cliente esperando deixa de somar carga justamente quando ela é o problema
+ *
+ * ⚠⚠ **A propriedade que o item 2 protege é a que faltava, e é a mais difícil de ver:** entre
+ * "parou de perguntar" e "o pedido parou de andar" a tela é **idêntica**. Nenhum erro, nenhuma
+ * mensagem — só um estado que não muda mais. Por isso `RN-VEN-047` exige que suspender nunca seja
+ * cessar: só o estado encerrado desliga esta corrente, e **quem suspende reagenda**.
  */
 
 /**
- * 10 segundos. O ciclo do pedido leva minutos, então o cliente não ganha nada com 1 s — e o
- * servidor perde: numa noite de 30 pedidos simultâneos, 1 s significa 30 requisições por segundo
- * de gente só esperando.
+ * `PAR-VEN-005` — 15 segundos, o valor padrão do parâmetro.
+ *
+ * ⚠ **Cópia do parâmetro no cliente, e a duplicação é conhecida.** O valor de verdade vive em
+ * `parametro_valor` e é por unidade (`SPEC-GER-003`); esta tela é **anônima** e não tem rota que
+ * leia parâmetro sem autenticação. Enquanto não houver — o lugar natural é o próprio corpo do
+ * cardápio público —, a constante fica aqui, nomeando o parâmetro que ela copia. Quem mudar
+ * `PAR-VEN-005` no banco precisa mudar esta linha, e é exatamente isso que a citação existe para
+ * fazer aparecer no `grep`.
+ *
+ * O ciclo do pedido leva minutos, então o cliente não ganha nada com 1 s — e o servidor perde:
+ * numa noite de 30 pedidos simultâneos, 1 s significa 30 requisições por segundo de gente só
+ * esperando.
  */
-const INTERVALO_MS = 10_000;
+const INTERVALO_MS = 15_000;
 
 /** Teto do recuo. Um minuto entre tentativas ainda recupera sozinho quando a API volta. */
 const INTERVALO_MAXIMO_MS = 60_000;
@@ -88,11 +102,13 @@ export function usePedidoAoVivo(
   aoAtualizarRef.current = aoAtualizar;
   statusAtual.current = pedido?.status ?? null;
 
-  // Estado terminal: `faseDe` devolve 'fim' para Entregue e Finalizado, 'morto' para Cancelado.
-  // Reusar essa função em vez de listar os estados aqui é o que impede esta tela de divergir do
-  // ciclo quando ele mudar (RN-VEN-018).
-  const terminal = pedido !== null && ['fim', 'morto'].includes(faseDe(pedido.status));
-  const acompanhando = pedido !== null && !terminal;
+  // RN-VEN-047 — encerrado é Finalizado ou Cancelado, e mais nada.
+  //
+  // ⚠ Aqui estava `faseDe(status)` em ['fim', 'morto'], e era um defeito silencioso: a fase 'fim'
+  // agrupa **Entregue** com Finalizado — agrupamento certo para filtrar, errado para parar de
+  // perguntar. O acompanhamento desligava no Entregue e a tela do cliente congelava um estado
+  // antes do fim, sem erro nenhum na tela. `pedidoEncerrado` existe para essa distinção.
+  const acompanhando = pedido !== null && !pedidoEncerrado(pedido.status);
 
   const atualizarAgora = useCallback(() => setGatilho((n) => n + 1), []);
 
@@ -126,7 +142,7 @@ export function usePedidoAoVivo(
         setSemConexao(false);
         setAtualizadoEm(new Date());
 
-        // Só avisa quem chamou se o estado REALMENTE mudou: um `setPedido` a cada 10 s
+        // Só avisa quem chamou se o estado REALMENTE mudou: um `setPedido` a cada 15 s
         // re-renderizaria a árvore inteira para nada.
         if (data.status !== statusAtual.current) {
           aoAtualizarRef.current(data);
@@ -157,10 +173,26 @@ export function usePedidoAoVivo(
         INTERVALO_MAXIMO_MS,
       );
 
+      // Um temporizador por corrente. Sem isto, `agendar` chamado por dois caminhos no mesmo
+      // instante — o retorno da consulta e a volta para a aba — deixaria dois timers correndo, e
+      // o intervalo real passaria a ser metade do configurado, dobrando a cada repetição.
+      window.clearTimeout(timer);
+
       timer = window.setTimeout(() => {
-        // Aba escondida: não consulta e não reagenda. Quem retoma é o `visibilitychange`, que
-        // consulta na hora — o cliente que volta para a aba quer ver agora, não em 10 s.
+        // ⚠ Aba escondida: **suspende a consulta e REAGENDA** (RN-VEN-047).
+        //
+        // Aqui havia um `return` seco, e era onde o acompanhamento morria: sem reagendar, a
+        // corrente inteira dependia de o `visibilitychange` disparar depois. Em celular ele nem
+        // sempre dispara — a aba congelada pelo navegador volta por `resume`, e a página
+        // restaurada do cache de retorno (`bfcache`) volta por `pageshow`. Quando nenhum dos dois
+        // veio, o resultado foi o pior possível: a tela seguiu aberta, sem erro, mostrando um
+        // estado que ninguém mais estava conferindo.
+        //
+        // Reagendar custa um temporizador ocioso — que o navegador já limita a uma vez por minuto
+        // em aba de fundo — e garante que a única coisa capaz de encerrar isto seja o estado
+        // encerrado do pedido.
         if (document.hidden) {
+          agendar();
           return;
         }
 
@@ -169,19 +201,38 @@ export function usePedidoAoVivo(
     }
 
     function aoVoltarParaAAba() {
-      if (!document.hidden) {
-        window.clearTimeout(timer);
-        void consultar();
+      if (document.hidden) {
+        return;
       }
+
+      window.clearTimeout(timer);
+
+      // Consulta em voo: não dá para disparar outra (item 3), e quem está em voo reagenda no
+      // `finally`. Mas o `clearTimeout` acima já apagou o temporizador — se a corrente dependesse
+      // deste caminho, ela pararia aqui. Reagendar é o que fecha o buraco.
+      if (emVoo.current) {
+        agendar();
+        return;
+      }
+
+      void consultar();
     }
 
     document.addEventListener('visibilitychange', aoVoltarParaAAba);
+
+    // `pageshow` cobre a volta do cache de retorno (`bfcache`), em que a página é restaurada
+    // inteira sem recarregar e sem necessariamente passar por `visibilitychange` — é o caminho do
+    // "voltar" do navegador no celular, e era mais um jeito de a corrente ficar parada com a tela
+    // no ar.
+    window.addEventListener('pageshow', aoVoltarParaAAba);
+
     agendar();
 
     return () => {
       vivo = false;
       window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', aoVoltarParaAAba);
+      window.removeEventListener('pageshow', aoVoltarParaAAba);
     };
   }, [acompanhando, slug, numero, telefone, gatilho]);
 
