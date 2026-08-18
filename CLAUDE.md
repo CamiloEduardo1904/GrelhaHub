@@ -40,7 +40,7 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 173 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 176 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 16 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
@@ -58,7 +58,7 @@ Errar aqui custa retrabalho de projeto, não de código.
 
 | Regra | O que exige |
 |-------|-------------|
-| `RN-GER-006` ⚠⚠ | Dia operacional das 04h00 às 03h59. **Nunca agrupe por data de criação** — use a coluna gerada `data_operacional` |
+| `RN-GER-006` ⚠⚠ | Dia operacional começa na **virada cadastrada da unidade** (`RN-GER-036`) — não é mais 04h00 fixo. **Nunca agrupe por data de criação** — use a coluna gerada `data_operacional`, que lê `hora_virada_operacional` e `fuso_operacional` **da própria linha do pedido** |
 | `RN-PRO-004` ⚠⚠ | Ficha técnica recursiva: o molho da casa é produto **e** insumo. Exige proteção contra ciclo |
 | `RN-EST-001` | Saldo **nunca** é coluna editável — é soma dos movimentos, materializada em view |
 | `RN-EST-004` + `RN-EST-011` | Todo movimento referencia um **lote**; custo é o do lote consumido, consumo **FEFO**. Nunca custo médio |
@@ -186,7 +186,7 @@ npm run lint && npm run build
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **173 regras catalogadas: 151 em `HIP`, 22 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **176 regras catalogadas: 150 em `HIP`, 26 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
@@ -197,7 +197,7 @@ inativo → espera o módulo RH, onda 10).
 **Existe uma fatia vertical funcionando** — `SPEC-VEN-001`, fora da ordem das ondas:
 cadastro de restaurante → cardápio público em `/c/:slug` → pedido → painel do restaurante.
 Backend, frontend, migration `Fundacao` e pipeline de deploy. 26 regras com código, e
-**54 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
+**56 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
 que não baixa estoque hoje não significa que a regra mudou**, significa que o estoque ainda
 não existe.
 
@@ -206,7 +206,7 @@ não existe.
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **256 testes** — 65 de domínio + 7 de aplicação + 184 de integração |
+| `dotnet test -c Release` | ✔ **271 testes** — 76 de domínio + 7 de aplicação + 188 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

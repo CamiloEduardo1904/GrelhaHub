@@ -65,10 +65,20 @@ public sealed class LogAuditoriaConfiguration : IEntityTypeConfiguration<LogAudi
     }
 
     /// <summary>
-    /// Mesma expressão de <c>pedido.data_operacional</c>, sobre a coluna desta tabela.
+    /// O dia operacional da trilha — e ⚠ <b>ele é o da PLATAFORMA, não o da casa</b>.
     /// <para>
-    /// A hora de virada é constante aqui pelo mesmo motivo de <c>RN-GER-006</c>: coluna gerada
-    /// exige expressão imutável, e alterá-la reclassificaria o passado.
+    /// <b>Divergência declarada em 18/08/2026, não descuido.</b> Quando <c>RN-GER-036</c> passou a
+    /// derivar a virada do horário de cada unidade, <c>pedido</c> acompanhou copiando a virada para
+    /// a linha. A trilha <b>não</b>: ela registra também o que a plataforma faz — e a plataforma não
+    /// tem unidade (<c>RN-GER-014</c>), logo não tem virada. Uma trilha com o dia de cada casa
+    /// deixaria as linhas de plataforma sem resposta, e "sem resposta" numa trilha de auditoria é
+    /// pior do que uma régua declarada.
+    /// </para>
+    /// <para>
+    /// O custo é real e está na §8 da <c>SPEC-GER-009</c>: "o que mudou no dia em que o caixa não
+    /// fechou" responde pela régua das 04h00, que pode não ser a da casa. Quando a pergunta
+    /// aparecer de verdade, o caminho é o mesmo do pedido — copiar a virada para a linha —, e a
+    /// coluna de origem já existirá em <c>unidade</c>.
     /// </para>
     /// </summary>
     internal const string DiaOperacionalDaTrilha =

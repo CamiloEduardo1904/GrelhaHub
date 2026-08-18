@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Comanda } from '../../components/Comanda';
 import { Dialogo } from '../../components/Dialogo';
 import { EnvioDeImagem } from '../../components/EnvioDeImagem';
+import { IconeImpressora } from '../../components/Icone';
+import { QRCodeSVG } from 'qrcode.react';
 import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
 import { PROXIMA_ACAO, rotaDeAvanco } from '../../services/ciclo';
@@ -282,6 +284,12 @@ function LinkPublico({
         Abrir cardápio
       </a>
 
+      <CartazDoCardapio
+        link={link}
+        nomeFantasia={restaurante.nomeFantasia}
+        urlLogo={restaurante.urlLogo}
+      />
+
       <dl className="dados">
         <div>
           <dt>Produtos ativos</dt>
@@ -292,6 +300,71 @@ function LinkPublico({
           <dd>{restaurante.pedidosDoDia}</dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+/**
+ * O QR do cardápio e o cartaz para imprimir.
+ *
+ * **Imprime pelo navegador, sem biblioteca de PDF.** O diálogo de impressão de qualquer navegador
+ * tem "Salvar como PDF", então baixar e imprimir são a mesma ação — e uma biblioteca de PDF
+ * custaria centenas de kB no pacote para gerar um cartaz com três elementos. O que faz isto
+ * funcionar é o `@media print`: fora dele, esconder o resto da tela é problema do CSS, não do JS.
+ *
+ * O QR aponta para o **mesmo link** exibido acima; ele não é gerado a partir de outra string, e é
+ * por isso que `link` chega por propriedade em vez de ser remontado aqui — dois lugares montando a
+ * URL divergem no dia em que o domínio mudar, e o cartaz impresso é o que menos perdoa: ele já
+ * está na parede.
+ */
+function CartazDoCardapio({
+  link,
+  nomeFantasia,
+  urlLogo,
+}: {
+  link: string;
+  nomeFantasia: string;
+  urlLogo?: string | null;
+}) {
+  return (
+    <div className="qr-bloco">
+      <div className="qr-moldura">
+        <QRCodeSVG
+          value={link}
+          size={168}
+          // Preto no branco, sem cor de marca: contraste é o que o leitor de QR precisa, e um
+          // código âmbar sobre carvão é bonito na tela e falha na câmera de celular antigo.
+          bgColor="#ffffff"
+          fgColor="#161210"
+          // 'M' aguenta ~15% de dano — respingo de gordura, dobra do papel, fita adesiva.
+          level="M"
+          marginSize={2}
+        />
+      </div>
+
+      <p className="secundario">Aponte a câmera para abrir o cardápio.</p>
+
+      <button type="button" className="btn calada" onClick={() => window.print()}>
+        <IconeImpressora />
+        Imprimir cartaz
+      </button>
+
+      {/* O cartaz. Fica fora da tela e só existe na impressão — montá-lo em outra janela com
+          `window.open` esbarraria no bloqueador de pop-up justamente de quem clicou no botão. */}
+      <div className="cartaz-impressao" aria-hidden="true">
+        {urlLogo ? (
+          <img className="cartaz-logo" src={urlLogo} alt="" />
+        ) : (
+          <Grelha etapa={2} de={5} alta />
+        )}
+
+        <strong className="cartaz-nome">{nomeFantasia}</strong>
+        <p className="cartaz-chamada">Cardápio digital</p>
+
+        <QRCodeSVG value={link} size={320} bgColor="#ffffff" fgColor="#000000" level="M" marginSize={2} />
+
+        <code className="cartaz-link">{link}</code>
+      </div>
     </div>
   );
 }

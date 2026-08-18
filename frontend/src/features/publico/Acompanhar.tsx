@@ -1,6 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
+import { CapaDaCasa } from './CapaDaCasa';
 import { Selo } from '../../components/Selo';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import { CICLO, etapaDe, ROTULO_STATUS } from '../../services/ciclo';
@@ -52,12 +53,17 @@ export function Acompanhar() {
   const cancelado = pedido?.status === 'Cancelado';
 
   return (
-    <div className="tela-centro">
-      <div className="placa form">
-        <header>
-          <Grelha etapa={2} de={5} alta />
-          <p className="tagline">Acompanhar pedido</p>
-        </header>
+    <div className="publico">
+      {/* A MESMA capa do cardápio: o cliente não trocou de restaurante ao vir para cá, e a tela
+          precisa dizer isso sem que ele pense a respeito (RN-GER-026, RN-GER-037). */}
+      <CapaDaCasa
+        nomeFantasia={pedido?.nomeFantasia ?? "Acompanhar pedido"}
+        urlLogo={pedido?.urlLogo}
+        endereco={pedido?.endereco}
+        chamada="Acompanhar pedido"
+      />
+
+      <div className="acompanhamento placa">
 
         <form onSubmit={buscar} style={{ display: 'grid', gap: '0.75rem' }}>
           <div className="linha">
@@ -95,6 +101,16 @@ export function Acompanhar() {
             <div className="comanda-id">
               <span className="numero-pedido">{pedido.numero}</span>
               <Selo status={pedido.status} />
+            </div>
+
+            {/* Quem pediu. É o que faz esta tela servir também ao balcão: o atendente lê o
+                número em voz alta e confere o nome com quem está na frente dele. */}
+            <div className="quem-pediu">
+              <strong>{pedido.nomeCliente}</strong>
+
+              {/* CHAPA-10 — a observação é PROSA, e vai na cor do texto: "sem cebola" ilegível
+                  é um sanduíche devolvido. Só aparece quando existe. */}
+              {pedido.observacao && <p className="descricao">{pedido.observacao}</p>}
             </div>
 
             {cancelado ? (

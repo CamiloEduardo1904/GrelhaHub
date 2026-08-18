@@ -67,6 +67,18 @@ export interface PedidoPublico {
   status: StatusPedido;
   total: number;
   criadoEm: string;
+
+  /** Quem pediu — obrigatório no lançamento (RN-CRM-003). */
+  nomeCliente: string;
+
+  /** A observação do pedido, quando houve. */
+  observacao?: string | null;
+
+  /** RN-GER-026 / RN-GER-037 — a casa, para a tela ter a mesma capa do cardápio. */
+  nomeFantasia: string;
+  urlLogo?: string | null;
+  endereco?: string | null;
+
   itens: { produto: string; quantidade: number; precoPraticado: number; total: number }[];
 }
 

@@ -8,18 +8,28 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace GrelhaHub.Infrastructure.Persistence.Configurations;
 
 /// <summary>
-/// Expressão SQL do dia operacional — <c>RN-GER-006</c> ⚠⚠, ADR-0011.
+/// Expressão SQL do dia operacional — <c>RN-GER-006</c> ⚠⚠, <c>RN-GER-036</c>, ADR-0011.
 /// <para>
-/// A hora de virada (<c>PAR-GER-001</c>, 04h00) é <b>constante</b> aqui de propósito:
-/// <c>GENERATED ALWAYS AS</c> exige expressão imutável, e alterá-la reclassificaria vendas
-/// passadas — exatamente o que a regra existe para impedir. Mudar a virada é operação de
-/// migration, não edição de parâmetro em tela.
+/// <b>A virada e o fuso vêm das COLUNAS DA PRÓPRIA LINHA</b>, copiadas da unidade quando o pedido
+/// nasceu. Até 18/08/2026 eram literais — <c>'America/Sao_Paulo'</c> e <c>interval '4 hours'</c> —,
+/// e essa fixação era a razão técnica de a virada não poder ser cadastrada por casa.
+/// </para>
+/// <para>
+/// <b>O que a mudança preserva é exatamente o que a versão anterior protegia.</b> O argumento de lá
+/// estava certo: alterar a expressão reclassificaria vendas passadas. Continua verdade — e é por
+/// isso que a virada é copiada para a linha em vez de lida da unidade. Editar o horário de
+/// funcionamento muda os pedidos <b>seguintes</b>; os gravados carregam o que valia.
+/// </para>
+/// <para>
+/// ⚠ <b>Conferido em PostgreSQL 16 antes de escrever:</b> coluna gerada aceita referência a outra
+/// coluna da mesma linha, inclusive em <c>AT TIME ZONE</c>. O que ela recusa é referência a outra
+/// tabela — que é justamente o desenho que a cópia evita.
 /// </para>
 /// </summary>
 internal static class DiaOperacionalSql
 {
     public const string Expressao =
-        "(((dh_criacao AT TIME ZONE 'America/Sao_Paulo') - interval '4 hours')::date)";
+        "(((dh_criacao AT TIME ZONE fuso_operacional) - hora_virada_operacional)::date)";
 }
 
 public sealed class UnidadeConfiguration : IEntityTypeConfiguration<Unidade>
@@ -44,6 +54,33 @@ public sealed class UnidadeConfiguration : IEntityTypeConfiguration<Unidade>
 
         // RN-GER-026 — caminho da logo exibida no cardápio público. 500, como `produto.url_imagem`.
         builder.Property(u => u.UrlLogo).HasMaxLength(500);
+
+        // RN-GER-006 / RN-GER-036 ⚠⚠ — a virada DESTA casa, derivada do horário de funcionamento.
+        // Default de 4 horas no banco: quem já existia continua apurando como apurava.
+        builder.Property(u => u.HoraDeViradaOperacional)
+            .HasColumnName("hora_virada_operacional")
+            .HasColumnType("interval")
+            .IsRequired()
+            .HasDefaultValueSql("interval '4 hours'");
+
+        // RN-GER-037 — o endereço. Tudo nulável: as unidades anteriores a esta regra não têm.
+        builder.Property(u => u.Cep).HasMaxLength(8);
+        builder.Property(u => u.Logradouro).HasMaxLength(200);
+        builder.Property(u => u.NumeroDoEndereco).HasColumnName("numero_endereco").HasMaxLength(20);
+        builder.Property(u => u.Complemento).HasMaxLength(100);
+        builder.Property(u => u.Bairro).HasMaxLength(100);
+        builder.Property(u => u.Cidade).HasMaxLength(100);
+        builder.Property(u => u.Uf).HasMaxLength(2).IsFixedLength();
+
+        builder.HasMany(u => u.Horarios)
+            .WithOne()
+            .HasForeignKey(h => h.UnidadeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata
+            .FindNavigation(nameof(Unidade.Horarios))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
 
         builder.HasIndex(u => u.Cnpj).IsUnique().HasDatabaseName("uq_unidade_cnpj");
 
@@ -246,6 +283,21 @@ public sealed class PedidoConfiguration : IEntityTypeConfiguration<Pedido>
         builder.Property(p => p.MotivoExclusao).HasMaxLength(500);
         builder.Ignore(p => p.Excluido);
 
+        // RN-GER-036 — a virada e o fuso APLICADOS, copiados da unidade na inserção. São eles
+        // que a coluna gerada abaixo lê: sem estarem NA LINHA, a expressão precisaria de outra
+        // tabela, que `GENERATED ALWAYS AS` não permite.
+        builder.Property(p => p.HoraDeViradaOperacional)
+            .HasColumnName("hora_virada_operacional")
+            .HasColumnType("interval")
+            .IsRequired()
+            .HasDefaultValueSql("interval '4 hours'");
+
+        builder.Property(p => p.FusoOperacional)
+            .HasColumnName("fuso_operacional")
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasDefaultValue("America/Sao_Paulo");
+
         // RN-GER-006 ⚠⚠ — coluna GERADA. A aplicação lê, nunca escreve.
         // Agrupar por dh_criacao faria a venda de sábado à noite cair em domingo.
         builder.Property(p => p.DataOperacional)
@@ -321,5 +373,51 @@ public sealed class ItemPedidoConfiguration : IEntityTypeConfiguration<ItemPedid
         });
 
         builder.Ignore(i => i.Total);
+    }
+}
+
+/// <summary>
+/// <c>RN-GER-036</c> ⚠⚠ — o horário de funcionamento, um registro por dia da semana.
+/// <para>
+/// Tabela e não coluna JSON: a primeira pergunta de logística que precisar de "quem abre domingo"
+/// vira um <c>WHERE</c>, e não um documento a desmontar. Mesmo argumento do endereço em campos.
+/// </para>
+/// </summary>
+public sealed class HorarioDeFuncionamentoConfiguration
+    : IEntityTypeConfiguration<HorarioDeFuncionamento>
+{
+    public void Configure(EntityTypeBuilder<HorarioDeFuncionamento> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable("unidade_horario", t =>
+        {
+            // O CHECK valida DOMÍNIO, nunca política (ADR-0009): os dois juntos ou os dois nulos.
+            // "Abre e nunca fecha" seria uma casa aberta para sempre — e a virada derivada dela
+            // não teria resposta.
+            t.HasCheckConstraint(
+                "ck_unidade_horario_par",
+                "(abre IS NULL AND fecha IS NULL) OR (abre IS NOT NULL AND fecha IS NOT NULL)");
+        });
+
+        builder.HasKey(h => h.Id);
+
+        builder.Property(h => h.DiaDaSemana)
+            .HasColumnName("dia_semana")
+            .HasConversion<int>()
+            .IsRequired();
+
+        builder.Property(h => h.Abre).HasColumnType("time");
+        builder.Property(h => h.Fecha).HasColumnType("time");
+
+        builder.Ignore(h => h.Fechado);
+        builder.Ignore(h => h.AtravessaMeiaNoite);
+
+        // RN-GER-009 — unidade_id como primeira coluna da chave única. Um dia da semana aparece
+        // uma vez por casa: duas linhas para terça-feira dariam duas respostas para "que horas
+        // abre", e a virada derivada dependeria de qual delas o `MAX` pegasse.
+        builder.HasIndex(h => new { h.UnidadeId, h.DiaDaSemana })
+            .IsUnique()
+            .HasDatabaseName("uq_unidade_horario_dia");
     }
 }

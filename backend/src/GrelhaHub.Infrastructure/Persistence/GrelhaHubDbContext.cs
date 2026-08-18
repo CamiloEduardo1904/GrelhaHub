@@ -29,6 +29,7 @@ public sealed class GrelhaHubDbContext(
     public DbSet<Perfil> Perfis => Set<Perfil>();
     public DbSet<SessaoDeSuporte> SessoesDeSuporte => Set<SessaoDeSuporte>();
     public DbSet<TokenDeAcesso> TokensDeAcesso => Set<TokenDeAcesso>();
+    public DbSet<HorarioDeFuncionamento> HorariosDeFuncionamento => Set<HorarioDeFuncionamento>();
     public DbSet<LogAuditoria> Trilha => Set<LogAuditoria>();
     public DbSet<Permissao> Permissoes => Set<Permissao>();
     public DbSet<Modulo> Modulos => Set<Modulo>();

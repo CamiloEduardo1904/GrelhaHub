@@ -20,6 +20,18 @@ public interface IAppDbContext
 
     /// <summary><c>RN-GER-033</c> — os links de uso único (convite e redefinição de senha).</summary>
     DbSet<TokenDeAcesso> TokensDeAcesso { get; }
+
+    /// <summary>
+    /// <c>RN-GER-036</c> — o horário de funcionamento.
+    /// <para>
+    /// ⚠ Exposto como <c>DbSet</c> porque o horário novo precisa ser <b>inserido explicitamente</b>.
+    /// Filho com <c>Id</c> já preenchido, descoberto pela navegação de um pai já rastreado, é
+    /// classificado como <c>Modified</c> pelo EF Core — e o `UPDATE` de uma linha que não existe
+    /// falha como conflito de concorrência, mandando investigar o lugar errado. É o mesmo defeito
+    /// que o log de SQL do harness pegou no CA-9 da SPEC-VEN-001.
+    /// </para>
+    /// </summary>
+    DbSet<HorarioDeFuncionamento> HorariosDeFuncionamento { get; }
     DbSet<LogAuditoria> Trilha { get; }
     DbSet<Permissao> Permissoes { get; }
     DbSet<Modulo> Modulos { get; }

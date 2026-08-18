@@ -18,6 +18,18 @@ public sealed record PedidoPublicoResponse(
     string Status,
     decimal Total,
     DateTimeOffset CriadoEm,
+
+    /// <summary>Quem pediu — obrigatório no lançamento (<c>RN-CRM-003</c>).</summary>
+    string NomeCliente,
+
+    /// <summary>A observação do pedido. Nula quando não houve.</summary>
+    string? Observacao,
+
+    /// <summary><c>RN-GER-026</c> / <c>RN-GER-037</c> — a casa, para a tela ter a mesma capa do cardápio.</summary>
+    string NomeFantasia,
+    string? UrlLogo,
+    string? Endereco,
+
     IReadOnlyList<ItemPublicoDto> Itens);
 
 public sealed record ItemPublicoDto(string Produto, int Quantidade, decimal PrecoPraticado, decimal Total);
@@ -60,11 +72,24 @@ public sealed class ConsultarPedidoPublicoHandler(IAppDbContext db, IContextoDeE
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NaoEncontradoException("Pedido não encontrado.");
 
+        // O nome de quem pediu. Consulta separada e não `Include`: `Cliente` guarda telefone, e
+        // trazer o agregado inteiro para uma rota ANÔNIMA convidaria a devolver mais do que o
+        // nome no dia em que alguém acrescentasse um campo ao DTO (RN-GER-012, mesma doutrina).
+        var nomeCliente = await db.Clientes.AsNoTracking()
+            .Where(c => c.Id == pedido.ClienteId)
+            .Select(c => c.Nome)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Cliente";
+
         return new PedidoPublicoResponse(
             pedido.Numero,
             pedido.Status.ToString(),
             pedido.Total.Valor,
             pedido.CriadoEm,
+            nomeCliente,
+            pedido.Observacao,
+            unidade.NomeFantasia,
+            unidade.UrlLogo,
+            unidade.EnderecoResumido(),
             pedido.Itens
                 .Select(item => new ItemPublicoDto(
                     item.NomeProduto,

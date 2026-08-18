@@ -79,16 +79,18 @@ services:
       Plataforma__Email: ${PLATAFORMA_EMAIL:-}
       Plataforma__SenhaInicial: ${PLATAFORMA_SENHA_INICIAL:-}
 
-      # RN-GER-032 / ADR-0016 — o correio. Mesma cadeia do JWT e da plataforma: valor no .env
-      # da VPS, nome de configuração aqui. Ausência é estado válido — sem host, nada é enviado
-      # e cada e-mail que deixou de sair fica no log.
-      Email__Host: ${EMAIL_HOST:-}
-      Email__Porta: ${EMAIL_PORTA:-587}
-      Email__Usuario: ${EMAIL_USUARIO:-}
+      # RN-GER-032 / ADR-0016 — o correio.
+      #
+      # ⚠ SÓ A SENHA passa por aqui, e a assimetria é deliberada. Host, porta, usuário,
+      # remetente e base do site NÃO são segredo: eles vivem no appsettings.json, versionados,
+      # onde se leem junto do resto da configuração. Repassá-los também pelo compose criaria
+      # DOIS lugares com o mesmo valor — e um `` sem variável no .env
+      # sobrescreveria o appsettings com string VAZIA, que é o defeito de configuração mais
+      # difícil de enxergar: o valor certo está escrito e não é o que vale.
+      #
+      # Ausência da senha é estado válido (RN-GER-032): nada é enviado, cada e-mail que deixou
+      # de sair fica no log, e nenhuma operação falha por isso.
       Email__Senha: ${EMAIL_SENHA:-}
-      Email__Remetente: ${EMAIL_REMETENTE:-}
-      Email__NomeDoRemetente: ${EMAIL_NOME_REMETENTE:-GrelhaHub}
-      Email__BaseDoSite: ${EMAIL_BASE_DO_SITE:-https://${DOMINIO}}
     volumes:
       # ⚠ A API ESCREVE aqui; o nginx le. É o unico estado da aplicacao fora do banco, e a
       # consequencia esta declarada no ADR-0015: `pg_dump` sozinho DEIXOU de ser backup completo.

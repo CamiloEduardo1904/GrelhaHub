@@ -134,3 +134,183 @@ public sealed class AlterarEstabelecimentoHandler(
         return todos.Single(e => e.Id == request.UnidadeId);
     }
 }
+
+/// <summary>O endereço da casa — <c>RN-GER-037</c>. Tudo opcional; ver <see cref="Unidade"/>.</summary>
+public sealed record EnderecoDto(
+    string? Cep,
+    string? Logradouro,
+    string? Numero,
+    string? Complemento,
+    string? Bairro,
+    string? Cidade,
+    string? Uf);
+
+/// <summary>Um dia da semana — <c>RN-GER-036</c>. <c>Abre</c> nulo é dia fechado.</summary>
+public sealed record HorarioDoDiaDto(DayOfWeek DiaDaSemana, TimeOnly? Abre, TimeOnly? Fecha);
+
+/// <summary>
+/// <c>RN-GER-036</c> ⚠⚠ / <c>RN-GER-037</c> — endereço e horário de funcionamento.
+/// <para>
+/// <b>Um comando só para os dois, e a semana inteira de uma vez.</b> A virada do dia operacional é
+/// derivada do conjunto (<c>RN-GER-006</c>): salvar dia a dia deixaria a virada dependente da ordem
+/// das chamadas, e no meio do caminho a casa apuraria por uma régua que ninguém escolheu.
+/// </para>
+/// <para>
+/// Exige sessão de suporte quando quem chama é a plataforma: é dado do cliente sendo alterado em
+/// nome dele, que é a definição de suporte em <c>RN-GER-015</c> — a mesma linha de
+/// <c>AlterarEstabelecimentoCommand</c>.
+/// </para>
+/// </summary>
+[ExigeModulo(CodigoDeModulo.Gerais)]
+[SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
+public sealed record DefinirOperacaoDaUnidadeCommand(
+    Guid? UnidadeId,
+    EnderecoDto? Endereco,
+    IReadOnlyList<HorarioDoDiaDto>? Horarios) : IRequest<OperacaoDaUnidadeDto>;
+
+/// <summary>O que a casa cadastrou, e a virada que saiu disso.</summary>
+public sealed record OperacaoDaUnidadeDto(
+    EnderecoDto Endereco,
+    string? EnderecoResumido,
+    IReadOnlyList<HorarioDoDiaDto> Horarios,
+
+    /// <summary><c>RN-GER-006</c> — derivada, nunca digitada. A tela exibe para explicar a apuração.</summary>
+    TimeOnly HoraDeViradaOperacional);
+
+public sealed class DefinirOperacaoDaUnidadeValidator
+    : AbstractValidator<DefinirOperacaoDaUnidadeCommand>
+{
+    public DefinirOperacaoDaUnidadeValidator()
+    {
+        // RN-GER-013 — documento e CEP só com dígitos. Oito, e o domínio para por aí: se o CEP
+        // existe é pergunta dos Correios, não nossa.
+        RuleFor(x => x.Endereco!.Cep)
+            .Must(cep => string.IsNullOrWhiteSpace(cep) || SoDigitos(cep).Length == 8)
+            .WithMessage("O CEP precisa ter 8 dígitos.")
+            .When(x => x.Endereco is not null);
+
+        RuleFor(x => x.Endereco!.Uf)
+            .Must(uf => string.IsNullOrWhiteSpace(uf) || uf.Trim().Length == 2)
+            .WithMessage("A UF é a sigla de dois caracteres.")
+            .When(x => x.Endereco is not null);
+
+        RuleForEach(x => x.Horarios!)
+            .Must(h => h.Abre.HasValue == h.Fecha.HasValue)
+            .WithMessage("Informe abertura e fechamento juntos, ou marque o dia como fechado.")
+            .When(x => x.Horarios is not null);
+    }
+
+    private static string SoDigitos(string valor) => new([.. valor.Where(char.IsAsciiDigit)]);
+}
+
+public sealed class DefinirOperacaoDaUnidadeHandler(IAppDbContext db, IContextoDeExecucao contexto)
+    : IRequestHandler<DefinirOperacaoDaUnidadeCommand, OperacaoDaUnidadeDto>
+{
+    public async Task<OperacaoDaUnidadeDto> Handle(
+        DefinirOperacaoDaUnidadeCommand request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        // ⚠ PRIVATIVA DA PLATAFORMA, por ora — e a limitação está declarada.
+        //
+        // O caminho natural seria o restaurante editar o próprio horário, e ele existe: bastaria
+        // uma permissão `unidade.gerenciar` no CatalogoDeAcesso. Mas permissão nova só chega aos
+        // perfis das unidades JÁ CRIADAS por migration de dados — `CadastrarRestaurante` semeia o
+        // catálogo no ato da criação —, e entregar a regra sem essa migration deixaria o
+        // administrador vendo um botão que responde 403. Fica na §8 da SPEC-GER-009.
+        ListarEstabelecimentosHandler.ExigirPlataforma(contexto);
+
+        var alvo = contexto.EhPlataforma
+            ? request.UnidadeId ?? throw new RegraDeNegocioException(
+                "Informe o estabelecimento.")
+            : contexto.UnidadeId;
+
+        if (alvo == Guid.Empty)
+        {
+            throw new NaoAutorizadoException("Sessão inválida.");
+        }
+
+        var unidade = await db.Unidades
+            .IgnoreQueryFilters()
+            .Include(u => u.Horarios)
+            .FirstOrDefaultAsync(u => u.Id == alvo, cancellationToken)
+            ?? throw new NaoEncontradoException("Estabelecimento não encontrado.");
+
+        if (request.Endereco is { } endereco)
+        {
+            unidade.DefinirEndereco(
+                endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento,
+                endereco.Bairro, endereco.Cidade, endereco.Uf);
+        }
+
+        if (request.Horarios is { } horarios)
+        {
+            var novos = horarios
+                .Select(h => new HorarioDeFuncionamento(unidade.Id, h.DiaDaSemana, h.Abre, h.Fecha))
+                .ToList();
+
+            // O domínio valida a semana e rederiva a virada; os antigos saem por órfãos (Cascade).
+            unidade.DefinirHorarios(novos);
+
+            // ⚠ INSERÇÃO EXPLÍCITA, e não pela navegação.
+            //
+            // `HorarioDeFuncionamento` nasce com `Id` preenchido, e filho com chave já definida
+            // descoberto pela navegação de um pai RASTREADO é classificado como `Modified`: o EF
+            // manda um `UPDATE` de linha que não existe, zero linhas afetadas, e o erro chega como
+            // `DbUpdateConcurrencyException` — que parece conflito de concorrência e manda
+            // investigar o lugar errado.
+            db.HorariosDeFuncionamento.AddRange(novos);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Montar(unidade);
+    }
+
+    internal static OperacaoDaUnidadeDto Montar(Unidade unidade) =>
+        new(
+            new EnderecoDto(
+                unidade.Cep, unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Complemento,
+                unidade.Bairro, unidade.Cidade, unidade.Uf),
+            unidade.EnderecoResumido(),
+            [.. unidade.Horarios
+                .OrderBy(h => h.DiaDaSemana)
+                .Select(h => new HorarioDoDiaDto(h.DiaDaSemana, h.Abre, h.Fecha))],
+            TimeOnly.FromTimeSpan(unidade.HoraDeViradaOperacional));
+}
+
+/// <summary><c>RN-GER-036</c> / <c>RN-GER-037</c> — o que a casa tem cadastrado.</summary>
+[ExigeModulo(CodigoDeModulo.Gerais)]
+[SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
+public sealed record ObterOperacaoDaUnidadeQuery(Guid? UnidadeId = null)
+    : IRequest<OperacaoDaUnidadeDto>;
+
+public sealed class ObterOperacaoDaUnidadeHandler(IAppDbContext db, IContextoDeExecucao contexto)
+    : IRequestHandler<ObterOperacaoDaUnidadeQuery, OperacaoDaUnidadeDto>
+{
+    public async Task<OperacaoDaUnidadeDto> Handle(
+        ObterOperacaoDaUnidadeQuery request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        ListarEstabelecimentosHandler.ExigirPlataforma(contexto);
+
+        var alvo = contexto.EhPlataforma
+            ? request.UnidadeId ?? throw new RegraDeNegocioException("Informe o estabelecimento.")
+            : contexto.UnidadeId;
+
+        if (alvo == Guid.Empty)
+        {
+            throw new NaoAutorizadoException("Sessão inválida.");
+        }
+
+        var unidade = await db.Unidades
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(u => u.Horarios)
+            .FirstOrDefaultAsync(u => u.Id == alvo, cancellationToken)
+            ?? throw new NaoEncontradoException("Estabelecimento não encontrado.");
+
+        return DefinirOperacaoDaUnidadeHandler.Montar(unidade);
+    }
+}

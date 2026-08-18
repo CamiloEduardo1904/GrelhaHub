@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
+import { CapaDaCasa } from './CapaDaCasa';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import type { CardapioPublico, ProdutoPublico } from '../../services/tipos';
 
@@ -138,18 +139,13 @@ export function Cardapio() {
 
   return (
     <div className="publico">
-      <header className="vitrine-capa">
-        <Grelha etapa={2} de={5} alta />
-
-        {/* RN-GER-026 — a logo, quando existe. Sem ela, o nome fantasia É a marca: um
-            placeholder de "sem imagem" na vitrine de um restaurante é pior que o nome escrito. */}
-        {cardapio.urlLogo && (
-          <img className="logo-casa" src={cardapio.urlLogo} alt={cardapio.nomeFantasia} />
-        )}
-
-        <h1>{cardapio.nomeFantasia}</h1>
-        <p className="tagline">Do pedido à brasa</p>
-      </header>
+      <CapaDaCasa
+        nomeFantasia={cardapio.nomeFantasia}
+        urlLogo={cardapio.urlLogo}
+        endereco={cardapio.endereco}
+        aberta={cardapio.aberta}
+        horarios={cardapio.horarios}
+      />
 
       <div className="vitrine">
         <section>
@@ -186,7 +182,7 @@ export function Cardapio() {
 
                       <div className="prato-info">
                         <strong>{produto.nome}</strong>
-                        {produto.descricao && <p className="secundario">{produto.descricao}</p>}
+                        {produto.descricao && <p className="descricao">{produto.descricao}</p>}
                         <span className="prato-preco">{moeda.format(produto.preco)}</span>
                       </div>
 

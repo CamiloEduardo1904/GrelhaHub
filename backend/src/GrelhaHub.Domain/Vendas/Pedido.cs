@@ -30,7 +30,14 @@ public sealed class Pedido
 
     private Pedido() { }
 
-    public Pedido(Guid unidadeId, int numero, CanalVenda canal, Guid? clienteId, string? observacao)
+    public Pedido(
+        Guid unidadeId,
+        int numero,
+        CanalVenda canal,
+        Guid? clienteId,
+        string? observacao,
+        TimeSpan horaDeViradaOperacional,
+        string fusoOperacional)
     {
         UnidadeId = unidadeId;
         Numero = numero;
@@ -39,9 +46,24 @@ public sealed class Pedido
         Observacao = observacao?.Trim();
         Status = StatusPedido.Aberto;
         CriadoEm = DateTimeOffset.UtcNow;
+
+        // RN-GER-006 / RN-GER-036 ⚠⚠ — a virada e o fuso APLICADOS, copiados da unidade.
+        //
+        // É o mesmo movimento de RN-VEN-008 com o preço: o pedido guarda o que valia quando ele
+        // nasceu. Sem a cópia, mudar o horário de funcionamento reclassificaria vendas passadas —
+        // o faturamento de um sábado fechado mudaria de dia sozinho, e ninguém perceberia, porque
+        // relatório que muda em silêncio não avisa.
+        HoraDeViradaOperacional = horaDeViradaOperacional;
+        FusoOperacional = fusoOperacional;
     }
 
     public Guid UnidadeId { get; private set; }
+
+    /// <summary><c>RN-GER-036</c> — a virada que valia nesta unidade quando o pedido nasceu.</summary>
+    public TimeSpan HoraDeViradaOperacional { get; private set; } = ViradaOperacional.Padrao;
+
+    /// <summary><c>RN-GER-005</c> — o fuso que valia. Entra na mesma expressão da coluna gerada.</summary>
+    public string FusoOperacional { get; private set; } = "America/Sao_Paulo";
 
     /// <summary>Sequencial por dia operacional — é o número que o cliente acompanha.</summary>
     public int Numero { get; private set; }

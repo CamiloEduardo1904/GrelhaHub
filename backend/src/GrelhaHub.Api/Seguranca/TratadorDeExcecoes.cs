@@ -14,12 +14,27 @@ namespace GrelhaHub.Api.Seguranca;
 /// registra o detalhe no log, em vez de expor o texto do banco.
 /// </para>
 /// </summary>
-public sealed partial class TratadorDeExcecoes(ILogger<TratadorDeExcecoes> logger) : IExceptionHandler
+public sealed partial class TratadorDeExcecoes(
+    ILogger<TratadorDeExcecoes> logger, IHostEnvironment ambiente) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         var problema = Traduzir(exception);
+
+        // ⚠ FORA DE PRODUÇÃO, o 500 conta o que aconteceu.
+        //
+        // A mensagem genérica está certa para o usuário — detalhe de exceção na tela é
+        // informação para quem ataca. Mas ela também escondia a causa de quem escreve teste: um
+        // 500 no harness dizia "não foi possível concluir a operação" e o defeito precisava ser
+        // caçado por eliminação. Aconteceu duas vezes em 18/08/2026, e a segunda custou meia hora.
+        //
+        // `IsProduction()` e não `IsDevelopment()`: o ambiente do harness é "Testing", e um
+        // `IsDevelopment` deixaria justamente ele no escuro.
+        if (problema.Status >= StatusCodes.Status500InternalServerError && !ambiente.IsProduction())
+        {
+            problema.Extensions["excecao"] = exception.ToString();
+        }
 
         if (exception is LoginRecusadoException login)
         {

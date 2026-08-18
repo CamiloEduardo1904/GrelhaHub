@@ -16,6 +16,7 @@ using GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 using GrelhaHub.Application.Features.Vendas.CancelarEExcluirPedido;
 using GrelhaHub.Application.Features.Vendas.ListarPedidos;
 using GrelhaHub.Application.Features.Gerais.Acesso;
+using GrelhaHub.Application.Features.Gerais.Plataforma;
 using GrelhaHub.Domain.Vendas;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -94,6 +95,24 @@ public sealed class RestauranteController(ISender sender) : ControllerBase
     [HttpGet("meu")]
     public async Task<ActionResult<MeuRestauranteResponse>> Meu(CancellationToken ct) =>
         Ok(await sender.Send(new ObterMeuRestauranteQuery(), ct));
+
+    /// <summary><c>RN-GER-036</c> / <c>RN-GER-037</c> — endereço e horário de funcionamento.</summary>
+    [HttpGet("operacao")]
+    public async Task<ActionResult<OperacaoDaUnidadeDto>> Operacao(
+        [FromQuery] Guid? unidadeId, CancellationToken ct) =>
+        Ok(await sender.Send(new ObterOperacaoDaUnidadeQuery(unidadeId), ct));
+
+    /// <summary>
+    /// <c>RN-GER-036</c> ⚠⚠ — grava a semana inteira e <b>rederiva a virada do dia operacional</b>.
+    /// <para>
+    /// A resposta devolve a virada resultante: ela não é digitada, e a tela precisa mostrar qual
+    /// régua passou a valer — senão a consequência mais importante do cadastro fica invisível.
+    /// </para>
+    /// </summary>
+    [HttpPut("operacao")]
+    public async Task<ActionResult<OperacaoDaUnidadeDto>> DefinirOperacao(
+        DefinirOperacaoDaUnidadeCommand comando, CancellationToken ct) =>
+        Ok(await sender.Send(comando, ct));
 }
 
 /// <summary>

@@ -75,8 +75,8 @@ operação de pé quando o correio cai.
   login
 - **A senha nunca viaja por e-mail.** O que viaja é um link de uso único e validade curta. Senha em
   texto claro fica arquivada na caixa de quem recebeu, e em qualquer servidor pelo caminho
-- **As credenciais SMTP vivem no `.env` da VPS** (`RNF-008`), repassadas pelo `docker-compose.yml`
-  — a mesma cadeia do JWT e do usuário de plataforma, com o mesmo modo de falha já documentado
+- **A SENHA vive no `.env` da VPS** (`RNF-008`), repassada pelo `docker-compose.yml`; host, porta, usuário, remetente e base do site vivem no `appsettings.json`, versionados. A assimetria é deliberada: só o segredo precisa do canal separado, e valor repetido em dois lugares é como a configuração se perde — variável vazia no `.env` sobrescreve o `appsettings` e deixa o valor certo escrito sem valer
+  — a senha segue a mesma cadeia do JWT e do usuário de plataforma, com o mesmo modo de falha já documentado
 
 ## Alternativas consideradas
 

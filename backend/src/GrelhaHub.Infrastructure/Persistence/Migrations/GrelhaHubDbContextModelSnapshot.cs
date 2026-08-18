@@ -154,6 +154,42 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("cliente", (string)null);
                 });
 
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.HorarioDeFuncionamento", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<TimeOnly?>("Abre")
+                        .HasColumnType("time")
+                        .HasColumnName("abre");
+
+                    b.Property<int>("DiaDaSemana")
+                        .HasColumnType("integer")
+                        .HasColumnName("dia_semana");
+
+                    b.Property<TimeOnly?>("Fecha")
+                        .HasColumnType("time")
+                        .HasColumnName("fecha");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unidade_horario");
+
+                    b.HasIndex("UnidadeId", "DiaDaSemana")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unidade_horario_dia");
+
+                    b.ToTable("unidade_horario", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_unidade_horario_par", "(abre IS NULL AND fecha IS NULL) OR (abre IS NOT NULL AND fecha IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
                 {
                     b.Property<Guid>("Id")
@@ -574,11 +610,31 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("ativa");
 
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("bairro");
+
+                    b.Property<string>("Cep")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("cep");
+
+                    b.Property<string>("Cidade")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("cidade");
+
                     b.Property<string>("Cnpj")
                         .IsRequired()
                         .HasMaxLength(14)
                         .HasColumnType("character varying(14)")
                         .HasColumnName("cnpj");
+
+                    b.Property<string>("Complemento")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("complemento");
 
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -592,11 +648,27 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("America/Sao_Paulo")
                         .HasColumnName("fuso_horario");
 
+                    b.Property<TimeSpan>("HoraDeViradaOperacional")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("interval")
+                        .HasColumnName("hora_virada_operacional")
+                        .HasDefaultValueSql("interval '4 hours'");
+
+                    b.Property<string>("Logradouro")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("logradouro");
+
                     b.Property<string>("NomeFantasia")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nome_fantasia");
+
+                    b.Property<string>("NumeroDoEndereco")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("numero_endereco");
 
                     b.Property<string>("RazaoSocial")
                         .IsRequired()
@@ -614,6 +686,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasMaxLength(11)
                         .HasColumnType("character varying(11)")
                         .HasColumnName("telefone");
+
+                    b.Property<string>("Uf")
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("uf")
+                        .IsFixedLength();
 
                     b.Property<string>("UrlLogo")
                         .HasMaxLength(500)
@@ -868,7 +946,7 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("date")
                         .HasColumnName("data_operacional")
-                        .HasComputedColumnSql("(((dh_criacao AT TIME ZONE 'America/Sao_Paulo') - interval '4 hours')::date)", true);
+                        .HasComputedColumnSql("(((dh_criacao AT TIME ZONE fuso_operacional) - hora_virada_operacional)::date)", true);
 
                     b.Property<DateTimeOffset?>("ExcluidoEm")
                         .HasColumnType("timestamp with time zone")
@@ -881,6 +959,20 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("FinalizadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dh_finalizacao");
+
+                    b.Property<string>("FusoOperacional")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("America/Sao_Paulo")
+                        .HasColumnName("fuso_operacional");
+
+                    b.Property<TimeSpan>("HoraDeViradaOperacional")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("interval")
+                        .HasColumnName("hora_virada_operacional")
+                        .HasDefaultValueSql("interval '4 hours'");
 
                     b.Property<string>("MotivoCancelamento")
                         .HasMaxLength(500)
@@ -962,6 +1054,16 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_cliente_unidades_unidade_id");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.HorarioDeFuncionamento", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
+                        .WithMany("Horarios")
+                        .HasForeignKey("UnidadeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_unidade_horario_unidades_unidade_id");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
@@ -1158,6 +1260,11 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Perfil", b =>
                 {
                     b.Navigation("Permissoes");
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Unidade", b =>
+                {
+                    b.Navigation("Horarios");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Vendas.Pedido", b =>

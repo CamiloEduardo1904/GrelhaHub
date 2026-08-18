@@ -231,6 +231,7 @@ real não está em lugar nenhum — que é exatamente o que o Document First exi
 | [SPEC-GER-005](specs/SPEC-GER-005-trilha-de-auditoria.md) | Trilha de auditoria | **`ENTREGUE`** 17/08/2026 | `RN-GER-001`, `011`, `002`, `012` |
 | [SPEC-GER-007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) ⚠⚠ | Pessoas, delegação de acesso e telas de administração | **`ENTREGUE`** 17/08/2026 | `RN-GER-023`, `024`, `025`, `013`, `010` |
 | [SPEC-GER-008](specs/SPEC-GER-008-recuperacao-de-acesso.md) ⚠ | Recuperação de acesso por e-mail — link de uso único, convite e "esqueci minha senha" | **`ENTREGUE`** 18/08/2026 | `RN-GER-032`, `033`, `034`, `035` |
+| [SPEC-GER-009](specs/SPEC-GER-009-horario-endereco-e-dia-operacional.md) ⚠⚠ | Horário de funcionamento, endereço e o dia operacional por unidade — **revisa `RN-GER-006`** | **`ENTREGUE`** 18/08/2026 | `RN-GER-006`, `036`, `037`, `RN-VEN-048` |
 
 **Ordem de implementação:** 001 → 002 → 003 → 004 → 005. As duas primeiras entram na mesma
 migration de fundação; 004 precisa de 001; 005 precisa de 001 e 004 (a trilha referencia o

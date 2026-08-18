@@ -134,10 +134,26 @@ export interface CardapioPublico {
   nomeFantasia: string;
   telefone?: string;
 
-  /** RN-GER-026 — a logo da casa. Nula: a vitrine exibe o nome fantasia. */
+  /** RN-GER-026 — a logo da casa. Nula: a vitrine exibe a marca do GrelhaHub. */
   urlLogo?: string | null;
 
+  /** RN-GER-037 — o endereço em uma linha. Nulo quando a casa não cadastrou. */
+  endereco?: string | null;
+
+  /** RN-VEN-048 — a casa está aberta agora. Falso fecha a vitrine. */
+  aberta: boolean;
+
+  /** RN-GER-036 — a semana, para dizer quando abre. */
+  horarios: HorarioPublico[];
+
   categorias: CategoriaPublica[];
+}
+
+/** RN-GER-036 — um dia da semana. `abre` nulo é dia fechado. */
+export interface HorarioPublico {
+  diaDaSemana: number;
+  abre?: string | null;
+  fecha?: string | null;
 }
 
 /** RN-VEN-018 — ciclo de vida do pedido. */

@@ -68,10 +68,24 @@ public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecu
 
         var unidade = await db.Unidades
             .AsNoTracking()
+            .Include(u => u.Horarios)
             .FirstOrDefaultAsync(u => u.Slug == slug && u.Ativa, cancellationToken)
             ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
         contexto.DefinirUnidadePublica(unidade.Id);
+
+        // RN-VEN-048 — fora do horário, a casa não recebe pedido.
+        //
+        // A recusa é AQUI, e não só na tela: esconder o botão não impede um POST, e um pedido
+        // aceito com a cozinha apagada vira comida que ninguém faz e cliente esperando. Unidade
+        // sem horário cadastrado é considerada aberta — a regra nova não fecha loja de ninguém no
+        // dia em que entrou.
+        if (!unidade.AbertaEm(relogio.Agora))
+        {
+            throw new RegraDeNegocioException(
+                "Este restaurante está fechado agora. Confira o horário de funcionamento.",
+                "RN-VEN-048");
+        }
         // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline.
         //
         // O behavior roda antes do handler, quando a unidade ainda não está no contexto: ela só
@@ -104,7 +118,14 @@ public sealed class CriarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecu
         // O pedido NÃO é confirmado automaticamente: a confirmação é ato do restaurante, e é
         // ela que dispara baixa de estoque e ordem de produção (RN-VEN-018).
         var pedido = new Pedido(
-            unidade.Id, numero, CanalVenda.DeliveryProprio, cliente.Id, request.Observacao);
+            unidade.Id, numero, CanalVenda.DeliveryProprio, cliente.Id, request.Observacao,
+
+            // RN-GER-036 ⚠⚠ — a virada e o fuso DESTA casa, copiados agora. A coluna gerada
+            // `data_operacional` calcula a partir destas duas colunas, e não de constante: é o
+            // que permite cada restaurante ter a sua madrugada sem que ninguém reclassifique o
+            // passado do outro.
+            unidade.HoraDeViradaOperacional,
+            unidade.FusoHorario);
 
         var idsPedidos = request.Itens.Select(i => i.ProdutoId).Distinct().ToList();
 

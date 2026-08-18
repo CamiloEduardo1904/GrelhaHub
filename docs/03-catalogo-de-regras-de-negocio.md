@@ -4,7 +4,7 @@
 |-------|-------|
 | Versão | **2.1** |
 | Data | Agosto/2026 |
-| Situação | Em validação — **173 regras**: 151 em hipótese, 22 decididas pelo time |
+| Situação | Em validação — **176 regras**: 150 em hipótese, 26 decididas pelo time |
 | Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + 10 regras descobertas na implementação (`IMP`) + 22 decisões de produto do time (`DEC`) |
 | Auditoria do cruzamento | [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md) |
 | Papel no projeto | **Fonte de verdade.** Toda spec de implementação transcreve regras daqui. Nenhuma regra de negócio nasce no código |
@@ -51,7 +51,7 @@
 
 ## 1. Estado do catálogo
 
-Das 173 regras, **151 estão em estado de hipótese** — 134 herdadas das fontes e 17 descobertas
+Das 176 regras, **150 estão em estado de hipótese** — 134 herdadas das fontes e 16 descobertas
 durante a implementação (origem `IMP`) — e as outras 19 são decisões de produto, estado `DEC`.
 As herdadas foram derivadas do
 conhecimento do domínio (operação de hamburgueria) e da estrutura dos dez módulos de ERP
@@ -181,8 +181,8 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 
 | Módulo | Regras | Prioridade de validação | Escopo predominante |
 |--------|-------:|-------------------------|---------------------|
-| **GER** — Gerais e transversais | 35 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
-| **VEN** — Vendas e Comercial | 47 | **MÁXIMA** | Núcleo |
+| **GER** — Gerais e transversais | 37 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
+| **VEN** — Vendas e Comercial | 48 | **MÁXIMA** | Núcleo |
 | **PRO** — Produção | 13 | **MÁXIMA** | Núcleo |
 | **EST** — Estoque | 23 | **MÁXIMA** | Núcleo |
 | **COM** — Compras | 9 | ALTA | Modelo |
@@ -191,7 +191,7 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 | **LOG** — Logística e Frota | 9 | MÉDIA | Núcleo |
 | **RH** — Recursos Humanos | 6 | BAIXA | Modelo |
 | **FIS** — Fiscal | 6 | BAIXA | **Fase 2 — por último** |
-| **Total** | **173** | | |
+| **Total** | **176** | | |
 
 > **Ordem de ataque decidida (17/08/2026).** O módulo **FIS** fica **por último**: é o único
 > cujo valor depende de homologação externa (SEFAZ, certificado digital), e nada nos outros
@@ -217,7 +217,7 @@ Os três módulos de prioridade máxima — **Vendas, Produção e Estoque** —
 | RN-GER-003 | Valores monetários são expressos em reais, com duas casas decimais. | R | todas com valor | CK | HIP | N |
 | RN-GER-004 | Quantidades de insumo admitem até quatro casas decimais, para permitir gramas e mililitros. | R | `movimento_estoque`, `ficha_tecnica_item` | CK | HIP | N |
 | RN-GER-005 | Datas e horas são armazenadas com fuso horário; a operação ocorre em `America/Sao_Paulo`. | R | todas com data/hora | MOD | HIP | N |
-| **RN-GER-006** ⚠⚠ | **O dia operacional não coincide com o dia civil: começa às 04h00 e termina às 03h59 do dia seguinte. Uma venda registrada à 01h30 de domingo pertence ao dia operacional de sábado.** | D C | `pedido`, `caixa_diario`, `dim_tempo` | GEN VW PAR | HIP | N |
+| **RN-GER-006** ⚠⚠ | **O dia operacional não coincide com o dia civil.** Ele começa na **virada cadastrada da unidade** (`RN-GER-036`) e termina um minuto antes dela no dia seguinte: uma venda registrada à 01h30 de domingo, numa casa que vira às 04h00, pertence ao dia operacional de sábado. ⚠⚠ **A virada não é constante do sistema** — *até 18/08/2026 era: 04h00 fixo na expressão da coluna gerada, e foi essa fixação que a decisão do dono do produto removeu.* Cada unidade tem a sua, derivada do horário de funcionamento; `PAR-GER-001` passa a ser o **valor de quem ainda não cadastrou horário**. ⚠ **Nenhuma apuração agrupa por data de criação** — o recorte é sempre pela coluna gerada `data_operacional`. | D C | `pedido`, `caixa_diario`, `dim_tempo`, `unidade` | GEN VW PAR | HIP | N |
 | RN-GER-007 | Dados pessoais de cliente só são armazenados mediante consentimento registrado, com data e finalidade. | R | `cliente`, `consentimento` | MOD NN | HIP | N |
 | RN-GER-008 | O cliente pode solicitar a anonimização dos seus dados. O histórico transacional é preservado, desvinculado da identificação pessoal. | A | `cliente`, `pedido` | APP TRG | HIP | M |
 | RN-GER-009 ⚠ | A operação ocorre em uma única unidade, mas todo registro transacional é vinculado a uma unidade para permitir expansão futura. **Única exceção ao recorte: o usuário de plataforma (`RN-GER-014`).** | F | todas transacionais | FK | HIP | N |
@@ -281,6 +281,9 @@ Os três módulos de prioridade máxima — **Vendas, Produção e Estoque** —
 | RN-GER-033 `IMP` ⚠⚠ | **Todo acesso por link usa um token opaco, de uso único, com validade curta**, guardado **apenas como hash** — nunca em claro, pela mesma razão da senha (`RNF-005`): quem lê a tabela não pode entrar na conta de ninguém. Emitir um token novo **invalida os anteriores** do mesmo tipo para aquele usuário, e usá-lo o consome. Validade: `PAR-GER-002` para redefinição de senha, `PAR-GER-003` para o convite de primeiro acesso — ambos em §1.1 dos parâmetros, ainda constantes no código pela ausência de parâmetro de escopo global. Token sem validade é senha permanente que a pessoa não escolheu, e token reutilizável é senha que fica no histórico do e-mail. | R F | `token_de_acesso`, `usuario` | MOD APP PAR | HIP | S |
 | RN-GER-034 `IMP` ⚠ | **A solicitação de redefinição responde a mesma coisa exista ou não a conta.** Mesma mensagem, mesmo código, e nenhum indício de tempo — é a mesma doutrina de `RN-GER-027` no login: dizer "não encontramos este e-mail" entrega a quem sonda a lista de quem é cliente. O link só é **emitido** para usuário ativo, de unidade ativa (`RN-GER-027`) ou de plataforma; quem não se enquadra recebe a mesma resposta e nenhum e-mail. | R | `usuario`, `token_de_acesso` | APP | HIP | S |
 | RN-GER-035 `IMP` | **Senha definida pelo próprio dono encerra a troca obrigatória** (`RF-SEG-005`); senha definida por terceiro a reativa (`RN-GER-028`). É a mesma pergunta nos dois casos — *quem mais conhece esta senha?* —, e a resposta é que muda: no link, ninguém; na redefinição pelo administrador, ele. | R | `usuario` | APP | HIP | S |
+| RN-GER-036 `DEC` ⚠⚠ | **A unidade cadastra o horário de funcionamento por dia da semana** — abre, fecha, ou **fechado no dia**. É deste cadastro que sai a **virada do dia operacional** de `RN-GER-006`: a virada é o **fechamento que atravessa a meia-noite** mais tarde da semana (fecha 03h00 → vira às 03h00); se nenhum dia atravessa, a virada é **00h00** e o dia operacional coincide com o civil. Sem horário cadastrado, vale `PAR-GER-001`. ⚠⚠ **Mudar o horário não reclassifica o passado:** cada pedido carrega a virada e o fuso aplicados no instante em que nasceu, pela mesma razão de `RN-VEN-008` copiar o preço praticado — relatório fechado que muda sozinho é pior do que relatório errado, porque ninguém percebe. | F R | `unidade`, `unidade_horario`, `pedido` | MOD GEN APP | **DEC** | S |
+| RN-GER-037 `DEC` | **A unidade tem endereço** — CEP, logradouro, número, complemento, bairro, cidade e UF —, exibido no cardápio público abaixo do nome. Guardado em **campos separados**, não em linha de texto: a primeira pergunta de logística que pedir bairro (`RN-LOG-*`) teria de desmontar texto livre. CEP só com dígitos (`RN-GER-013`). ⚠ **Tudo opcional:** as unidades anteriores a esta regra não têm endereço, e exigi-lo obrigaria a inventar um ou a impedi-las de operar. A consulta automática por CEP é **conveniência da tela** e nunca condição para gravar — serviço de terceiro fora do ar não pode travar cadastro. | F R | `unidade` | MOD APP | **DEC** | S |
+| RN-VEN-048 `DEC` | **O cardápio público fecha fora do horário de funcionamento** (`RN-GER-036`): a vitrine informa que a casa está fechada, diz quando abre, e **não aceita pedido**. A recusa é do servidor, não da tela — esconder o botão não impede um `POST`. ⚠ **Unidade sem horário cadastrado é considerada aberta**: ausência de cadastro não pode desligar a venda de quem já vendia. | R F | `unidade`, `unidade_horario`, `pedido` | APP | **DEC** | S |
 
 > ### ⚠⚠ RN-GER-006 — a regra mais subestimada do catálogo
 >
@@ -680,6 +683,7 @@ implementada; uma spec sem regra é comportamento não autorizado.
 | `RN-GER-014` `DEC` ⚠⚠ · `RN-GER-016` | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | **Entregue** — plataforma vê todas as unidades (ADR-0013) e é invisível ao restaurante | `AcessoTests` ✔ CA-9 — **e que o usuário comum continua isolado**; `UsuariosESuporteTests` ✔ CA-11 |
 | `RN-GER-030` `IMP` · `RN-GER-031` `IMP` ⚠ | [SPEC-GER-007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) | **Entregue** — a plataforma cria, lista e inativa usuário de plataforma; o último ativo não pode ser inativado | `UsuariosDePlataformaTests` ✔ CA-13 a CA-18 |
 | `RN-GER-032` a `RN-GER-035` `IMP` ⚠⚠ | [SPEC-GER-008](specs/SPEC-GER-008-recuperacao-de-acesso.md) | **Entregue** — token de uso único guardado como hash, resposta uniforme na solicitação, convite nos três caminhos de criação, e o envio fora da transação (ADR-0016) | `RecuperacaoDeAcessoTests` ✔ CA-1 a CA-8 |
+| **`RN-GER-006`** ⚠⚠ *(revisada)* · `RN-GER-036` `DEC` ⚠⚠ · `RN-GER-037` `DEC` · `RN-VEN-048` `DEC` | [SPEC-GER-009](specs/SPEC-GER-009-horario-endereco-e-dia-operacional.md) | **Entregue** — a virada do dia operacional deixou de ser constante do sistema: sai do horário cadastrado, e cada pedido carrega a virada aplicada. Endereço em campos, exibido na vitrine. Fora do horário, a vitrine não aceita pedido | `HorarioDeFuncionamentoTests` ✔ 8 casos de domínio; `HorarioEViradaTests` ✔ CA-1 a CA-4 — CA-2 é o que prova que o passado não se reclassifica; `DiaOperacionalParidadeTests` ✔ continua verde |
 | `RN-GER-015` `DEC` ⚠ | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) · [005](specs/SPEC-GER-005-trilha-de-auditoria.md) | **Entregue** — `sessao_suporte` com motivo, escrita de plataforma bloqueada sem ela, e cada operação do usuário de plataforma agora fica na trilha com o seu `usuario_id` | `UsuariosESuporteTests` ✔ CA-10; `AuditoriaTests` ✔ CA-1 |
 | `RN-GER-017` a `021` `DEC` | [SPEC-GER-006](specs/SPEC-GER-006-modulos-por-unidade.md) · [007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) | **Entregue** — módulo por unidade, com vigência e dependências. `RN-GER-020` é imposta nos **dois** caminhos (alterar e criar) por `FechoDeDependencia`, com fecho **transitivo** | `ModulosTests` ✔ 7 casos; `DependenciaDeModulosTests` ✔ 9; `FechoDeDependenciaTests` ✔ 7 de contrato |
 | `RN-GER-022` `DEC` | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | **Entregue** — perfil Operador semeado; conjunto de permissões **provisório** | `AcessoTests` ✔ perfis conferidos contra o catálogo |
@@ -830,6 +834,8 @@ esta tabela é o índice inverso. Ver [`06-guia-de-specs.md`](06-guia-de-specs.m
 | **2.3** | **18/08/2026** | **O acompanhamento do pedido parava antes do fim.** `RN-VEN-047` (`IMP`) ⚠ — a consulta roda a cada `PAR-VEN-005` segundos (15) e **só cessa em Finalizado ou Cancelado**. Duas coisas estavam erradas e nenhuma dava erro na tela. **Primeira:** o critério de parada era a *fase* `fim`, que agrupa **Entregue** com Finalizado — agrupamento certo para filtrar, errado para parar de perguntar; a tela do cliente congelava um estado antes do fim. **Segunda:** com a aba escondida o temporizador disparava e **não reagendava** — a corrente dependia de o `visibilitychange` voltar, e quando ele não veio (aba congelada, cache de retorno) o acompanhamento morreu em silêncio. ⚠ A regra enuncia a propriedade que faltava: **suspender não é cessar**, porque entre "parou de perguntar" e "o pedido parou de andar" a tela é idêntica. Parâmetro novo: `PAR-VEN-005`. Total: **169 regras** |
 
 | **2.4** | **18/08/2026** | **Recuperação de acesso, e a cadência do acompanhamento.** Quatro regras `IMP` fechando o beco que a §8 da `SPEC-GER-007` registrou no dia anterior: senha esquecida só se resolvia com outra pessoa, e **acima do acesso de plataforma não há ninguém**. **RN-GER-032** ⚠ — o e-mail sai de endereço próprio e **nunca entra na transação**: falha de envio é registrada e não desfaz usuário criado nem senha redefinida; ausência de SMTP é estado válido, como em `RN-GER-014`. **RN-GER-033** ⚠⚠ — token opaco, uso único, validade curta e guardado **apenas como hash**, pela mesma razão da senha em `RNF-005`; emitir um novo invalida os anteriores. **RN-GER-034** ⚠ — a solicitação responde igual exista ou não a conta, mesma doutrina de `RN-GER-027` no login. **RN-GER-035** — senha escolhida pelo dono encerra a troca obrigatória; escolhida por terceiro, a reativa (`RN-GER-028`). Decidido em ADR-0016: SMTP do próprio domínio, com a fila em memória — a volatilidade é aceita porque **todo e-mail nosso é reemitível**. `RN-VEN-047` ganhou a segunda cadência (15 s nas dez primeiras consultas, 25 s depois). Total: **169 regras** |
+
+| **2.5** | **18/08/2026** | ⚠⚠ **A virada do dia operacional deixou de ser constante do sistema** — decisão do dono do produto, e revisão de uma das sete regras estruturais. `RN-GER-006` passa a apontar para a **virada cadastrada da unidade**; até aqui eram `04h00` fixos dentro da expressão da coluna gerada, e essa fixação era a razão técnica de não haver como cadastrar. **RN-GER-036** (`DEC`) ⚠⚠ — a casa cadastra o horário por dia da semana, e a virada é **derivada**: o fechamento que atravessa a meia-noite mais tarde da semana; quem fecha antes dela tem dia operacional igual ao civil. ⚠ **O passado não se reclassifica**: cada pedido carrega a virada e o fuso aplicados, pela mesma razão de `RN-VEN-008` copiar o preço praticado — relatório fechado que muda sozinho é pior que relatório errado, porque ninguém percebe. **RN-GER-037** (`DEC`) — endereço em campos separados, exibido na vitrine; consulta por CEP é conveniência da tela e nunca condição para gravar. **RN-VEN-048** (`DEC`) — fora do horário a vitrine informa e **não aceita pedido**, com a recusa no servidor; casa sem horário cadastrado continua vendendo. Total: **176 regras** |
 
 ### Regras revogadas na consolidação
 

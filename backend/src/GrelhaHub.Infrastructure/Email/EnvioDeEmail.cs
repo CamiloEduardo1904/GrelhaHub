@@ -36,11 +36,20 @@ public sealed class OpcoesDeEmail
     /// </summary>
     public string BaseDoSite { get; set; } = string.Empty;
 
-    /// <summary><c>RN-GER-032</c> — sem host, usuário e remetente não há envio, e isso é estado válido.</summary>
+    /// <summary>
+    /// <c>RN-GER-032</c> — sem configuração completa não há envio, e isso é estado válido.
+    /// <para>
+    /// ⚠ <b>A senha entra na conta.</b> Host, usuário e remetente vêm do <c>appsettings</c> e estão
+    /// sempre preenchidos; o que falta em desenvolvimento é justamente o segredo. Sem exigi-la
+    /// aqui, a fila tentaria enviar em toda máquina de desenvolvimento e falharia na autenticação
+    /// — barulho de log no lugar do aviso claro de "não configurado".
+    /// </para>
+    /// </summary>
     public bool Completo =>
         !string.IsNullOrWhiteSpace(Host)
         && !string.IsNullOrWhiteSpace(Usuario)
-        && !string.IsNullOrWhiteSpace(Remetente);
+        && !string.IsNullOrWhiteSpace(Remetente)
+        && !string.IsNullOrWhiteSpace(Senha);
 }
 
 /// <summary>

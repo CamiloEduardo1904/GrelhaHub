@@ -1,5 +1,6 @@
 using FluentAssertions;
 using GrelhaHub.Domain.Common;
+using GrelhaHub.Domain.Gerais;
 using GrelhaHub.Domain.Vendas;
 
 namespace GrelhaHub.Domain.Tests.Vendas;
@@ -14,7 +15,9 @@ public class PedidoTests
 
     private static Pedido PedidoComUmItem(decimal preco = 28.00m, int quantidade = 1)
     {
-        var pedido = new Pedido(Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null);
+        var pedido = new Pedido(
+            Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null,
+            ViradaOperacional.Padrao, "America/Sao_Paulo");
         pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(preco), quantidade);
         return pedido;
     }
@@ -32,7 +35,9 @@ public class PedidoTests
     [Fact(DisplayName = "RN-VEN-002 — pedido sem itens não pode ser confirmado")]
     public void PedidoSemItens_NaoConfirma()
     {
-        var pedido = new Pedido(Unidade, 1, CanalVenda.Balcao, null, null);
+        var pedido = new Pedido(
+            Unidade, 1, CanalVenda.Balcao, null, null,
+            ViradaOperacional.Padrao, "America/Sao_Paulo");
 
         var acao = pedido.Confirmar;
 
@@ -117,7 +122,9 @@ public class PedidoTests
     public void PrecoPraticado_EhCopiadoNaVenda()
     {
         var produtoId = Guid.CreateVersion7();
-        var pedido = new Pedido(Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null);
+        var pedido = new Pedido(
+            Unidade, 1, CanalVenda.DeliveryProprio, Guid.CreateVersion7(), null,
+            ViradaOperacional.Padrao, "America/Sao_Paulo");
 
         // Vendido a 32,00 hoje.
         var item = pedido.AdicionarItem(produtoId, "X-Bacon", Dinheiro.De(32.00m), 2);
@@ -132,7 +139,9 @@ public class PedidoTests
     [Fact(DisplayName = "RN-VEN-011 — a quantidade de um item é sempre maior que zero")]
     public void Quantidade_DeveSerMaiorQueZero()
     {
-        var pedido = new Pedido(Unidade, 1, CanalVenda.Balcao, null, null);
+        var pedido = new Pedido(
+            Unidade, 1, CanalVenda.Balcao, null, null,
+            ViradaOperacional.Padrao, "America/Sao_Paulo");
 
         pedido.Invoking(p => p.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(28m), 0))
             .Should().Throw<ArgumentOutOfRangeException>().WithMessage("*RN-VEN-011*");
@@ -152,7 +161,9 @@ public class PedidoTests
     [Fact(DisplayName = "RN-VEN-039 — o total do pedido é a soma dos itens")]
     public void Total_EhASomaDosItens()
     {
-        var pedido = new Pedido(Unidade, 1, CanalVenda.Balcao, null, null);
+        var pedido = new Pedido(
+            Unidade, 1, CanalVenda.Balcao, null, null,
+            ViradaOperacional.Padrao, "America/Sao_Paulo");
         pedido.AdicionarItem(Guid.CreateVersion7(), "X-Burger", Dinheiro.De(28.00m), 2);
         pedido.AdicionarItem(Guid.CreateVersion7(), "Batata frita", Dinheiro.De(18.00m), 1);
         pedido.AdicionarItem(Guid.CreateVersion7(), "Refrigerante", Dinheiro.De(7.00m), 2);

@@ -160,32 +160,33 @@ existe guarda o dono de quando nasceu — daí o comando acima.
 A caixa do domínio, na Hostinger. **SPF, DKIM e DMARC já publicados** — é o que faz o link de
 recuperação chegar na entrada em vez do spam.
 
+**Só a senha vem para cá.** Host, porta, usuário, remetente e base do site vivem no
+`appsettings.json`, versionados — não são segredo, e o valor único evita o defeito de configuração
+mais difícil de enxergar: uma variável **vazia** no `.env` sobrescrevendo o `appsettings`, deixando
+o valor certo escrito sem valer.
+
 ```bash
 cd /opt/grelhahub
 
 cat >> .env <<'FIM'
-EMAIL_HOST=smtp.hostinger.com
-EMAIL_PORTA=587
-EMAIL_USUARIO=sistema@grelhahub.com
 EMAIL_SENHA=a-senha-DA-CAIXA
-EMAIL_REMETENTE=noreply@grelhahub.com
-EMAIL_NOME_REMETENTE=GrelhaHub
-EMAIL_BASE_DO_SITE=https://grelhahub.com
 FIM
 
-docker compose config | grep Email__     # os sete precisam aparecer
+chmod 600 .env
+docker compose config | grep Email__     # só Email__Senha aparece aqui
 docker compose up -d api
 ```
 
-| Campo | Valor | Observação |
-|-------|-------|------------|
-| Host | `smtp.hostinger.com` | |
-| Porta | **587** | STARTTLS. 465 é SSL implícito, e o código escolhe pelo número — trocar um pelo outro **trava a conexão sem erro legível** |
-| Usuário | `sistema@grelhahub.com` | ⚠ a senha é a **da caixa**, não a do hPanel |
-| Remetente | `noreply@grelhahub.com` | Alias da mesma caixa |
-| `EMAIL_BASE_DO_SITE` | `https://grelhahub.com` | ⚠ Monta o link do e-mail. Vem **daqui**, nunca do cabeçalho `Host` da requisição — link montado com o que o cliente mandou é o furo clássico da troca de senha |
+| Campo | Valor | Onde vive |
+|-------|-------|-----------|
+| Host | `smtp.hostinger.com` | `appsettings.json` |
+| Porta | **587** | `appsettings.json`. STARTTLS; 465 é SSL implícito e o código escolhe pelo número — trocar um pelo outro **trava a conexão sem erro legível** |
+| Usuário | `sistema@grelhahub.com` | `appsettings.json` |
+| Senha | ⚠ a **da caixa**, não a do hPanel | **`.env` da VPS**, permissão 600 |
+| Remetente | `noreply@grelhahub.com` | `appsettings.json` — alias da mesma caixa |
+| Base do site | `https://grelhahub.com` | `appsettings.json`. ⚠ Monta o link do e-mail e vem **de configuração**, nunca do cabeçalho `Host` da requisição — link montado com o que o cliente mandou é o furo clássico da troca de senha |
 
-**Sem `EMAIL_HOST`, nada é enviado — e isso é estado válido** (`RN-GER-032`). Cada e-mail que
+**Sem `EMAIL_SENHA`, nada é enviado — e isso é estado válido** (`RN-GER-032`). Cada e-mail que
 deixou de sair fica no log com destinatário e assunto, e **nenhuma operação falha por causa disso**:
 usuário criado continua criado. Confira com:
 

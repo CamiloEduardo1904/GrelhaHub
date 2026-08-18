@@ -21,10 +21,22 @@ as análises da Sprint 7 & 8 já foram construídas sobre a agregação errada.
 
 ## Decisão
 
+> ⚠⚠ **Revisado em 18/08/2026 — a virada deixou de ser constante do sistema.** Decisão do dono do
+> produto: horário de funcionamento é cadastro da loja, e a virada sai dele (`RN-GER-036`,
+> [`SPEC-GER-009`](../specs/SPEC-GER-009-horario-endereco-e-dia-operacional.md)). O que **não**
+> mudou é a razão de a coluna existir: agrupar por data de criação continua sendo o defeito que
+> este ADR previne. O que mudou é de onde vem o número.
+>
+> A expressão passou a ler **colunas da própria linha** — `pedido.hora_virada_operacional` e
+> `pedido.fuso_operacional`, copiadas da unidade na inserção. É o que preserva o argumento original
+> ("alterar a expressão reclassificaria vendas passadas") num mundo em que cada casa tem a sua
+> virada: editar o horário muda os pedidos seguintes, não os gravados.
+
 O **dia operacional** é uma propriedade de primeira classe do modelo, não um cálculo de
 relatório.
 
-- Vai das **04h00** (`PAR-GER-001`) às **03h59** do dia seguinte
+- Vai da **virada cadastrada da unidade** (`RN-GER-036`; `PAR-GER-001`, 04h00, para quem não
+  cadastrou) até um minuto antes dela no dia seguinte
 - Toda tabela com data de evento comercial — `pedido`, `pagamento`, `movimento_estoque`,
   `movimento_caixa`, `caixa_diario`, `lancamento_financeiro` — tem a coluna
   **`data_operacional`**, do tipo `date`
@@ -67,6 +79,14 @@ estrutural.
 - É um ponto forte de defesa na banca: mostra domínio de negócio real, não de CRUD
 
 **Negativas / custos aceitos**
+- ⚠ **Trocar a expressão da coluna gerada derruba os índices que a contêm** (`DROP COLUMN` leva o
+  índice junto, sem aviso). A migration de 18/08/2026 recria `uq_pedido_numero` e
+  `ix_pedido_dia_status` à mão — quem mexer na expressão outra vez precisa fazer o mesmo
+- ⚠ **Duas colunas por linha transacional** (`hora_virada_operacional`, `fuso_operacional`) para
+  que a virada seja por unidade sem reclassificar histórico. É redundância deliberada, do mesmo
+  tipo do preço praticado de `RN-VEN-008`
+- **A trilha de auditoria ficou com a régua da plataforma** (04h00), e a divergência está declarada
+  na §4 da `SPEC-GER-009`: a plataforma não tem unidade, logo não tem virada
 - Coluna adicional em várias tabelas, com índice — custo de armazenamento pequeno e
   conhecido
 - Mudar a hora de virada é operação de migration, não de configuração

@@ -3,6 +3,7 @@ import { Grelha } from '../../components/Grelha';
 import { IconeLapis, IconeMais, IconeOlho } from '../../components/Icone';
 import { api, mensagemDeErro } from '../../services/api';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
+import { CadastroDeOperacao } from './CadastroDeOperacao';
 import { OperacaoDaCasa } from './OperacaoDaCasa';
 import { SessaoDeSuporteDaCasa } from './SessaoDeSuporteDaCasa';
 import {
@@ -213,7 +214,13 @@ function DetalheDaCasa({
           <SessaoDeSuporteDaCasa casa={casa} sessao={sessao} aoMudar={aoMudar} />
 
           {aba === 'dados' && (
-            <DadosDaCasa casa={casa} temSessao={sessao !== null} aoMudar={aoMudar} />
+            <>
+              <DadosDaCasa casa={casa} temSessao={sessao !== null} aoMudar={aoMudar} />
+
+              {/* RN-GER-036 / RN-GER-037 — endereço e horário. Fica sob a mesma sessão de
+                  suporte do bloco acima: é dado do cliente sendo alterado em nome dele. */}
+              <CadastroDeOperacao unidadeId={casa.id} />
+            </>
           )}
 
           {aba === 'modulos' && (

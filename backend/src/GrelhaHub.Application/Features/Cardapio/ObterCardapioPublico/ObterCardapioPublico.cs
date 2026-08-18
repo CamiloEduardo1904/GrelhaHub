@@ -27,7 +27,22 @@ public sealed record CardapioPublicoResponse(
     /// </summary>
     string? UrlLogo,
 
+    /// <summary><c>RN-GER-037</c> — o endereço em uma linha. Nulo quando a casa não cadastrou.</summary>
+    string? Endereco,
+
+    /// <summary>
+    /// <c>RN-VEN-048</c> — a casa está aberta AGORA. Falso fecha a vitrine: sem botão de pedir e
+    /// com o aviso de quando abre.
+    /// </summary>
+    bool Aberta,
+
+    /// <summary><c>RN-GER-036</c> — a semana, para a vitrine dizer quando abre.</summary>
+    IReadOnlyList<HorarioPublicoDto> Horarios,
+
     IReadOnlyList<CategoriaPublicaDto> Categorias);
+
+/// <summary><c>RN-GER-036</c> — um dia da semana na vitrine. <c>Abre</c> nulo é dia fechado.</summary>
+public sealed record HorarioPublicoDto(DayOfWeek DiaDaSemana, TimeOnly? Abre, TimeOnly? Fecha);
 
 public sealed record CategoriaPublicaDto(Guid Id, string Nome, IReadOnlyList<ProdutoPublicoDto> Produtos);
 
@@ -46,7 +61,8 @@ public sealed record ProdutoPublicoDto(
     /// <summary><c>RN-VEN-042</c> — caminho público da imagem. Nulo quando não há.</summary>
     string? UrlImagem);
 
-public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto, IModulos modulos)
+public sealed class ObterCardapioPublicoHandler(
+    IAppDbContext db, IContextoDeExecucao contexto, IModulos modulos, IRelogio relogio)
     : IRequestHandler<ObterCardapioPublicoQuery, CardapioPublicoResponse>
 {
     public async Task<CardapioPublicoResponse> Handle(ObterCardapioPublicoQuery request, CancellationToken cancellationToken)
@@ -56,6 +72,7 @@ public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExe
         // `unidade` não é filtrada por unidade_id — ela É a unidade.
         var unidade = await db.Unidades
             .AsNoTracking()
+            .Include(u => u.Horarios)
             .FirstOrDefaultAsync(u => u.Slug == slug && u.Ativa, cancellationToken)
             ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
@@ -107,6 +124,20 @@ public sealed class ObterCardapioPublicoHandler(IAppDbContext db, IContextoDeExe
             .ToList();
 
         return new CardapioPublicoResponse(
-            unidade.Slug, unidade.NomeFantasia, unidade.Telefone, unidade.UrlLogo, publicas);
+            unidade.Slug,
+            unidade.NomeFantasia,
+            unidade.Telefone,
+            unidade.UrlLogo,
+            unidade.EnderecoResumido(),
+
+            // RN-VEN-048 — no fuso DA CASA, não no do servidor. O contêiner roda em UTC, e
+            // perguntar "está aberta?" com a hora de Londres fecharia a loja três horas antes.
+            unidade.AbertaEm(relogio.Agora),
+
+            [.. unidade.Horarios
+                .OrderBy(h => h.DiaDaSemana)
+                .Select(h => new HorarioPublicoDto(h.DiaDaSemana, h.Abre, h.Fecha))],
+
+            publicas);
     }
 }
