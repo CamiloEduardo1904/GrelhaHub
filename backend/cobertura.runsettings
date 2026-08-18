@@ -24,6 +24,18 @@
           <!-- Código gerado pelo EF Core: migration e snapshot do modelo. -->
           <ExcludeByFile>**/Migrations/**.cs</ExcludeByFile>
 
+          <!--
+            ⚠ O CÓDIGO GERADO DO OPENAPI NÃO É EXCLUÍDO AQUI, e a tentativa está registrada
+            para ninguém repetir: são 208 linhas do gerador de fonte da Microsoft, dentro de
+            obj/, e nenhum padrão de `ExcludeByFile` que tentei casou com o caminho relativo
+            de barra invertida que o relatório usa (`GrelhaHub.Apiobj...`).
+
+            A exclusão acontece no RELATÓRIO, com `-classfilters` — ver o comando no CLAUDE.md.
+            Faz diferença grande e é honesta: com o gerado dentro, a camada de API media 54,9%
+            e a leitura era "a API está mal testada", quando os controllers estavam acima de
+            87%. Sem ele: 80,9%.
+          -->
+
 
           <!--
             ⚠⚠ ESTA LISTA FICA CURTA DE PROPÓSITO. Duas exclusões que pareciam inofensivas

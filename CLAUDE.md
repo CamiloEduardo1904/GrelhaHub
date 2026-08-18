@@ -177,9 +177,9 @@ cd backend
 dotnet build -c Release      # Release trata warning como erro
 dotnet test -c Release       # integração sobe PostgreSQL efêmero: exige Docker rodando
 
-# Cobertura — a régua honesta (18/08/2026: 86,1% de linha, 59,1% de ramo)
+# Cobertura — a régua honesta (18/08/2026: 90,6% de linha, 70,7% de ramo)
 dotnet test -c Release --settings cobertura.runsettings --results-directory ./TestResults
-reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/relatorio" "-reporttypes:TextSummary"
+reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/relatorio" "-reporttypes:TextSummary" \n  "-classfilters:-Microsoft.AspNetCore.OpenApi.Generated*"   # sem isto o Api mede 54,9% em vez de 80,9%
 
 # Frontend
 cd frontend
@@ -228,7 +228,7 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 
 > ⚠⚠ **A cobertura que o projeto citava — 95,4% — estava inflada.** As migrations do EF Core são
 > milhares de linhas GERADAS e contavam como cobertas só porque a suíte cria o banco na partida.
-> Sem elas, o número real é **86,1%**. E há duas exclusões que apagam medição em SILÊNCIO, ambas
+> Sem elas, e sem as 208 linhas do gerador de OpenAPI da Microsoft, o número real é **90,6%**. E há duas exclusões que apagam medição em SILÊNCIO, ambas
 > documentadas em `backend/cobertura.runsettings`: `CompilerGeneratedAttribute` derruba todo código
 > `async` (2.249 linhas contra 4.106), e `Exclude`/`ExcludeByAttribute` fizeram o assembly
 > **Infrastructure sumir do relatório** — não com nota baixa: ausente, com a média subindo porque a

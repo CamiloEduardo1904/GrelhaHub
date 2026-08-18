@@ -170,6 +170,18 @@ public sealed record DefinirOperacaoDaUnidadeCommand(
 
 /// <summary>O que a casa cadastrou, e a virada que saiu disso.</summary>
 public sealed record OperacaoDaUnidadeDto(
+    /// <summary>
+    /// De QUAL casa é esta operação — <c>RN-GER-009</c>.
+    /// <para>
+    /// ⚠ Faltava, e o vazio só apareceu quando o primeiro teste tentou afirmar que a resposta era
+    /// da casa certa. Para o restaurante é redundante — ele só recebe a própria —, mas a
+    /// plataforma lê a operação de <b>qualquer</b> unidade (<c>RN-GER-014</c>), e sem este campo o
+    /// cliente não tem como conferir se recebeu o que pediu. Resposta que não se identifica só
+    /// funciona enquanto ninguém erra o parâmetro.
+    /// </para>
+    /// </summary>
+    Guid UnidadeId,
+
     EnderecoDto Endereco,
     string? EnderecoResumido,
     IReadOnlyList<HorarioDoDiaDto> Horarios,
@@ -266,6 +278,7 @@ public sealed class DefinirOperacaoDaUnidadeHandler(IAppDbContext db, IContextoD
 
     internal static OperacaoDaUnidadeDto Montar(Unidade unidade) =>
         new(
+            unidade.Id,
             new EnderecoDto(
                 unidade.Cep, unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Complemento,
                 unidade.Bairro, unidade.Cidade, unidade.Uf),
