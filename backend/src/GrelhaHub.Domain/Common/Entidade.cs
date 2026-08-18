@@ -32,7 +32,18 @@ public interface IPertenceAUnidade
 public interface IAuditavel
 {
     DateTimeOffset CriadoEm { get; }
-    Guid CriadoPorUsuarioId { get; }
+
+    /// <summary>
+    /// Quem criou.
+    /// <para>
+    /// <b>Nulo em operação anônima</b>, e a nulidade é obrigatória: o pedido do cardápio público
+    /// (<c>RN-VEN-038</c>) é criado por um cliente que não é usuário do sistema, e o cadastro de
+    /// restaurante roda antes de existir qualquer usuário. A versão original de <c>RN-GER-001</c>
+    /// dizia "todo registro guarda o usuário responsável" — com <c>NOT NULL</c>, essas duas
+    /// operações seriam impossíveis. A regra vale onde há responsável.
+    /// </para>
+    /// </summary>
+    Guid? CriadoPorUsuarioId { get; }
 }
 
 /// <summary>
@@ -50,4 +61,22 @@ public interface IAuditavel
 public interface IPossuiDiaOperacional
 {
     DateOnly DataOperacional { get; }
+}
+
+/// <summary>
+/// Registro que admite <b>exclusão lógica</b> — <c>RN-GER-002</c>, <c>RN-VEN-041</c>.
+/// <para>
+/// Exclusão no GrelhaHub é sempre lógica: nenhum registro transacional é apagado. Quem implementa
+/// esta interface recebe filtro global no <c>DbContext</c> e desaparece de toda consulta, sem
+/// que nenhum handler precise lembrar de escrever <c>Where(!p.Excluido)</c> — mesmo motivo do
+/// filtro de unidade.
+/// </para>
+/// </summary>
+public interface IExcluivelLogicamente
+{
+    /// <summary>
+    /// Instante da exclusão, ou nulo. <b>Propriedade mapeada</b>, e não um <c>bool</c> calculado:
+    /// o filtro global precisa traduzir para SQL, e <c>Excluido</c> derivado não tem coluna.
+    /// </summary>
+    DateTimeOffset? ExcluidoEm { get; }
 }

@@ -193,9 +193,10 @@ GrelhaHub/
    — 60 requisitos funcionais (MoSCoW), 40 regras de negócio, 20 requisitos
    não-funcionais, 8 critérios de aceite Given-When-Then, matriz de rastreabilidade
    dor→requisito, riscos e entidades candidatas.
-2. ~~**ADRs**~~ → **feito**: [`docs/adr/`](docs/adr/) — 8 decisões documentadas
+2. ~~**ADRs**~~ → **feito**: [`docs/adr/`](docs/adr/) — 12 decisões documentadas
    (stack, Clean Architecture + CQRS, desacoplamento, PostgreSQL,
-   multi-estabelecimento, deploy, core genérico, estoque como livro-razão).
+   multi-estabelecimento, deploy, core genérico, estoque como livro-razão,
+   onde as regras vivem, custeio por lote com FEFO, dia operacional, direção visual Chapa).
 3. ~~**Glossário do domínio**~~ → **feito**: [`docs/02-glossario.md`](docs/02-glossario.md).
 4. **Pendente — entrevista com dono de hamburgueria real:** rende regras de negócio
    que brainstorm interno não traz e fica excelente citar "levantamento com

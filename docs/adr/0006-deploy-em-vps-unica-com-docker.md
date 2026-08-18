@@ -84,6 +84,11 @@ derruba o serviço em execução.
   mitigado com backup diário do volume `pgdata` e backup extra antes de apresentações
 - Sem escala horizontal — a saída para crescer é aumentar a VPS
 - Recursos compartilhados entre API, banco e Nginx exigem limites de memória por container
+- Com o agente de CI na própria VPS, **build e testes rodam no host de produção**. Desde
+  17/08/2026 isso inclui um PostgreSQL efêmero por execução, exigido pelo
+  [ADR-0009](0009-onde-as-regras-de-negocio-vivem.md). Não conflita com o banco de produção —
+  porta alta aleatória e remoção automática pelo *reaper* — mas é mais carga no host que
+  atende usuário. Detalhe em [`infra/azure-devops.md`](../../infra/azure-devops.md)
 - Certificado, DNS e renovação ficam por conta do time
 
 ## Pendências vinculadas

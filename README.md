@@ -39,9 +39,9 @@ Se durante a implementação aparecer um comportamento necessário que não est�
 
 | Documento | O que é |
 |-----------|---------|
-| [Catálogo de Regras](docs/03-catalogo-de-regras-de-negocio.md) ★ | **Fonte de verdade** — 138 regras de negócio |
+| [Catálogo de Regras](docs/03-catalogo-de-regras-de-negocio.md) ★ | **Fonte de verdade** — 166 regras de negócio |
 | [Guia de Specs](docs/06-guia-de-specs.md) | Como a regra vira spec e a spec vira código |
-| [ADRs](docs/adr/) | As 12 decisões de arquitetura, com alternativas e custos |
+| [ADRs](docs/adr/) | As 14 decisões de arquitetura, com alternativas e custos |
 | [Design System Chapa](docs/08-design-system.md) | Identidade da interface — tokens, componentes e as 8 regras `CHAPA-*` |
 | [Fila de Validação](docs/05-fila-de-validacao-com-cliente.md) | Roteiro da entrevista com o cliente |
 
@@ -65,7 +65,7 @@ GrelhaHub/
 ├── docs/                        📖 documentação — comece aqui
 │   ├── 03-catalogo-de-regras-de-negocio.md    ★ fonte de verdade
 │   ├── adr/                     decisões de arquitetura
-│   └── specs/                   6 specs (onda 0 + fatia vertical)
+│   └── specs/                   9 specs (onda 0 + fatia vertical) — todas ENTREGUE
 ├── backend/
 │   ├── src/
 │   │   ├── GrelhaHub.Domain/            entidades e regras — sem dependências
@@ -119,8 +119,12 @@ npm run dev
 ### Testes
 
 ```bash
+# Backend — os testes de integração sobem um PostgreSQL efêmero: exige Docker rodando
 cd backend && dotnet test -c Release
-cd frontend && npm run lint && npm run build
+
+# Frontend — `npm ci` primeiro. Sem node_modules, `npm run lint` sai com código 0
+# sem ter rodado nada, e o gate parece verde
+cd frontend && npm ci && npm run lint && npm run build
 ```
 
 ---
@@ -130,10 +134,12 @@ cd frontend && npm run lint && npm run build
 | Item | Situação |
 |------|----------|
 | Sprint | 1 & 2 — documentação entregue |
-| Regras catalogadas | **138** — 134 em `HIP`, 4 em `DEC` |
+| Regras catalogadas | **159** — 140 em `HIP`, 19 em `DEC`; 6 descobertas na implementação |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco |
-| Specs | **6** — 5 da onda 0 (`PRONTA`) + `SPEC-VEN-001` (`EM IMPLEMENTAÇÃO`) |
-| Código | **Fatia vertical funcionando** na direção Chapa: cadastro → cardápio público → pedido → painel. 26 testes de domínio |
+| Specs | **9 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `007`) + `VEN-001` e `VEN-002` |
+| Código | **Fatia vertical funcionando** na direção Chapa: cadastro → cardápio público → pedido → painel |
+| Testes | **240 verdes** — 65 de domínio + 7 de aplicação + 168 de integração contra PostgreSQL real (Testcontainers; exige Docker rodando) |
+| Rastreabilidade | **40 regras** com o ID citado no `DisplayName` de um teste |
 
 ### O que já funciona
 
@@ -141,9 +147,16 @@ cd frontend && npm run lint && npm run build
 
 | Fluxo | Estado |
 |-------|--------|
+| Vitrine pública em `grelhahub.com` (`/`), com **Acesse já** no alto à direita | ✔ |
+| Cadastro de estabelecimento **só pela plataforma** — ninguém ganha conta sem contrato | ✔ |
+| Usuário com **nome, sobrenome, CPF** (máscara e verificador), e-mail e senha | ✔ |
+| Tela de **equipe**: gerente cadastra operador, atendente, cozinha e entregador | ✔ |
+| Tela de **plataforma** (`/plataforma`): estabelecimentos, módulos e usuários | ✔ |
+| **Foto no produto** e **logo da casa** no cardápio público (JPEG/PNG, 5 MB) | ✔ |
 | Cadastro de restaurante + admin, com JWT | ✔ |
 | Link público do cardápio (`/c/:slug`) | ✔ |
 | Pedido pelo cardápio, sem login | ✔ |
+| Acompanhamento **ao vivo** do pedido pelo cliente, sem recarregar a página | ✔ |
 | Painel do restaurante com ciclo de vida do pedido | ✔ |
 | Ficha técnica, estoque, lote e FEFO | ✘ — ondas 2 e 3 |
 | Alerta de falta de insumo (`RN-VEN-035`) | ✘ — depende de estoque |

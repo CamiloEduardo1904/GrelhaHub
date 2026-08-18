@@ -6,6 +6,8 @@ using GrelhaHub.Application.Common.Interfaces;
 using GrelhaHub.Infrastructure;
 using GrelhaHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -91,6 +93,15 @@ if (args.Contains("--migrate"))
             Log.Information("Migrations aplicadas.");
         }
 
+        // RN-GER-014 — o usuário de suporte da plataforma. Idempotente: roda a cada deploy e
+        // não faz nada se já existir. A senha vem do .env da VPS (RNF-008), nunca do repositório.
+        await SemeadorDePlataforma.SemearAsync(
+            banco,
+            escopoMigracao.ServiceProvider.GetRequiredService<IHashDeSenha>(),
+            app.Configuration,
+            escopoMigracao.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(nameof(SemeadorDePlataforma)));
+
         return 0;
     }
     catch (Exception excecao)
@@ -115,6 +126,47 @@ if (app.Environment.IsDevelopment())
     app.UseCors(PoliticaDesenvolvimento);
 }
 
+// ADR-0015 / SPEC-VEN-002 — as imagens.
+//
+// Em produção quem serve é o NGINX (`location /arquivos/`), que faz isto melhor e sem passar
+// pelo pipeline do ASP.NET. Aqui existe para desenvolvimento e para o teste de integração, que
+// sobe a API sem Nginx na frente.
+//
+// ANTES de UseAuthentication, e de propósito: a imagem do cardápio é pública (RN-VEN-037), e um
+// arquivo estático não deve atravessar autenticação para ser lido. O controle está em quem
+// GRAVA, não em quem lê.
+{
+    var raiz = Path.GetFullPath(
+        builder.Configuration["Arquivos:Raiz"] ?? "arquivos");
+
+    Directory.CreateDirectory(raiz);
+
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(raiz),
+        RequestPath = builder.Configuration["Arquivos:PrefixoPublico"] ?? "/arquivos",
+
+        // Só os tipos que RN-VEN-042 aceita. Um provedor que servisse qualquer extensão
+        // devolveria, como download, qualquer arquivo que acabasse na pasta por outro caminho.
+        ContentTypeProvider = new FileExtensionContentTypeProvider(
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [".jpg"] = "image/jpeg",
+                [".jpeg"] = "image/jpeg",
+                [".png"] = "image/png",
+            }),
+
+        ServeUnknownFileTypes = false,
+
+        OnPrepareResponse = contexto =>
+        {
+            // Nome gerado por arquivo (SPEC-VEN-002 §4): trocar a imagem gera caminho novo, então
+            // o conteúdo de um caminho nunca muda e pode ser cacheado longe.
+            contexto.Context.Response.Headers.CacheControl = "public,max-age=604800,immutable";
+        },
+    });
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -132,6 +184,13 @@ if (app.Environment.IsDevelopment())
     using var escopo = app.Services.CreateScope();
     var db = escopo.ServiceProvider.GetRequiredService<GrelhaHubDbContext>();
     await db.Database.MigrateAsync();
+
+    await SemeadorDePlataforma.SemearAsync(
+        db,
+        escopo.ServiceProvider.GetRequiredService<IHashDeSenha>(),
+        app.Configuration,
+        escopo.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger(nameof(SemeadorDePlataforma)));
 }
 
 await app.RunAsync();

@@ -49,3 +49,10 @@ desktop.ini
 *.local
 scratch/
 tmp/
+
+# Volume de imagem do desenvolvimento — ADR-0015.
+#
+# O arquivo do usuário vive em disco, e em produção isso é um volume Docker montado fora do
+# repositório. Em desenvolvimento a raiz cai dentro de `GrelhaHub.Api/`, então foto de teste de
+# hamburguer entraria no versionamento junto com o código.
+arquivos-dev/

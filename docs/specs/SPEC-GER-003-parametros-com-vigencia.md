@@ -4,7 +4,7 @@
 |-------|-------|
 | ID | `SPEC-GER-003-parametros-com-vigencia` |
 | Módulo | GER |
-| Situação | `PRONTA` |
+| Situação | `ENTREGUE` — 17/08/2026. **CA-6 fechado** pela `SPEC-GER-005` no mesmo dia |
 | Onda | 0 — fundação |
 | Regras implementadas | `RN-GER-009`, `RN-GER-011` *(auditoria da alteração)* — e habilita todas as regras marcadas `PAR` |
 | ADRs aplicáveis | [ADR-0009](../adr/0009-onde-as-regras-de-negocio-vivem.md) |
@@ -105,12 +105,18 @@ restrição e é usado tanto na validação quanto na mensagem de erro:
 
 | `tipo_valor` | Exemplo de domínio |
 |--------------|--------------------|
+| `fator` `IMP` | `> 0` — multiplicador adimensional |
 | `percentual` | `0..100` |
 | `dinheiro` | `> 0` |
 | `dias` | `>= 0` |
 | `tempo` | `00:00..23:59` |
 | `intervalo` | duração positiva |
 | `enum` | `bloquear\|avisar\|permitir` |
+
+> **Tipo `fator` descoberto na implementação.** `PAR-CRM-001` é o multiplicador `1,5` do
+> intervalo médio, e nenhum dos tipos previstos servia: não é percentual, não é dinheiro e não
+> é contagem. Gravá-lo como `percentual` faria alguém, mais tarde, ler 1,5% onde a regra quer
+> 150%. O tipo entrou no `CHECK` de `tipo_valor` e nesta tabela.
 
 > **`CHECK` valida domínio, nunca política.** `percentual entre 0 e 100` é constraint;
 > `percentual <= 10` seria política e não pode virar constraint — é justamente o valor que
@@ -236,21 +242,52 @@ Todos — esta spec é o mecanismo.
 
 | Artefato | Caminho |
 |----------|---------|
-| Entidades | `src/GrelhaHub.Domain/Gerais/Parametro.cs`, `ParametroValor.cs` |
-| Interface | `IParametros` em `src/GrelhaHub.Application/Common/Interfaces/IContextoDeExecucao.cs` ✔ |
-| Implementação | `src/GrelhaHub.Infrastructure/Services/ServicoDeParametros.cs` |
-| Features | `src/GrelhaHub.Application/Features/Gerais/ObterParametro/`, `AlterarValorDeParametro/` |
-| Migration | `.../Migrations/0001_Fundacao` |
-| Carga inicial | `src/GrelhaHub.Infrastructure/Persistence/CargaInicial.cs` |
-| Testes | `tests/GrelhaHub.Integration.Tests/Gerais/ParametroTests.cs` |
+| Entidades | `src/GrelhaHub.Domain/Gerais/Parametro.cs`, `ParametroValor.cs` ✔ |
+| Catálogo | `src/GrelhaHub.Domain/Gerais/CatalogoDeParametros.cs` ✔ — transcrição do documento |
+| Interface | `src/GrelhaHub.Application/Common/Interfaces/IParametros.cs` ✔ |
+| Implementação e cache | `src/GrelhaHub.Infrastructure/Services/Parametros.cs` ✔ |
+| Configuração EF | `.../Persistence/Configurations/ConfiguracoesDeParametro.cs` ✔ |
+| Features | `src/GrelhaHub.Application/Features/Gerais/Parametros/` ✔ |
+| Rotas | `ParametrosController` em `src/GrelhaHub.Api/Controllers/GestaoController.cs` ✔ |
+| Migration | `.../Migrations/20260817162934_ParametrosComVigencia.cs` ✔ — `btree_gist`, `EXCLUDE` e a semeadura das 9 definições |
+| Carga inicial do valor | `CadastrarRestauranteHandler.SemearParametrosAsync` ✔ — por unidade |
+| Testes | `tests/GrelhaHub.Integration.Tests/Gerais/ParametrosTests.cs` ✔ (11 casos) |
 
 ## 10. Definição de pronto
 
-- [ ] `parametro` e `parametro_valor` com a `EXCLUDE` de vigência
-- [ ] `btree_gist` habilitada na migration
-- [ ] `IParametros` com cache por vigência, ponto único de leitura
-- [ ] CA-1 a CA-7 passando como teste de integração
-- [ ] CA-7 comparando a carga inicial com o documento de parâmetros
-- [ ] Nenhum literal de negócio introduzido no código por esta spec
-- [ ] Rastreabilidade do catálogo §16 atualizada
-- [ ] `dotnet build -c Release` e `dotnet test` verdes
+- [x] `parametro` e `parametro_valor` com a `EXCLUDE` de vigência
+- [x] `btree_gist` habilitada na migration
+- [x] `IParametros` com cache **por vigência** — guarda todas as vigências, não o valor
+      corrente: cachear só o de agora faria consulta em data passada ser servida pela entrada
+      errada, e um pedido antigo passaria a ser explicado por uma taxa que não vigorava
+- [x] CA-1, CA-2, CA-3, CA-4, CA-5 e CA-7 passando como teste de integração
+- [x] **CA-6 — auditoria da alteração** — fechado pela `SPEC-GER-005`. `ParametroValor`
+      implementa `IAuditavelDetalhado`, e a alteração de parâmetro produz **duas** linhas de
+      trilha: a vigência antiga fechada (`Alteracao`, com `VigenciaFim` no `depois`) e a nova
+      aberta (`Criacao`, com a justificativa e o autor). Teste
+      `AlteracaoDeParametroEntraNaTrilha` em `Gerais/AuditoriaTests.cs`.
+      A justificativa continua **também** em `parametro_valor` — divergência declarada da §6
+      original, e agora deliberada: a coluna sobrevive à política de retenção da trilha, e a
+      vigência é o lugar onde alguém procura "por que este valor?"
+- [x] CA-7 comparando **três** fontes: o documento, `CatalogoDeParametros` e a tabela
+      `parametro`. Verificado por mutação — remover um parâmetro do catálogo do C# faz o teste
+      nomear o que falta
+- [x] Nenhum literal de negócio introduzido no código por esta spec
+- [x] Rastreabilidade do catálogo §16 atualizada
+- [x] `dotnet build -c Release` e `dotnet test` verdes — **95 testes** na entrega desta spec
+      (42 de domínio, 53 de integração); **125** depois da `SPEC-GER-005`
+
+> ### O padrão de vigência está pronto para ser reusado
+>
+> `preco_produto` (`RN-VEN-010`, onda 1) e `ficha_tecnica` (`RN-PRO-002`, onda 2) usam o mesmo
+> desenho: intervalo **semiaberto** `[inicio, fim)`, `fim` nulo na vigência aberta, e
+> `EXCLUDE USING gist` com `tstzrange`. Há teste provando as duas metades que costumam sair
+> erradas: que uma vigência começando **onde a outra termina** é aceita (senão o fechamento
+> encadeado não funciona), e que uma **sobreposta** é recusada mesmo por `INSERT` direto no
+> banco — o caminho por onde ela nasceria se a garantia fosse só no C#.
+>
+> **Defeito encontrado no harness, não no código.** A limpeza entre testes descobria as tabelas
+> no catálogo do PostgreSQL e truncava todas — inclusive `parametro`, que é dado de referência
+> semeado por migration. A partir do segundo teste o cadastro de restaurante falhava, e a causa
+> aparente era a migration. `AmbienteDeIntegracao.TabelasDeReferencia` agora declara o que não
+> se esvazia.

@@ -11,6 +11,16 @@
 > unidade para permitir expansão futura."* Duas análises independentes concluindo o mesmo é
 > o sinal mais forte disponível antes da entrevista.
 
+> ## ⚠⚠ Revisado pelo [ADR-0013](0013-acesso-de-plataforma.md) — 17/08/2026
+>
+> A invariante central deste ADR — **nenhuma consulta vê duas unidades** — passou a ter **uma
+> exceção**: o usuário de plataforma (`RN-GER-014`), para quem o filtro global é desligado.
+>
+> Leia este ADR sabendo disso. O que continua verdadeiro é o desenho para o usuário de
+> restaurante, que é 100% dos usuários de um cliente. O que deixou de ser verdadeiro é a
+> garantia absoluta: um defeito que marque `EhPlataforma` indevidamente agora vaza dado entre
+> clientes, e é o risco declarado no ADR-0013.
+
 ## Contexto
 
 O GrelhaHub é posicionado como sistema para "pequenos e médios restaurantes" — ou seja,

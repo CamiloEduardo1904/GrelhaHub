@@ -14,6 +14,15 @@ public interface IAppDbContext
 {
     DbSet<Unidade> Unidades { get; }
     DbSet<Usuario> Usuarios { get; }
+    DbSet<Parametro> Parametros { get; }
+    DbSet<Perfil> Perfis { get; }
+    DbSet<SessaoDeSuporte> SessoesDeSuporte { get; }
+    DbSet<LogAuditoria> Trilha { get; }
+    DbSet<Permissao> Permissoes { get; }
+    DbSet<Modulo> Modulos { get; }
+    DbSet<ModuloDependencia> DependenciasDeModulo { get; }
+    DbSet<UnidadeModulo> ModulosDaUnidade { get; }
+    DbSet<ParametroValor> ValoresDeParametro { get; }
     DbSet<Categoria> Categorias { get; }
     DbSet<Produto> Produtos { get; }
     DbSet<Cliente> Clientes { get; }

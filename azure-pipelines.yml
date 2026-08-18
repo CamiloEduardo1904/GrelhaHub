@@ -82,8 +82,27 @@ stages:
             workingDirectory: backend
             displayName: Build (Release)
 
-          # Os testes de integração sobem PostgreSQL via Testcontainers — o agente
-          # hospedado do Azure já tem Docker disponível (ADR-0009).
+          # Os testes de integração sobem PostgreSQL via Testcontainers (ADR-0009).
+          #
+          # O agente e SELF-HOSTED na VPS, roda como usuario `azagent` e esta no grupo
+          # `docker` — a mesma permissao que o build de imagem ja usa. E o que faz o
+          # Testcontainers alcancar /var/run/docker.sock.
+          #
+          # Este passo existe para que a falta de Docker apareca como "Docker
+          # indisponivel" e nao como 16 testes falhando por timeout de conexao, que
+          # manda o proximo a investigar procurar defeito no lugar errado.
+          - script: |
+              if ! docker info > /dev/null 2>&1; then
+                echo "##vso[task.logissue type=error]Docker inacessivel para o usuario do agente. Os testes de integracao (ADR-0009) exigem o daemon. Confira se o usuario esta no grupo docker."
+                exit 1
+              fi
+
+              # Pre-baixa a imagem: no primeiro run da VPS o pull concorre com o
+              # timeout de partida do Testcontainers e o teste falha por infra, nao
+              # por regra. A versao casa com AmbienteDeIntegracao.
+              docker pull --quiet postgres:16-alpine
+            displayName: Verificar Docker para os testes de integração
+
           - script: dotnet test -c Release --no-build --logger trx --results-directory $(Agent.TempDirectory)/testes
             workingDirectory: backend
             displayName: Testes
@@ -241,7 +260,11 @@ stages:
 
                       # Limpeza restrita as NOSSAS imagens antigas. Um
                       # "docker image prune -f" sem filtro apagaria imagem
-                      # dangling de qualquer projeto que rode nesta VPS.
+                      # dangling de qualquer projeto que rode nesta VPS — e
+                      # tambem o postgres:16-alpine e o testcontainers/ryuk que
+                      # a etapa de testes usa, fazendo o proximo run baixar tudo
+                      # de novo e ficar sujeito a timeout de partida.
+                      # NAO troque o filtro por prune sem filtro.
                       docker image ls --format "{{.Repository}}:{{.Tag}}" \
                         | grep "grelhahub-" \
                         | grep -v ":$(imageTag)$" \
