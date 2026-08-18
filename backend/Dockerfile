@@ -36,6 +36,23 @@ ENV TZ=America/Sao_Paulo
 
 # Nunca rodar como root (ADR-0006).
 RUN useradd --uid 1001 --create-home --shell /usr/sbin/nologin grelhahub
+
+# ⚠ ADR-0015 — a raiz das imagens, criada AQUI e com dono 1001.
+#
+# Em produção este caminho é um VOLUME. Ao montar um volume vazio sobre um caminho
+# que existe na imagem, o Docker copia o conteúdo E o dono desse caminho; sobre um
+# caminho que NÃO existe, ele cria o ponto de montagem como root:root — e o
+# processo, que roda como 1001, não consegue criar a pasta da unidade dentro dele.
+#
+# O modo de falha é o pior possível: a API sobe, o healthcheck fica verde, o
+# cardápio responde, e só o primeiro upload de foto quebra — com 500 genérico,
+# porque UnauthorizedAccessException não é regra de negócio. Foi assim que apareceu
+# em produção em 18/08/2026.
+#
+# Volume que JÁ existe não é corrigido por esta linha: ele guarda o dono de quando
+# nasceu. Ver "Imagens não gravam" em infra/README.md.
+RUN mkdir -p /app/arquivos && chown 1001:1001 /app/arquivos
+
 USER 1001
 
 COPY --from=build --chown=1001:1001 /app/publish .

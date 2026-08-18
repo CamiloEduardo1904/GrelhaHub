@@ -227,6 +227,23 @@ stages:
                     failOnStdErr: false
                     inline: |
                       set -e
+
+                      # O `docker compose` escreve TODO o progresso no stderr —
+                      # "Pulling", "Pulled", "Container Created", "Healthy". A task
+                      # SSH marca cada linha de stderr como erro no log, e um deploy
+                      # que deu certo termina com uma dezena de erros vermelhos que
+                      # nao sao erros. Isso e pior que feio: quando aparecer um erro
+                      # DE VERDADE, ele vai estar no meio de dez falsos.
+                      #
+                      # `exec 2>&1` manda o stderr do script e de tudo que ele chama
+                      # para o stdout, de uma vez, e cobre os comandos que vierem
+                      # depois sem precisar lembrar do redirecionamento em cada um.
+                      #
+                      # Nao se perde deteccao de falha: o gate e o CODIGO DE SAIDA
+                      # com `set -e`, nunca o stderr — `failOnStdErr` esta false
+                      # exatamente porque stderr aqui e ruido, nao sinal.
+                      exec 2>&1
+
                       cd /opt/grelhahub
 
                       # IMAGE_TAG setado JA AQUI: sem isso o compose puxa a tag
@@ -259,6 +276,8 @@ stages:
                     failOnStdErr: false
                     inline: |
                       set -e
+                      exec 2>&1   # progresso do compose e stderr — ver step de migrations
+
                       cd /opt/grelhahub
                       export IMAGE_TAG=$(imageTag)
 
@@ -272,6 +291,8 @@ stages:
                     failOnStdErr: false
                     inline: |
                       set -e
+                      exec 2>&1   # progresso do compose e stderr — ver step de migrations
+
                       cd /opt/grelhahub
                       export IMAGE_TAG=$(imageTag)
 
@@ -302,6 +323,8 @@ stages:
                     runOptions: inline
                     failOnStdErr: false
                     inline: |
+                      exec 2>&1   # progresso do compose e stderr — ver step de migrations
+
                       cd /opt/grelhahub
 
                       # A API nao publica porta: o teste sai de dentro do nginx,

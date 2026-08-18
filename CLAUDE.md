@@ -40,7 +40,7 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 166 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 168 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 14 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
@@ -186,9 +186,9 @@ npm run lint && npm run build
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **166 regras catalogadas: 144 em `HIP`, 22 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **168 regras catalogadas: 146 em `HIP`, 22 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
-está entregue (`SPEC-VEN-003`).
+está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`): o usuário de plataforma cria, lista e inativa outro — o caminho que `RN-GER-016` previa e que só existia pela carga inicial.
 
 Restam **dois critérios abertos por dependência de onda**, ambos declarados na sua spec:
 `SPEC-GER-004` CA-4 (gerente vê custo → espera a ficha técnica, onda 2) e CA-6 (colaborador
@@ -197,7 +197,7 @@ inativo → espera o módulo RH, onda 10).
 **Existe uma fatia vertical funcionando** — `SPEC-VEN-001`, fora da ordem das ondas:
 cadastro de restaurante → cardápio público em `/c/:slug` → pedido → painel do restaurante.
 Backend, frontend, migration `Fundacao` e pipeline de deploy. 26 regras com código, e
-**48 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
+**50 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
 que não baixa estoque hoje não significa que a regra mudou**, significa que o estoque ainda
 não existe.
 
@@ -206,7 +206,7 @@ não existe.
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **240 testes** — 65 de domínio + 7 de aplicação + 168 de integração |
+| `dotnet test -c Release` | ✔ **248 testes** — 65 de domínio + 7 de aplicação + 176 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

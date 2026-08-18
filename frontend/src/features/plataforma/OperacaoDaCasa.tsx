@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { CampoDeData } from '../../components/CampoDeData';
 import { Grelha } from '../../components/Grelha';
+import { diasAtras, hojeIso } from '../../services/datas';
 import { Selo } from '../../components/Selo';
 import { api, mensagemDeErro, moeda } from '../../services/api';
 import { faseDe, ROTULO_STATUS } from '../../services/ciclo';
@@ -36,20 +38,23 @@ const FASES = [
 
 type Fase = (typeof FASES)[number]['chave'];
 
-/** `AAAA-MM-DD` de hoje, para o valor inicial do campo. */
-function hoje(): string {
-  const agora = new Date();
-
-  return [
-    agora.getFullYear(),
-    String(agora.getMonth() + 1).padStart(2, '0'),
-    String(agora.getDate()).padStart(2, '0'),
-  ].join('-');
-}
+/**
+ * Os atalhos de período — **em dias operacionais**, como todo o resto desta tela.
+ *
+ * "7 dias" é `hoje - 6` até hoje, e não `hoje - 7`: sete dias operacionais **contando o de hoje**,
+ * que é como o dono da casa conta a semana. Começar em `-7` devolveria oito dias e o número não
+ * bateria com o que ele diz em voz alta.
+ */
+const ATALHOS = [
+  { chave: 'hoje', nome: 'Hoje', calcular: () => [hojeIso(), hojeIso()] as const },
+  { chave: 'ontem', nome: 'Ontem', calcular: () => [diasAtras(1), diasAtras(1)] as const },
+  { chave: '7', nome: '7 dias', calcular: () => [diasAtras(6), hojeIso()] as const },
+  { chave: '30', nome: '30 dias', calcular: () => [diasAtras(29), hojeIso()] as const },
+] as const;
 
 export function OperacaoDaCasa({ casa }: { casa: Estabelecimento }) {
-  const [de, setDe] = useState(hoje);
-  const [ate, setAte] = useState(hoje);
+  const [de, setDe] = useState(hojeIso);
+  const [ate, setAte] = useState(hojeIso);
   const [fase, setFase] = useState<Fase>('todas');
 
   const [pedidos, setPedidos] = useState<PedidoResumo[]>([]);
@@ -85,15 +90,34 @@ export function OperacaoDaCasa({ casa }: { casa: Estabelecimento }) {
   return (
     <div className="operacao">
       <div className="operacao-filtros">
-        <label>
-          Do dia operacional
-          <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
-        </label>
+        <CampoDeData rotulo="Do dia operacional" valor={de} aoMudar={setDe} />
+        <CampoDeData rotulo="Até" valor={ate} aoMudar={setAte} />
 
-        <label>
-          Até
-          <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
-        </label>
+        {/* Os intervalos que a operação pede de verdade. É o que torna a digitação um caminho de
+            exceção, e não o caminho principal — e é por isso que o campo não precisa de
+            calendário. CHAPA-02: uma barra âmbar no grupo, o atalho em vigor. */}
+        <nav className="chips atalhos-de-data" aria-label="Períodos">
+          {ATALHOS.map(({ chave, nome, calcular }) => {
+            const [inicio, fim] = calcular();
+            const vigente = de === inicio && ate === fim;
+
+            return (
+              <button
+                key={chave}
+                type="button"
+                className="chip"
+                aria-pressed={vigente}
+                onClick={() => {
+                  setDe(inicio);
+                  setAte(fim);
+                }}
+              >
+                <Grelha etapa={vigente ? 0 : -1} de={1} />
+                {nome}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* RN-GER-006 — dito por extenso, porque é o que faz o número desta tela bater com o do

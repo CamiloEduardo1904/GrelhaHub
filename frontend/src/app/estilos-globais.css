@@ -1787,3 +1787,38 @@ button.link-discreto {
 .dialogo-acoes .btn:last-child {
   flex: 1;
 }
+
+/* ============================================================================
+   CAMPO DE DATA — docs/08-design-system.md §3
+   ============================================================================
+
+   Substitui `<input type="date">`, cujo popover não aceita estilo nenhum: ele
+   chega azul, arredondado e com a tipografia do navegador, dentro de uma
+   interface que recusa exatamente isso (ADR-0012). O que entra é digitação
+   `DD/MM/AAAA` em mono, mais os atalhos de período ao lado. */
+
+.campo-data input {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* O contorno de erro é o mesmo traço, na cor de erro: sem sombra vermelha, sem
+   fundo pastel — CHAPA-05. */
+.campo-data input[aria-invalid='true'] {
+  border-color: var(--erro);
+}
+
+.campo-data .ajuda,
+.campo-data .erro {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+
+/* Os atalhos ficam na LINHA dos campos, e alinhados pela base: eles são a via
+   principal de escolha de período, não um apêndice abaixo do formulário. */
+.atalhos-de-data {
+  align-self: end;
+  padding-bottom: 0.15rem;
+}

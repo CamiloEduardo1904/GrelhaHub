@@ -191,9 +191,21 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     /// dizendo o que está fazendo, e um <c>grep</c> por <c>CriarDePlataforma</c> lista todos os
     /// pontos onde a marca nasce.
     /// </para>
+    /// <para>
+    /// <paramref name="deveTrocarSenha"/> separa os <b>dois</b> caminhos de <c>RN-GER-016</c>, e a
+    /// diferença não é de gosto:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><b>Carga inicial</b> (<c>false</c>) — a senha vem do <c>.env</c> do servidor. Não há
+    /// "outra pessoa" a quem ela foi entregue: quem tem acesso ao arquivo é o dono da conta.
+    /// Exigir troca aqui pediria a troca a ninguém.</item>
+    /// <item><b>Criado por outro usuário de plataforma</b> (<c>true</c>) — <c>RF-SEG-005</c>: são
+    /// duas pessoas, e enquanto a senha inicial valer o dono da conta não é o único que entra.</item>
+    /// </list>
     /// </summary>
-    public static Usuario CriarDePlataforma(string nome, string email, string senhaHash) =>
-        new(nome, email, senhaHash) { EhPlataforma = true, DeveTrocarSenha = false };
+    public static Usuario CriarDePlataforma(
+        string nome, string email, string senhaHash, bool deveTrocarSenha = false) =>
+        new(nome, email, senhaHash) { EhPlataforma = true, DeveTrocarSenha = deveTrocarSenha };
 
     /// <summary><c>RN-GER-002</c> — não se exclui; inativa-se.</summary>
     public void Inativar() => Ativo = false;

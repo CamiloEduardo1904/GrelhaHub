@@ -87,6 +87,47 @@ public sealed class PlataformaController(ISender sender) : ControllerBase
     [HttpGet("modulos")]
     public async Task<ActionResult<IReadOnlyList<ModuloDoCatalogoDto>>> Catalogo(CancellationToken ct) =>
         Ok(await sender.Send(new ListarCatalogoDeModulosQuery(), ct));
+
+    /// <summary>
+    /// <c>RN-GER-030</c> — os usuários de plataforma, os colegas de suporte.
+    /// <para>
+    /// Rota separada de <c>/api/v1/usuarios</c>, que lista <b>usuário de restaurante</b> e filtra
+    /// <c>EhPlataforma</c> fora (<c>RN-GER-016</c>). São duas populações sem interseção: uma tem
+    /// unidade, perfil e CPF; a outra não tem nenhum dos três.
+    /// </para>
+    /// </summary>
+    [HttpGet("usuarios")]
+    public async Task<ActionResult<IReadOnlyList<UsuarioDeSuporteDto>>> ListarUsuariosDeSuporte(
+        CancellationToken ct) =>
+        Ok(await sender.Send(new ListarUsuariosDeSuporteQuery(), ct));
+
+    /// <summary>
+    /// <c>RN-GER-030</c> — cria outro usuário de plataforma.
+    /// <para>
+    /// Sem unidade e sem perfil no corpo, e a ausência é o ponto: quem opera o produto não pertence
+    /// a restaurante nenhum (<c>RN-GER-014</c>). Nasce com troca de senha obrigatória
+    /// (<c>RF-SEG-005</c>) e <b>não</b> exige sessão de suporte aberta (<c>RN-GER-015</c>) — não há
+    /// dado de cliente sendo tocado, nem unidade para a qual abrir a sessão.
+    /// </para>
+    /// </summary>
+    [HttpPost("usuarios")]
+    public async Task<ActionResult<UsuarioDeSuporteDto>> CriarUsuarioDeSuporte(
+        CriarUsuarioDeSuporteCommand comando, CancellationToken ct) =>
+        Ok(await sender.Send(comando, ct));
+
+    /// <summary>
+    /// <c>RN-GER-031</c> ⚠ — inativa ou reativa um usuário de plataforma. Nunca exclui
+    /// (<c>RN-GER-002</c>), nunca a si mesmo, e nunca o último ativo.
+    /// </summary>
+    [HttpPost("usuarios/{usuarioId:guid}/situacao")]
+    public async Task<ActionResult<UsuarioDeSuporteDto>> AlternarSituacaoDoUsuarioDeSuporte(
+        Guid usuarioId, SituacaoDoUsuarioCorpo corpo, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(corpo);
+
+        return Ok(await sender.Send(
+            new AlternarSituacaoDoUsuarioDeSuporteCommand(usuarioId, corpo.Ativo), ct));
+    }
 }
 
 // ⚠ NÃO existe rota de alterar módulo aqui, e a ausência é correção de um defeito meu:
@@ -104,6 +145,17 @@ public sealed record AlterarEstabelecimentoCorpo(
 }
 
 public sealed record SituacaoCorpo(bool Ativa, string Justificativa);
+
+/// <summary>
+/// O corpo sem o usuário, que vem da rota — <c>RN-GER-031</c>.
+/// <para>
+/// <b>Sem justificativa</b>, ao contrário de <see cref="SituacaoCorpo"/>: ali se encerra o contrato
+/// de um cliente, e o motivo é o que a trilha precisa guardar. Aqui é a equipe da plataforma
+/// administrando a si mesma — a autoria na trilha (<c>SPEC-GER-005</c>) já responde quem desligou
+/// quem. Pedir justificativa sem uso seria campo de formulário fingindo controle.
+/// </para>
+/// </summary>
+public sealed record SituacaoDoUsuarioCorpo(bool Ativo);
 
 /// <summary>O corpo sem a unidade, que vem da rota.</summary>
 public sealed record CriarUsuarioDePlataformaCorpo(

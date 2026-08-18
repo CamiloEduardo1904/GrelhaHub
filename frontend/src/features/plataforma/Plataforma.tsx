@@ -4,6 +4,7 @@ import { Grelha } from '../../components/Grelha';
 import { encerrarSessao, lerSessao } from '../admin/sessao';
 import { Estabelecimentos } from './Estabelecimentos';
 import { UsuariosDaPlataforma } from './UsuariosDaPlataforma';
+import { EquipeDaPlataforma } from './EquipeDaPlataforma';
 
 /**
  * A administração da plataforma — `RN-GER-014`, ADR-0013, ADR-0014.
@@ -21,6 +22,10 @@ import { UsuariosDaPlataforma } from './UsuariosDaPlataforma';
 const ABAS = [
   { chave: 'estabelecimentos', nome: 'Estabelecimentos' },
   { chave: 'usuarios', nome: 'Usuários' },
+
+  // RN-GER-030 — a equipe da plataforma. Aba separada de "Usuários" porque são duas populações
+  // sem interseção: lá tem unidade, perfil e CPF; aqui não tem nenhum dos três.
+  { chave: 'equipe', nome: 'Equipe' },
 ] as const;
 
 type Aba = (typeof ABAS)[number]['chave'];
@@ -82,6 +87,7 @@ export function Plataforma() {
       <main className="conteudo">
         {aba === 'estabelecimentos' && <Estabelecimentos />}
         {aba === 'usuarios' && <UsuariosDaPlataforma />}
+        {aba === 'equipe' && <EquipeDaPlataforma />}
       </main>
     </div>
   );

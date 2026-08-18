@@ -4,7 +4,7 @@
 |-------|-------|
 | Versão | **2.1** |
 | Data | Agosto/2026 |
-| Situação | Em validação — **166 regras**: 144 em hipótese, 22 decididas pelo time |
+| Situação | Em validação — **168 regras**: 146 em hipótese, 22 decididas pelo time |
 | Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + 10 regras descobertas na implementação (`IMP`) + 22 decisões de produto do time (`DEC`) |
 | Auditoria do cruzamento | [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md) |
 | Papel no projeto | **Fonte de verdade.** Toda spec de implementação transcreve regras daqui. Nenhuma regra de negócio nasce no código |
@@ -51,7 +51,7 @@
 
 ## 1. Estado do catálogo
 
-Das 166 regras, **144 estão em estado de hipótese** — 134 herdadas das fontes e 10 descobertas
+Das 168 regras, **146 estão em estado de hipótese** — 134 herdadas das fontes e 12 descobertas
 durante a implementação (origem `IMP`) — e as outras 19 são decisões de produto, estado `DEC`.
 As herdadas foram derivadas do
 conhecimento do domínio (operação de hamburgueria) e da estrutura dos dez módulos de ERP
@@ -181,7 +181,7 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 
 | Módulo | Regras | Prioridade de validação | Escopo predominante |
 |--------|-------:|-------------------------|---------------------|
-| **GER** — Gerais e transversais | 29 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
+| **GER** — Gerais e transversais | 31 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
 | **VEN** — Vendas e Comercial | 46 | **MÁXIMA** | Núcleo |
 | **PRO** — Produção | 13 | **MÁXIMA** | Núcleo |
 | **EST** — Estoque | 23 | **MÁXIMA** | Núcleo |
@@ -191,7 +191,7 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 | **LOG** — Logística e Frota | 9 | MÉDIA | Núcleo |
 | **RH** — Recursos Humanos | 6 | BAIXA | Modelo |
 | **FIS** — Fiscal | 6 | BAIXA | **Fase 2 — por último** |
-| **Total** | **166** | | |
+| **Total** | **168** | | |
 
 > **Ordem de ataque decidida (17/08/2026).** O módulo **FIS** fica **por último**: é o único
 > cujo valor depende de homologação externa (SEFAZ, certificado digital), e nada nos outros
@@ -236,6 +236,8 @@ Os três módulos de prioridade máxima — **Vendas, Produção e Estoque** —
 | RN-GER-014 `DEC` ⚠⚠ | Existe um **usuário de plataforma** (suporte do GrelhaHub) que **não pertence a nenhuma unidade** e **enxerga todas**. Para ele, e só para ele, o recorte por unidade de `RN-GER-009` não se aplica — é o que permite suporte e relatório agregado entre restaurantes. Ele não é usuário do restaurante: é de quem opera o produto. | F R | `usuario`, `unidade` | APP | **DEC** | N |
 | RN-GER-015 `DEC` ⚠ | **Toda leitura** feita por usuário de plataforma sobre dado de unidade é registrada, com usuário, instante e operação. **Toda escrita** exige, além do registro, uma **sessão de suporte aberta com motivo**. Ler para diagnosticar é rotina de suporte; alterar o dado de um cliente sem dizer por quê, não. | R A | `sessao_suporte`, `log_auditoria`, `usuario` | APP MOD NN | **DEC** | N |
 | RN-GER-016 `DEC` | Usuário de plataforma é criado **apenas** por outro usuário de plataforma ou pela carga inicial. O administrador do restaurante não pode criá-lo, alterá-lo, nem vê-lo em listagem alguma. | R | `usuario` | APP VW | **DEC** | N |
+| RN-GER-030 `IMP` | **A plataforma administra os seus próprios usuários.** Um usuário de plataforma **cria outro** (é o caminho que `RN-GER-016` já prevê e que não existia) e **vê a lista** deles — sem a lista, o usuário criado desapareceria da tela, porque `RN-GER-016` o esconde de toda listagem de restaurante. O criado nasce **sem unidade, sem perfil e sem CPF** (`RN-GER-014`, `RN-GER-023`) e com **troca de senha obrigatória no primeiro acesso** (`RF-SEG-005`): a senha inicial foi escolhida por outra pessoa. **Não exige sessão de suporte** (`RN-GER-015`) — nenhum dado de cliente é tocado, e a sessão é aberta *para uma unidade*: exigi-la aqui não tornaria a operação mais controlada, tornaria-a impossível de executar. Mesma linha comercial × suporte de `RN-GER-029`. | F R | `usuario` | APP | HIP | N |
+| RN-GER-031 `IMP` ⚠ | **A instalação nunca fica sem acesso de suporte.** Usuário de plataforma é **inativado**, nunca excluído (`RN-GER-002`), por outro usuário de plataforma; **ninguém inativa a si mesmo**, e o sistema **recusa inativar o último** usuário de plataforma ativo. Reativar devolve o acesso sem restaurar nada, porque nada foi removido. Sem esta regra um clique deixaria o produto sem suporte **e sem caminho de volta**: o acesso de plataforma não se recria pela interface — só pela carga inicial, que por sua vez não sobrescreve usuário existente (`RN-GER-016`). ⚠ *Não é hipótese distante: em 17/08/2026 esta instalação passou a existir sem nenhum usuário de plataforma, por variável de ambiente não repassada, e a recuperação exigiu acesso ao servidor.* | R | `usuario` | APP | HIP | N |
 
 ### Modularidade comercial
 
@@ -661,6 +663,7 @@ implementada; uma spec sem regra é comportamento não autorizado.
 | `RN-VEN-035` `DEC` | *(onda 4 — lançar item)* | A escrever | — |
 | `RN-EST-021` a `023` `IMP` ⚠⚠ | *(onda 3 — estoque)* | **Regra escrita, código não** — o gatilho da baixa existe no catálogo; a implementação espera o módulo EST | — |
 | `RN-GER-014` `DEC` ⚠⚠ · `RN-GER-016` | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | **Entregue** — plataforma vê todas as unidades (ADR-0013) e é invisível ao restaurante | `AcessoTests` ✔ CA-9 — **e que o usuário comum continua isolado**; `UsuariosESuporteTests` ✔ CA-11 |
+| `RN-GER-030` `IMP` · `RN-GER-031` `IMP` ⚠ | [SPEC-GER-007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) | **Entregue** — a plataforma cria, lista e inativa usuário de plataforma; o último ativo não pode ser inativado | `UsuariosDePlataformaTests` ✔ CA-13 a CA-18 |
 | `RN-GER-015` `DEC` ⚠ | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) · [005](specs/SPEC-GER-005-trilha-de-auditoria.md) | **Entregue** — `sessao_suporte` com motivo, escrita de plataforma bloqueada sem ela, e cada operação do usuário de plataforma agora fica na trilha com o seu `usuario_id` | `UsuariosESuporteTests` ✔ CA-10; `AuditoriaTests` ✔ CA-1 |
 | `RN-GER-017` a `021` `DEC` | [SPEC-GER-006](specs/SPEC-GER-006-modulos-por-unidade.md) · [007](specs/SPEC-GER-007-pessoas-e-delegacao-de-acesso.md) | **Entregue** — módulo por unidade, com vigência e dependências. `RN-GER-020` é imposta nos **dois** caminhos (alterar e criar) por `FechoDeDependencia`, com fecho **transitivo** | `ModulosTests` ✔ 7 casos; `DependenciaDeModulosTests` ✔ 9; `FechoDeDependenciaTests` ✔ 7 de contrato |
 | `RN-GER-022` `DEC` | [SPEC-GER-004](specs/SPEC-GER-004-usuarios-perfis-e-permissoes.md) | **Entregue** — perfil Operador semeado; conjunto de permissões **provisório** | `AcessoTests` ✔ perfis conferidos contra o catálogo |
@@ -804,6 +807,8 @@ esta tabela é o índice inverso. Ver [`06-guia-de-specs.md`](06-guia-de-specs.m
 | **2.0** | **17/08/2026** | **Cadastro do cardápio — e duas regras que já estavam no banco sem estar no catálogo.** `RN-VEN-043` (categoria: nome único na unidade, ordem de exibição, e **categoria inativa esconde os produtos sem inativá-los**), `RN-VEN-044` ⚠ (produto: nome único, preço positivo, e a distinção entre **`ativo`** — cadastral, o produto saiu — e **`disponível`** — do turno, "acabou hoje"; confundir os dois é o erro previsível), `RN-VEN-045` (categoria e produto **não** são excluídos: `RN-GER-002` fala de registro transacional, e cadastro é outra coisa). ⚠ **`uq_categoria_nome`, `uq_produto_nome` e `ck_produto_preco` existiam desde a migration `Fundacao`** sem regra que os enunciasse — o inverso do defeito habitual, e igualmente grave: ninguém sabia se era decisão ou acidente, e a entrevista não tinha o que validar. Total: **165 regras** |
 
 | **2.1** | **17/08/2026** | **Teto de produtos por categoria.** `RN-VEN-046` (`IMP`) — no máximo **`PAR-VEN-004`** produtos **ativos** por categoria, 50 por padrão, ajustável por unidade pela tabela `parametro_valor`. Pedida pelo dono do produto como "flag de 50 por categoria, ajustável via banco": virou **parâmetro** e não coluna, porque é valor configurável da operação e `parametro_valor` já entrega vigência, recorte por unidade e trilha (`SPEC-GER-003`) — coluna nova daria só o número. ⚠ **Conta apenas os ativos**: `RN-VEN-045` proíbe exclusão, então contar o histórico entupiria a categoria para sempre. Total: **166 regras** |
+
+| **2.2** | **18/08/2026** | **A plataforma passa a administrar os seus próprios usuários** — e a regra nasceu de uma falha de operação, não de um pedido de tela. `RN-GER-016` já dizia que usuário de plataforma é criado "por outro usuário de plataforma ou pela carga inicial", e **só a carga inicial existia**: quando esta instalação subiu sem nenhum usuário de plataforma — variável de ambiente não repassada pelo compose —, não havia caminho pela interface, e a recuperação exigiu acesso ao servidor. **RN-GER-030** (`IMP`) — criar e listar usuário de plataforma, sem unidade, sem perfil e sem CPF, com troca de senha obrigatória; **sem** sessão de suporte, pela mesma linha comercial × suporte de `RN-GER-029` (a sessão é aberta *para uma unidade*, e aqui não há unidade nenhuma). **RN-GER-031** (`IMP`) ⚠ — inativação por outro usuário de plataforma, nunca de si mesmo, e **recusa de inativar o último ativo**: sem isso um clique reproduziria de propósito o estado que custou um dia de diagnóstico. Total: **168 regras** |
 
 ### Regras revogadas na consolidação
 

@@ -66,6 +66,7 @@ por isso que a interface existe.
 | **O backup deixa de ser só o banco** | `pg_dump` sozinho passa a não ser backup completo. O volume precisa entrar na rotina, e isso está declarado no `infra/README.md` |
 | **Estado no disco da máquina** | O contêiner deixa de ser descartável de verdade. Recriar o contêiner é seguro; recriar a **VPS** exige restaurar o volume |
 | **Sem redimensionamento** | Guardamos o que o restaurante enviou, até 5 MB. Uma foto de 4 MB é baixada inteira pelo cliente no celular. Miniatura fica para quando doer — e vai doer antes do que parece |
+| **Permissão do volume vira problema de deploy** ⚠ | O contêiner roda como UID 1001 (ADR-0006) e o Docker cria ponto de montagem como `root:root` quando o caminho não existe na imagem. Aconteceu em 18/08/2026: API no ar, cardápio servindo, e **só o upload** quebrando com 500 genérico. Duas correções entraram — o `Dockerfile` cria `/app/arquivos` com dono 1001, e `GarantirEscritaDeArquivos` **recusa a partida** com a raiz sem escrita. Volume que já existe guarda o dono antigo: ver "Imagens não gravam" em `infra/README.md` |
 
 ### Onde a segurança fica
 

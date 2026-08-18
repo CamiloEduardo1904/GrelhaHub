@@ -124,6 +124,37 @@ o semeador nunca sobrescreve senha de usuário existente, senão quem tivesse um
 `.env` teria uma porta. Se a senha do suporte se perder, isso é uma decisão a registrar no catálogo
 antes de virar código — não um `UPDATE` no banco.
 
+## Imagens não gravam — 500 no upload
+
+**Sintoma:** a API está no ar, o cardápio responde, e o envio de foto devolve
+`{"status": 500, "detail": "Não foi possível concluir a operação."}`. Nada na tela diz o motivo,
+porque `UnauthorizedAccessException` não é regra de negócio — cai no 500 genérico.
+
+**Causa:** o container roda como **UID 1001** (ADR-0006, nunca root) e o volume `arquivos` nasceu
+`root:root`. Docker cria o ponto de montagem como root quando o caminho **não existe na imagem**, e
+até 18/08/2026 a imagem não criava `/app/arquivos`. O processo consegue ler, e não consegue criar a
+pasta da unidade para escrever dentro.
+
+**Correção, uma vez, sem parar a pilha:**
+
+```bash
+docker run --rm -v grelhahub_arquivos:/d alpine chown -R 1001:1001 /d
+docker compose up -d api
+```
+
+Instalação nova não precisa disto: o `Dockerfile` passou a criar `/app/arquivos` com dono 1001, e o
+Docker copia o dono do caminho da imagem quando monta um volume **vazio** sobre ele. Volume que já
+existe guarda o dono de quando nasceu — daí o comando acima.
+
+> ⚠ **A partir da mesma data a API RECUSA A PARTIDA com a raiz de arquivos sem escrita**
+> (`GarantirEscritaDeArquivos`), e a mensagem traz o comando. É deliberado, e tem um custo que
+> precisa ser dito: **um deploy nesse estado deixa a API fora do ar** em vez de subir quebrada. A
+> alternativa era a que já vivemos — deploy verde, healthcheck verde, e o defeito esperando o
+> primeiro usuário que tentasse enviar uma foto.
+>
+> A sonda **escreve e apaga** um arquivo. Conferir se o diretório existe não pegaria nada: ele
+> existia, montado, e sem permissão para quem precisava escrever.
+
 ## Backup — RNF-017
 
 > ⚠⚠ **`pg_dump` sozinho DEIXOU de ser backup completo.** Desde a `SPEC-VEN-002` (ADR-0015) as

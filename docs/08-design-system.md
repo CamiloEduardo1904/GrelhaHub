@@ -251,6 +251,31 @@ O status. Borda de 2 px, fundo cheio, mono em caixa alta com `letter-spacing`.
 | Entregue, Finalizado | `--ok` sobre branco |
 | Cancelado | `--erro` sobre branco |
 
+### `<CampoDeData />`
+
+Data digitada em `DD/MM/AAAA`, mono com `tabular-nums`. Entra e sai em **ISO** (`AAAA-MM-DD`),
+que é o que a API recebe; a tradução vive no componente.
+
+**Substitui `<input type="date">`** pelo mesmo motivo que `<Dialogo />` substituiu `confirm()`: o
+popover nativo **não aceita estilo**. Ele chega com azul de sistema, cantos arredondados,
+tipografia do navegador e um ícone que não é nosso — dentro de uma interface que recusa gradiente,
+raio de desfoque e cor pastel. Nenhuma regra de CSS alcança aquele calendário:
+`::-webkit-calendar-picker-indicator` troca o ícone e para por aí.
+
+> **E não trocamos por um calendário artesanal.** Calendário próprio é um mês de teclado, foco e
+> leitor de tela para resolver o que, nas telas que temos, é escolher um intervalo de dia
+> operacional. Os intervalos que a operação pede de verdade vivem nos **atalhos** ao lado do campo
+> — `Hoje`, `Ontem`, `7 dias`, `30 dias` —, e é o que torna a digitação o caminho de exceção. Se
+> aparecer tela que precise navegar meses, o calendário entra **dentro deste componente** e
+> nenhuma chamada muda.
+
+| Detalhe | Como |
+|---------|------|
+| Erro | Borda em `--erro`, sem sombra colorida nem fundo pastel (`CHAPA-05`) |
+| Data que não existe | `31/02` é recusado por **ida e volta** no `Date`, não por faixa de dia |
+| Incompleto | Não é erro enquanto se digita; vira erro ao sair do campo |
+| Atalhos | `.chips` com uma barra âmbar no ativo (`CHAPA-02`) |
+
 ---
 
 ## 4. As onze regras — checklist de revisão de código

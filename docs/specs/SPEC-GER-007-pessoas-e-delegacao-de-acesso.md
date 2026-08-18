@@ -38,6 +38,8 @@ tela para criar os outros. Esta spec entrega:
 | `RN-GER-025` | Gerente administra os usuários da própria unidade | Aplicação | `usuario.gerenciar` no perfil Gerente |
 | `RN-GER-013` | Documento sem máscara | Aplicação | Só dígitos entram no banco; a máscara é da tela |
 | `RN-GER-010` | Permissão granular | Aplicação | `[ExigePermissao]` |
+| `RN-GER-030` | A plataforma cria e lista os seus próprios usuários, sem unidade e sem perfil | Aplicação | `CriarUsuarioDeSuporteCommand` + isenção declarada no `SessaoDeSuporteBehavior` |
+| `RN-GER-031` ⚠ | Não se inativa a si mesmo nem o último acesso de plataforma ativo | Aplicação | Contagem na mesma transação da escrita |
 
 ## 3. Contrato
 
@@ -160,6 +162,68 @@ Continua valendo o que a `SPEC-GER-004` decidiu: usuário criado **por** alguém
 `deveTrocarSenha = true`, porque a senha inicial é conhecida por quem não vai usá-la. O admin
 fundador, que escolheu a própria senha no cadastro, nasce com `false`.
 
+### A equipe da plataforma — `RN-GER-030`, `RN-GER-031`
+
+`RN-GER-016` sempre disse que usuário de plataforma é criado "por outro usuário de plataforma
+**ou** pela carga inicial". **Só a carga inicial existia.** A lacuna apareceu do pior jeito
+possível: a instalação de produção subiu sem nenhum usuário de plataforma — as variáveis
+`Plataforma__*` não eram repassadas pelo `docker-compose.yml` —, e não havia porta na interface.
+A recuperação exigiu acesso ao servidor.
+
+| Rota | O que faz |
+|------|-----------|
+| `GET /api/v1/plataforma/usuarios` | Lista os usuários de plataforma |
+| `POST /api/v1/plataforma/usuarios` | Cria outro — `nome`, `email`, `senhaInicial` |
+| `POST /api/v1/plataforma/usuarios/{id}/situacao` | Inativa ou reativa |
+
+**Três campos, e as ausências são o conteúdo da regra.** Sem `unidadeId` porque ele não pertence a
+restaurante nenhum (`RN-GER-014`); sem `perfilNome` porque perfil é de unidade (`RN-GER-010`); sem
+`cpf` pela exceção que `RN-GER-023` já declarava. O usuário nasce com `deveTrocarSenha = true`
+(`RF-SEG-005`) — são duas pessoas conhecendo a senha, o que não acontece na carga inicial, em que a
+senha vem do `.env` e não foi entregue a ninguém.
+
+#### Por que **não** exige sessão de suporte
+
+`RN-GER-015` obriga sessão aberta com motivo antes de qualquer escrita de plataforma, e a isenção
+aqui segue a linha divisória que o `SessaoDeSuporteBehavior` já documenta — **comercial × suporte**,
+com o teste sendo "há dado de cliente sendo tocado?". Aqui não há cliente algum. E há um argumento
+que fecha a questão: a sessão é aberta **para uma unidade**. Exigi-la obrigaria a escolher um
+restaurante ao acaso e registrar um motivo de suporte falso na conta dele — menos rastreável, não
+mais. A autoria continua na trilha (`SPEC-GER-005`).
+
+#### ⚠ O deadlock que a troca de senha obrigatória criava
+
+Ao pôr `deveTrocarSenha = true` no usuário novo, a conta nasceria **inutilizável**:
+
+1. `TrocaDeSenhaBehavior` libera **uma** operação com a troca pendente: `TrocarSenhaCommand`
+2. `SessaoDeSuporteBehavior` exigia sessão de suporte para **todo** `Command` de plataforma — e
+   `TrocarSenhaCommand` é um deles
+3. Abrir a sessão exige `AbrirSessaoDeSuporteCommand`, que a troca pendente bloqueia
+
+Círculo fechado, sem nenhuma operação possível e sem mensagem que o explicasse. `TrocarSenhaCommand`
+entrou na lista de isenções: trocar a **própria** senha não é escrita sobre dado de unidade.
+
+> Era **latente** antes desta spec — nenhum caminho criava usuário de plataforma com a troca
+> pendente. Virou alcançável no mesmo commit que abriu a porta, e é o quinto caso da série "regra
+> que recusa a operação sem dizer para onde ir".
+
+#### O último acesso — `RN-GER-031`
+
+Duas recusas, e a segunda não é redundante:
+
+| Caso | Por quê |
+|------|---------|
+| Inativar a si mesmo | Perde a sessão no request seguinte e não tem como desfazer sozinho |
+| Inativar o **último ativo** | Não há desfazer por caminho nenhum: a interface não recria acesso de plataforma, e a carga inicial **não sobrescreve** usuário existente |
+
+⚠ O segundo caso é alcançável de verdade, e o teste percorre o caminho real: `Ativo` é conferido no
+**login** (`RN-RH-006`) e em requisição nenhuma depois — o token de quem acabou de ser inativado
+continua valendo até expirar. Com ele, o inativado desligaria o único ativo que restou.
+
+A contagem é feita **no banco, na mesma transação** da escrita. Contar antes e decidir depois é uma
+corrida entre dois usuários de plataforma se inativando no mesmo instante, com as duas operações
+"bem-sucedidas" e zero acessos de suporte no fim.
+
 ## 5. Critérios de aceite
 
 ### CA-1 — CPF inválido é recusado (`RN-GER-023`)
@@ -235,6 +299,63 @@ fundador, que escolheu a própria senha no cadastro, nasce com `false`.
 > **Então** existe registro de criação com o autor, e **sem o hash de senha** (`SPEC-GER-005`
 > CA-6).
 
+### CA-13 — Plataforma cria outro usuário de plataforma (`RN-GER-030`)
+
+> **Dado** um usuário de plataforma autenticado,
+> **Quando** ele criar um acesso com nome, e-mail e senha inicial,
+> **Então** o usuário nasce **sem unidade e sem perfil**, autentica com `ehPlataforma`, e chega com
+> a troca de senha **pendente** (`RF-SEG-005`).
+
+### CA-14 — Criar não exige sessão de suporte; alterar cliente continua exigindo (`RN-GER-030`)
+
+> **Dado** nenhuma sessão de suporte aberta,
+> **Quando** a plataforma criar um usuário de plataforma **e** tentar alterar o cadastro de um
+> estabelecimento,
+> **Então** a criação passa e a alteração é recusada com **403**.
+
+*É o par que importa: sozinha, a criação bem-sucedida não distingue "isenção declarada" de "gate
+desligado por acidente".*
+
+### CA-15 — Visível para a plataforma, invisível para o restaurante (`RN-GER-030`, `RN-GER-016`)
+
+> **Dado** um usuário de plataforma recém-criado,
+> **Quando** a plataforma listar `/plataforma/usuarios` e o restaurante listar `/usuarios`,
+> **Então** ele aparece na primeira e **não** aparece na segunda.
+
+### CA-16 — Ninguém inativa o próprio acesso (`RN-GER-031`)
+
+> **Dado** o usuário de plataforma autenticado,
+> **Quando** ele tentar inativar a si mesmo,
+> **Então** a operação é recusada com **422** e ele continua ativo.
+
+### CA-17 — O último acesso ativo não pode ser inativado (`RN-GER-031`) ⚠
+
+> **Dado** dois usuários de plataforma, um deles já inativado — **com o token ainda válido**, porque
+> `Ativo` só é conferido no login,
+> **Quando** o inativado tentar inativar o único que restou ativo,
+> **Então** a operação é recusada com **422** e a instalação continua com um acesso de suporte.
+
+### CA-17b — Inativar não apaga (`RN-GER-031`, `RN-GER-002`)
+
+> **Dado** um usuário de plataforma inativado, que já não autentica,
+> **Quando** ele for reativado,
+> **Então** ele autentica de novo com a mesma senha — nada foi restaurado porque nada foi removido.
+
+### CA-18 — O usuário novo consegue trocar a senha (`RF-SEG-005`) ⚠
+
+> **Dado** um usuário de plataforma recém-criado, com a troca pendente,
+> **Quando** ele trocar a própria senha e reautenticar,
+> **Então** a operação responde **204** e o token novo opera normalmente.
+
+*Sem a isenção de `TrocarSenhaCommand` no `SessaoDeSuporteBehavior`, este caso responde 403 e a
+conta nasce inutilizável — ver §4.*
+
+### CA-19 — Restaurante não cria usuário de plataforma (`RN-GER-016`)
+
+> **Dado** o administrador de um restaurante,
+> **Quando** ele chamar `POST /plataforma/usuarios`,
+> **Então** a resposta é **403**.
+
 ## 6. Modelo de dados tocado
 
 ```sql
@@ -262,7 +383,7 @@ Nenhum.
 ## 8. Fora de escopo
 
 - **Alterar o próprio cadastro** (nome, CPF) — só criação e desativação nesta spec
-- **Redefinir senha de outro usuário** — `TrocarSenhaCommand` cobre a própria senha
+- **Redefinir senha de um usuário de PLATAFORMA** — ⚠ consequência a decidir: quem perder a senha do acesso de plataforma não tem recuperação por caminho nenhum, porque a carga inicial não sobrescreve usuário existente. Outro usuário de plataforma pode inativá-lo e criar um acesso novo (`RN-GER-030`), o que resolve na prática e deixa o rastro certo — mas a redefinição em si é regra que ainda não existe no catálogo
 - Convite por e-mail: exige serviço de envio, que não existe
 - Perfil personalizado pela unidade — os seis do catálogo bastam até alguém pedir o sétimo
 - **Colaborador** (`RN-RH-006`): usuário é acesso, colaborador é vínculo. Onda 10
@@ -278,7 +399,7 @@ Nenhum.
 | Plataforma | `src/GrelhaHub.Application/Features/Gerais/Plataforma/` |
 | Migration | `.../Migrations/*_PessoaEDelegacao.cs` |
 | Telas | `frontend/src/features/admin/Usuarios.tsx`, `frontend/src/features/plataforma/` |
-| Testes | `tests/GrelhaHub.Integration.Tests/Gerais/DelegacaoTests.cs`, `tests/GrelhaHub.Domain.Tests/Common/CpfTests.cs` |
+| Testes | `tests/GrelhaHub.Integration.Tests/Gerais/DelegacaoTests.cs`, `tests/GrelhaHub.Domain.Tests/Common/CpfTests.cs`, `tests/GrelhaHub.Integration.Tests/Gerais/UsuariosDePlataformaTests.cs` |
 
 ## 10. Definição de pronto
 
@@ -289,6 +410,8 @@ Nenhum.
 - [x] Tela de usuários no painel (aba **Equipe**), com máscara de CPF
 - [x] Tela de plataforma em `/plataforma`: estabelecimentos, módulos e usuários
 - [x] CA-1 a CA-12 passando como teste de integração — 11 testes em `DelegacaoTests`
+- [x] CA-13 a CA-19 — 7 testes em `UsuariosDePlataformaTests` (`RN-GER-030`, `RN-GER-031`)
+- [x] Aba **Equipe** em `/plataforma`: criar, listar, inativar e reativar acesso de plataforma
 - [x] Rastreabilidade do catálogo §16 atualizada
 - [x] `dotnet build -c Release`, `dotnet test`, `eslint` e `tsc` verdes — **174 testes** na
       entrega; **190** depois de fechar a §11.5 (`RN-GER-020` na criação)

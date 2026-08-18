@@ -79,6 +79,34 @@ public sealed class SessaoDeSuporteBehavior<TRequest, TResponse>(
         // cliente — **NÃO** está aqui de propósito: aquilo é mexer no dado de alguém em nome dele,
         // que é a definição de suporte, e não carrega justificativa própria. Exige sessão.
         "AlternarSituacaoDaUnidadeCommand",
+
+        // RN-GER-030 / RN-GER-031 — a plataforma administrando os SEUS PRÓPRIOS usuários.
+        //
+        // Cai do lado esquerdo da linha divisória por uma razão mais forte que as anteriores: aqui
+        // não existe dado de cliente nem cliente. E a sessão de suporte é aberta PARA UMA UNIDADE
+        // (`AbrirSessaoDeSuporteCommand` recebe `unidadeId`) — exigi-la para criar um colega de
+        // suporte obrigaria a escolher um restaurante ao acaso e registrar um motivo de suporte
+        // falso na conta dele. Seria menos rastreável, não mais.
+        //
+        // A autoria não se perde: fica na trilha (SPEC-GER-005) com o `usuario_id` de quem criou.
+        "CriarUsuarioDeSuporteCommand",
+        "AlternarSituacaoDoUsuarioDeSuporteCommand",
+
+        // RF-SEG-005 — trocar a PRÓPRIA senha.
+        //
+        // ⚠ Sem esta linha, usuário de plataforma com troca pendente fica em DEADLOCK, e o
+        // bloqueio é total: `TrocaDeSenhaBehavior` só libera `TrocarSenhaCommand`, e este behavior
+        // exigiria sessão de suporte justamente dele — sessão que não pode ser aberta, porque
+        // `AbrirSessaoDeSuporteCommand` está bloqueado pela troca pendente. A conta nasceria
+        // inutilizável, sem nenhuma operação possível e sem mensagem que explicasse o círculo.
+        //
+        // Era latente até RN-GER-030: nenhum caminho criava usuário de plataforma com a troca
+        // pendente (a carga inicial nasce sem ela, e `RedefinirSenhaCommand` recusa plataforma).
+        // Passou a ser alcançável no mesmo commit que criou a porta, e é por isso que está aqui.
+        //
+        // Trocar a própria senha também não é "escrita sobre dado de unidade": é a conta de quem
+        // está pedindo.
+        "TrocarSenhaCommand",
     ];
 
     public async Task<TResponse> Handle(

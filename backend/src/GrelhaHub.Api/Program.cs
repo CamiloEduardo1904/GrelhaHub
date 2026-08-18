@@ -4,6 +4,7 @@ using GrelhaHub.Api.Seguranca;
 using GrelhaHub.Application;
 using GrelhaHub.Application.Common.Interfaces;
 using GrelhaHub.Infrastructure;
+using GrelhaHub.Infrastructure.Arquivos;
 using GrelhaHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles;
@@ -166,7 +167,13 @@ if (app.Environment.IsDevelopment())
     var raiz = Path.GetFullPath(
         builder.Configuration["Arquivos:Raiz"] ?? "arquivos");
 
-    Directory.CreateDirectory(raiz);
+    // ⚠ Sonda de ESCRITA, e não `Directory.CreateDirectory` sozinho.
+    //
+    // Criar o diretório passava mesmo com o volume sem permissão — ele já existia, montado, e
+    // `CreateDirectory` em diretório existente não faz nada nem reclama. A API subia inteira e
+    // quebrava só no primeiro upload, com 500 genérico. Recusar a partida aqui transforma um
+    // defeito que espera um usuário em um deploy que não sobe (ADR-0015).
+    GarantirEscritaDeArquivos.Validar(raiz);
 
     app.UseStaticFiles(new StaticFileOptions
     {
