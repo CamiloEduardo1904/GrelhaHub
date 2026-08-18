@@ -177,6 +177,10 @@ cd backend
 dotnet build -c Release      # Release trata warning como erro
 dotnet test -c Release       # integração sobe PostgreSQL efêmero: exige Docker rodando
 
+# Cobertura — a régua honesta (18/08/2026: 86,1% de linha, 59,1% de ramo)
+dotnet test -c Release --settings cobertura.runsettings --results-directory ./TestResults
+reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/relatorio" "-reporttypes:TextSummary"
+
 # Frontend
 cd frontend
 npm ci                       # sem isto, o `npm run` abaixo sai 0 sem rodar nada
@@ -221,6 +225,14 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | `dotnet test -c Release` | ✔ **289 testes** — 76 de domínio + 13 de aplicação + 200 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
+
+> ⚠⚠ **A cobertura que o projeto citava — 95,4% — estava inflada.** As migrations do EF Core são
+> milhares de linhas GERADAS e contavam como cobertas só porque a suíte cria o banco na partida.
+> Sem elas, o número real é **86,1%**. E há duas exclusões que apagam medição em SILÊNCIO, ambas
+> documentadas em `backend/cobertura.runsettings`: `CompilerGeneratedAttribute` derruba todo código
+> `async` (2.249 linhas contra 4.106), e `Exclude`/`ExcludeByAttribute` fizeram o assembly
+> **Infrastructure sumir do relatório** — não com nota baixa: ausente, com a média subindo porque a
+> camada saiu da conta. **Confira sempre se os quatro assemblies aparecem no resumo.**
 
 > ⚠ **`npm run` mascara ausência de dependência.** Sem `node_modules`, `npm run lint` imprime
 > "eslint não é reconhecido" e ainda assim **sai com código 0** — o gate parece verde e não

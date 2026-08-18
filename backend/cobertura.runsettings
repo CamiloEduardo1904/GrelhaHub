@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A régua de cobertura — usada pelo `dotnet test` com a opção de settings apontando para este arquivo.
+
+  ⚠⚠ AS EXCLUSÕES SÃO O PONTO DESTE ARQUIVO, e não um detalhe. Sem elas o relatório
+  dizia 95,4% de linha, e o número era mentira útil: as migrations do EF Core são
+  milhares de linhas GERADAS — o `ModelSnapshot` sozinho tem mais de mil — e elas
+  contam como "cobertas" só porque a suíte cria o banco na partida. Isso empurrava a
+  média para cima e escondia que a camada de API estava em 55,6 por cento.
+
+  Cobertura que sobe quando alguém acrescenta uma migration não mede teste nenhum.
+
+  ⚠ `Migrations` é a única exclusão por PASTA. Nada de excluir "código difícil de
+  testar": exclusão por conveniência transforma a régua em decoração, e a primeira
+  classe excluída assim é sempre a que mais precisava de teste.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+
+          <!-- Código gerado pelo EF Core: migration e snapshot do modelo. -->
+          <ExcludeByFile>**/Migrations/**.cs</ExcludeByFile>
+
+
+          <!--
+            ⚠⚠ ESTA LISTA FICA CURTA DE PROPÓSITO. Duas exclusões que pareciam inofensivas
+            apagaram medição inteira, e as duas em silêncio:
+
+            1) `CompilerGeneratedAttribute` — toda máquina de estado de `async` é gerada pelo
+               compilador, e com ela na lista o código assíncrono de TODAS as camadas some da
+               conta. Coberturas medidas: 2.249 linhas com ela, 4.106 sem.
+
+            2) `Exclude` por tipo e `ExcludeByAttribute` — com qualquer um dos dois presente,
+               GrelhaHub.Infrastructure DESAPARECEU do relatório. Não ficou com nota baixa:
+               sumiu, e a média subiu porque a camada saiu da conta.
+
+            O sintoma é sempre o mesmo e é o pior possível: o relatório fica mais bonito, e
+            ninguém procura o que não está na lista. Antes de acrescentar exclusão aqui,
+            confira se os QUATRO assemblies continuam aparecendo no resumo.
+          -->
+
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
