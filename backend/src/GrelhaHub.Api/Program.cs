@@ -66,41 +66,67 @@ builder.Services.AddCors(options => options.AddPolicy(
 
 var app = builder.Build();
 
-// ADR-0006 — em produção as migrations rodam como STEP DO PIPELINE, e este é o
-// modo que o step usa: aplica e SAI, sem subir o servidor.
+// ADR-0006 — em produção as migrations rodam como STEP DO PIPELINE, e estes são os
+// modos que os steps usam: executam e SAEM, sem subir o servidor.
 //
 // Sem isto, `docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate`
 // subiria a API e ficaria escutando — o deploy travaria para sempre esperando
 // um processo que nunca termina.
-if (args.Contains("--migrate"))
+//
+// ⚠ SÃO DOIS MODOS SEPARADOS, e a separação é o ponto (RN-GER-014):
+//
+//   --migrate   aplica o schema
+//   --semear    cria o usuário de suporte da plataforma
+//
+// Enquanto a semeadura era um apêndice do `--migrate`, o resultado dela aparecia
+// no meio do log de um step chamado "Migrations EF Core" — e num deploy sem
+// migration pendente, que é o caso comum, ninguém tinha motivo para abrir esse
+// log. Esta instalação subiu sem acesso de suporte nenhum, com o aviso registrado a
+// cada deploy, lido por ninguém. Step próprio, nome próprio, log curto.
+//
+// Os dois podem ser passados juntos (`--migrate --semear`), e nessa ordem: semear
+// antes de aplicar o schema é semear contra tabela que pode não existir.
+var modoMigrar = args.Contains("--migrate");
+var modoSemear = args.Contains("--semear");
+
+if (modoMigrar || modoSemear)
 {
     try
     {
         using var escopoMigracao = app.Services.CreateScope();
         var banco = escopoMigracao.ServiceProvider.GetRequiredService<GrelhaHubDbContext>();
 
-        var pendentes = (await banco.Database.GetPendingMigrationsAsync()).ToList();
-
-        if (pendentes.Count == 0)
+        if (modoMigrar)
         {
-            Log.Information("Nenhuma migration pendente.");
-        }
-        else
-        {
-            Log.Information("Aplicando {Total} migration(s): {Nomes}",
-                pendentes.Count, string.Join(", ", pendentes));
-            await banco.Database.MigrateAsync();
-            Log.Information("Migrations aplicadas.");
+            var pendentes = (await banco.Database.GetPendingMigrationsAsync()).ToList();
+
+            if (pendentes.Count == 0)
+            {
+                Log.Information("Nenhuma migration pendente.");
+            }
+            else
+            {
+                Log.Information("Aplicando {Total} migration(s): {Nomes}",
+                    pendentes.Count, string.Join(", ", pendentes));
+                await banco.Database.MigrateAsync();
+                Log.Information("Migrations aplicadas.");
+            }
         }
 
-        // RN-GER-014 — o usuário de suporte da plataforma. Idempotente: roda a cada deploy e
-        // não faz nada se já existir. A senha vem do .env da VPS (RNF-008), nunca do repositório.
-        await SemeadorDePlataforma.SemearAsync(
-            banco,
-            escopoMigracao.ServiceProvider.GetRequiredService<IHashDeSenha>(),
-            app.Configuration,
-            escopoMigracao.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(nameof(SemeadorDePlataforma)));
+        if (modoSemear)
+        {
+            // RN-GER-014 — o usuário de suporte da plataforma. Idempotente: pode rodar a cada
+            // deploy e não faz nada se já existir, nem sobrescreve a senha de quem existe. A
+            // senha vem do .env da VPS (RNF-008), nunca do repositório.
+            //
+            // Todo desfecho — criado, já existia, não configurado — sai como log do semeador.
+            await SemeadorDePlataforma.SemearAsync(
+                banco,
+                escopoMigracao.ServiceProvider.GetRequiredService<IHashDeSenha>(),
+                app.Configuration,
+                escopoMigracao.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger(nameof(SemeadorDePlataforma)));
+        }
 
         return 0;
     }
@@ -108,7 +134,8 @@ if (args.Contains("--migrate"))
     {
         // Falha ruidosa: o pipeline precisa parar aqui, não seguir para o
         // `up -d` e subir uma API contra um schema desatualizado.
-        Log.Fatal(excecao, "Falha ao aplicar migrations.");
+        Log.Fatal(excecao, "Falha no modo de linha de comando ({Modos}).",
+            string.Join(" ", args));
         return 1;
     }
     finally

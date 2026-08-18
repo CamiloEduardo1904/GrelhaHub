@@ -18,6 +18,13 @@ namespace GrelhaHub.Infrastructure.Persistence;
 /// senha de usuário existente: um deploy que sobrescrevesse a senha do suporte seria uma porta
 /// para quem tivesse acesso ao arquivo de configuração antigo.
 /// </para>
+/// <para>
+/// ⚠ <b>Todo caminho de saída daqui é um log.</b> A semeadura roda sem ninguém olhando, e o
+/// sintoma de qualquer falha é o mesmo — "não consigo entrar" numa tela de login que, por
+/// <c>RN-GER-027</c>, não pode dizer o motivo. Se este método sair em silêncio, o operador fica
+/// sem nada para ler. Foi o que aconteceu em 17/08/2026: o aviso existia, mas nomeava as duas
+/// chaves de configuração sem dizer qual delas faltava, nem de onde elas deveriam ter vindo.
+/// </para>
 /// </summary>
 public static partial class SemeadorDePlataforma
 {
@@ -40,24 +47,54 @@ public static partial class SemeadorDePlataforma
         var email = configuracao[SecaoEmail]?.Trim().ToLowerInvariant();
         var senha = configuracao[SecaoSenha];
 
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
+        var faltando = new List<string>(2);
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            faltando.Add(SecaoEmail);
+        }
+
+        if (string.IsNullOrWhiteSpace(senha))
+        {
+            faltando.Add(SecaoSenha);
+        }
+
+        if (faltando.Count > 0)
         {
             // Aviso e não exceção: um ambiente de desenvolvimento pode legitimamente não ter
             // suporte configurado. Em produção a ausência aparece no log do deploy.
-            NaoConfigurado(logger, SecaoEmail, SecaoSenha);
+            //
+            // O aviso nomeia QUAL chave faltou e a cadeia inteira de onde ela vem. Sem a cadeia,
+            // quem lê confere o .env, encontra a variável lá, e não tem como suspeitar do elo do
+            // meio — o repasse no docker-compose.yml, que é onde ela se perdeu.
+            NaoConfigurado(logger, string.Join(" e ", faltando));
 
             return;
         }
 
+        // A senha é usada COMO ESTÁ, sem Trim: recortar caractere de uma senha em silêncio é
+        // gravar um hash que ninguém consegue reproduzir digitando o que está no arquivo. Mas
+        // borda em branco quase nunca é intencional — é CRLF de .env editado no Windows —, e o
+        // sintoma seria "a senha certa não entra". Então avisa, e não corrige.
+        if (senha! != senha!.Trim())
+        {
+            SenhaComBordaEmBranco(logger, senha!.Length, senha!.Trim().Length);
+        }
+
         // IgnoreQueryFilters: o usuário de plataforma não tem unidade, e o filtro global não se
         // aplica a `usuario` — mas a consulta é explícita de qualquer forma.
-        var jaExiste = await db.Usuarios
+        var jaExistente = await db.Usuarios
             .IgnoreQueryFilters()
-            .AnyAsync(usuario => usuario.EhPlataforma, cancellationToken);
+            .Where(usuario => usuario.EhPlataforma)
+            .Select(usuario => usuario.Email)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (jaExiste)
+        if (jaExistente is not null)
         {
-            JaExiste(logger);
+            // O e-mail existente vai no log porque a confusão previsível é configurar um e-mail
+            // novo e tentar entrar com ele: o semeador não cria o segundo, e a senha configurada
+            // não vale para o primeiro.
+            JaExiste(logger, jaExistente);
             return;
         }
 
@@ -79,22 +116,35 @@ public static partial class SemeadorDePlataforma
 
         var plataforma = Usuario.CriarDePlataforma(
             string.IsNullOrWhiteSpace(nome) ? "Suporte GrelhaHub" : nome,
-            email,
-            hash.Gerar(senha));
+            email!,
+            hash.Gerar(senha!));
 
         db.Usuarios.Add(plataforma);
         await db.SaveChangesAsync(cancellationToken);
 
-        Criado(logger, email);
+        Criado(logger, email!);
     }
 
     [LoggerMessage(EventId = 1400, Level = LogLevel.Warning,
-        Message = "RN-GER-014 — usuário de plataforma não configurado ({Email} e {Senha} ausentes). Nenhum acesso de suporte existirá nesta instalação.")]
-    private static partial void NaoConfigurado(ILogger logger, string email, string senha);
+        Message = "RN-GER-014 — usuário de plataforma não configurado: {Chaves} sem valor. " +
+                  "Nenhum acesso de suporte existirá nesta instalação. No deploy estas chaves " +
+                  "vêm de PLATAFORMA_EMAIL e PLATAFORMA_SENHA_INICIAL no .env da VPS, " +
+                  "REPASSADAS pelo bloco environment do serviço api em docker-compose.yml — " +
+                  "confira os dois elos, não só o .env.")]
+    private static partial void NaoConfigurado(ILogger logger, string chaves);
+
+    [LoggerMessage(EventId = 1403, Level = LogLevel.Warning,
+        Message = "RN-GER-014 — a senha configurada tem espaço ou quebra de linha nas bordas " +
+                  "({Bruto} caracteres, {Limpo} sem as bordas). Ela foi usada COMO ESTÁ: o " +
+                  "login vai exigir os mesmos caracteres. Quase sempre é CRLF de um .env " +
+                  "editado no Windows.")]
+    private static partial void SenhaComBordaEmBranco(ILogger logger, int bruto, int limpo);
 
     [LoggerMessage(EventId = 1401, Level = LogLevel.Information,
-        Message = "RN-GER-014 — usuário de plataforma já existe; nada a fazer.")]
-    private static partial void JaExiste(ILogger logger);
+        Message = "RN-GER-014 — usuário de plataforma já existe ({Email}); nada a fazer. A " +
+                  "senha configurada foi IGNORADA: este semeador nunca sobrescreve senha de " +
+                  "usuário existente.")]
+    private static partial void JaExiste(ILogger logger, string email);
 
     [LoggerMessage(EventId = 1402, Level = LogLevel.Warning,
         Message = "RN-GER-014 — usuário de plataforma criado ({Email}). Ele enxerga TODAS as unidades (ADR-0013). Troque a senha inicial.")]

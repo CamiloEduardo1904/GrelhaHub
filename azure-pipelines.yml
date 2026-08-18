@@ -240,6 +240,30 @@ stages:
                       # 1 e o "set -e" interrompe o deploy antes do up -d.
                       docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
 
+                # RN-GER-014 / ADR-0013 — o usuario de suporte da plataforma.
+                #
+                # Step PROPRIO, e nao um apendice do step de migrations, porque o
+                # desfecho dele precisa ser lido: idempotente, o caso comum e "ja
+                # existe", e quando NAO existe o motivo esta neste log e em lugar
+                # nenhum mais — a tela de login nao pode contar (RN-GER-027).
+                #
+                # As tres variaveis vem do .env da VPS (RNF-008), repassadas pelo
+                # bloco environment do servico api em docker-compose.yml. Ausencia
+                # e estado valido: o semeador avisa e sai com 0, e a instalacao
+                # segue sem acesso de suporte.
+                - task: SSH@0
+                  displayName: Semear plataforma
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    runOptions: inline
+                    failOnStdErr: false
+                    inline: |
+                      set -e
+                      cd /opt/grelhahub
+                      export IMAGE_TAG=$(imageTag)
+
+                      docker compose run --rm api dotnet GrelhaHub.Api.dll --semear
+
                 - task: SSH@0
                   displayName: Subir servicos
                   inputs:

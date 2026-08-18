@@ -42,8 +42,11 @@ cd /opt/grelhahub && docker compose up -d
 curl -fsS http://localhost/api/health
 
 # 4. Primeira carga do schema (o pipeline faz isso sozinho depois)
-#    É ESTE passo que cria o usuário de suporte da plataforma — `up -d` não cria.
+#    O usuário de suporte da plataforma vem do passo 4b, não daqui.
 docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
+
+# 4b. Usuário de suporte da plataforma (RN-GER-014) — idempotente, ver seção abaixo
+docker compose run --rm api dotnet GrelhaHub.Api.dll --semear
 
 # 5. Com o domínio apontando para o IP
 ./infra/ativar-https.sh
@@ -59,12 +62,26 @@ sudo crontab -e
 > aplica a ele. A senha dele é a mais sensível da instalação, e por isso não vem de migration
 > nenhuma (`RNF-008`): vem do `.env` da VPS.
 
-`SemeadorDePlataforma` roda **apenas no passo `--migrate`** — em produção o `Program.cs` só semeia
-dentro do bloco `args.Contains("--migrate")`; a semeadura no startup é restrita a
-`IsDevelopment()`. Consequência: **acrescentar as variáveis ao `.env` e dar `docker compose up -d`
-não cria nada.** É preciso rodar o passo de migration outra vez — o que é seguro, porque ele é
-idempotente nas duas pontas (sem migration pendente não aplica nada; com usuário de plataforma
-existente não toca na senha).
+A semeadura tem **modo próprio de linha de comando** — `--semear` —, separado do `--migrate`:
+
+```bash
+docker compose run --rm api dotnet GrelhaHub.Api.dll --semear
+```
+
+**É idempotente e pode ser rodado a qualquer momento.** Não aplica schema, não sobe servidor, não
+sobrescreve a senha de um usuário que já existe: aplica a carga inicial de `RN-GER-016` e sai. No
+deploy ele é o step **"Semear plataforma"**, logo depois das migrations.
+
+> **Por que step separado, e não um apêndice do `--migrate`.** Era assim até 17/08/2026, e o
+> resultado da semeadura saía no meio do log de um step chamado "Migrations EF Core" — que num
+> deploy sem migration pendente, o caso comum, ninguém tem motivo para abrir. A instalação ficou
+> sem acesso de suporte com o aviso sendo registrado a cada deploy, lido por ninguém. O sintoma
+> apareceu do outro lado: "não consigo entrar", numa tela que por `RN-GER-027` **não pode** dizer
+> o motivo. Quando o único lugar que explica é um log, esse log precisa de nome próprio.
+
+Em desenvolvimento a semeadura continua acontecendo no startup (`IsDevelopment()`); em produção,
+**só** por este comando. Acrescentar as variáveis ao `.env` e dar `docker compose up -d` não cria
+nada.
 
 ```bash
 cd /opt/grelhahub
@@ -80,19 +97,20 @@ FIM
 docker compose config | grep Plataforma__
 
 # 3. Semear
-docker compose run --rm api dotnet GrelhaHub.Api.dll --migrate
+docker compose run --rm api dotnet GrelhaHub.Api.dll --semear
 ```
 
-O log do passo 3 diz qual dos três caminhos aconteceu:
+O log do passo 3 diz qual dos quatro caminhos aconteceu:
 
 | Log | Significado |
 |-----|-------------|
-| `RN-GER-014 — usuário de plataforma criado (...)` | criado agora |
-| `RN-GER-014 — usuário de plataforma já existe; nada a fazer.` | já havia um — a senha do `.env` foi **ignorada** |
-| `RN-GER-014 — usuário de plataforma não configurado (...)` | as variáveis não chegaram ao container; confira o passo 2 |
+| `usuário de plataforma criado (...)` | criado agora |
+| `usuário de plataforma já existe (...); nada a fazer` | já havia um, com o e-mail que o log mostra — a senha do `.env` foi **ignorada** |
+| `usuário de plataforma não configurado: <chave> sem valor` | a chave nomeada não chegou ao container; confira o `.env` **e** o repasse do passo 2 |
+| `a senha configurada tem espaço ou quebra de linha nas bordas` | o valor foi usado como está, e o login vai exigir os mesmos caracteres — quase sempre CRLF de `.env` editado no Windows |
 
 ⚠ **O e-mail não pode pertencer a um usuário de restaurante.** O e-mail é único globalmente; nesse
-caso o semeador lança, o passo sai com código 1 e o `set -e` do pipeline aborta o deploy — antes do
+caso o semeador lança, o step sai com código 1 e o `set -e` do pipeline aborta o deploy — antes do
 `up -d`, de propósito.
 
 ⚠ **O usuário de plataforma nasce com `DeveTrocarSenha = false`** (`Usuario.CriarDePlataforma`):
@@ -100,6 +118,11 @@ caso o semeador lança, o passo sai com código 1 e o `set -e` do pipeline abort
 à mão em `/trocar-senha` — rota que ele alcança, porque `TrocarSenhaCommand` não exige módulo nem
 permissão. Se a senha inicial passou por qualquer canal que não seja o `.env`, troque depois de
 entrar.
+
+⚠ **Não há como redefinir a senha do usuário de plataforma por fora do sistema**, e é deliberado:
+o semeador nunca sobrescreve senha de usuário existente, senão quem tivesse uma cópia antiga do
+`.env` teria uma porta. Se a senha do suporte se perder, isso é uma decisão a registrar no catálogo
+antes de virar código — não um `UPDATE` no banco.
 
 ## Backup — RNF-017
 
