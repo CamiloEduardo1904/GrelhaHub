@@ -5,8 +5,7 @@ import { api, mensagemDeErro } from '../../services/api';
 import { MenuDePerfis, type PerfilDaUnidade } from '../admin/MenuDePerfis';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import type { UsuarioDaUnidade } from '../../services/tipos';
-import { SessaoDeSuporteDaCasa } from './SessaoDeSuporteDaCasa';
-import { sessaoVigente, type Estabelecimento, type SessaoDeSuporte } from './tipos';
+import type { Estabelecimento } from './tipos';
 
 /**
  * A tela dedicada de usuários — `RN-GER-028`.
@@ -24,7 +23,6 @@ import { sessaoVigente, type Estabelecimento, type SessaoDeSuporte } from './tip
 
 export function UsuariosDaPlataforma() {
   const [casas, setCasas] = useState<Estabelecimento[]>([]);
-  const [sessoes, setSessoes] = useState<SessaoDeSuporte[]>([]);
   const [filtro, setFiltro] = useState('');
   const [usuarios, setUsuarios] = useState<UsuarioDaUnidade[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -33,13 +31,9 @@ export function UsuariosDaPlataforma() {
 
   const carregarCasas = useCallback(async () => {
     try {
-      const [lista, abertas] = await Promise.all([
-        api.get<Estabelecimento[]>('/v1/plataforma/estabelecimentos'),
-        api.get<SessaoDeSuporte[]>('/v1/plataforma/sessoes-de-suporte'),
-      ]);
+      const lista = await api.get<Estabelecimento[]>('/v1/plataforma/estabelecimentos');
 
       setCasas(lista.data);
-      setSessoes(abertas.data);
     } catch (e) {
       setErro(mensagemDeErro(e));
     }
@@ -109,13 +103,11 @@ export function UsuariosDaPlataforma() {
         {criando && (
           <FormularioDeUsuario
             casas={casas}
-            sessoes={sessoes}
             unidadeInicial={filtro}
             aoCriar={async () => {
               setCriando(false);
               await recarregar();
             }}
-            aoMudarSessao={carregarCasas}
           />
         )}
       </div>
@@ -189,10 +181,7 @@ export function UsuariosDaPlataforma() {
       {editando && (
         <EdicaoDeUsuario
           usuario={usuarios.find((u) => u.id === editando)!}
-          casas={casas}
-          sessoes={sessoes}
           aoMudar={recarregar}
-          aoMudarSessao={carregarCasas}
         />
       )}
     </>
@@ -211,43 +200,14 @@ function rotuloDaSituacao(u: UsuarioDaUnidade): string {
   return u.deveTrocarSenha ? 'Senha pendente' : 'Ativo';
 }
 
-/** Um bloco de sessão de suporte reaproveitado, com a casa do usuário sendo editado. */
-function ExigeSessao({
-  unidadeId,
-  casas,
-  sessoes,
-  aoMudarSessao,
-}: {
-  unidadeId: string | null;
-  casas: Estabelecimento[];
-  sessoes: SessaoDeSuporte[];
-  aoMudarSessao: () => Promise<void>;
-}) {
-  const casa = casas.find((c) => c.id === unidadeId);
-
-  if (!casa) return null;
-
-  return (
-    <SessaoDeSuporteDaCasa
-      casa={casa}
-      sessao={sessaoVigente(sessoes, casa.id)}
-      aoMudar={aoMudarSessao}
-    />
-  );
-}
-
+// ⚠ `casas` saiu das propriedades: existia só para o bloco de sessão de suporte descobrir a casa
+// do usuário editado. Com a sessão removida (ADR-0020), a lista não tem mais para que servir aqui.
 function EdicaoDeUsuario({
   usuario,
-  casas,
-  sessoes,
   aoMudar,
-  aoMudarSessao,
 }: {
   usuario: UsuarioDaUnidade;
-  casas: Estabelecimento[];
-  sessoes: SessaoDeSuporte[];
   aoMudar: () => Promise<void>;
-  aoMudarSessao: () => Promise<void>;
 }) {
   const [form, setForm] = useState({
     nome: usuario.nome,
@@ -259,7 +219,7 @@ function EdicaoDeUsuario({
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
-  const temSessao = usuario.unidadeId !== null && sessaoVigente(sessoes, usuario.unidadeId) !== null;
+  
   const cpfErrado = apenasDigitos(form.cpf).length === 11 && !cpfValido(form.cpf);
 
   async function agir(acao: () => Promise<unknown>) {
@@ -284,12 +244,6 @@ function EdicaoDeUsuario({
       </h3>
 
       {/* RN-GER-015 — mexer no dado de um usuário de cliente é SUPORTE. */}
-      <ExigeSessao
-        unidadeId={usuario.unidadeId}
-        casas={casas}
-        sessoes={sessoes}
-        aoMudarSessao={aoMudarSessao}
-      />
 
       <form
         onSubmit={(e) => {
@@ -300,7 +254,7 @@ function EdicaoDeUsuario({
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}
       >
-        <fieldset disabled={!temSessao || ocupado}>
+        <fieldset disabled={ocupado}>
           <legend>Cadastro</legend>
 
           <div className="linha">
@@ -357,13 +311,13 @@ function EdicaoDeUsuario({
 
         {cpfErrado && <p className="erro">Este CPF não é válido.</p>}
 
-        <button type="submit" className="btn" disabled={!temSessao || ocupado || cpfErrado}>
+        <button type="submit" className="btn" disabled={ocupado || cpfErrado}>
           <IconeLapis />
           Salvar cadastro
         </button>
       </form>
 
-      <fieldset disabled={!temSessao || ocupado}>
+      <fieldset disabled={ocupado}>
         <legend>Senha</legend>
 
         <label>
@@ -386,7 +340,7 @@ function EdicaoDeUsuario({
         <button
           type="button"
           className="btn calada"
-          disabled={!temSessao || ocupado || novaSenha.length < 8}
+          disabled={ocupado || novaSenha.length < 8}
           onClick={() =>
             void agir(async () => {
               await api.post(`/v1/usuarios/${usuario.id}/senha`, { novaSenha });
@@ -399,7 +353,7 @@ function EdicaoDeUsuario({
         </button>
       </fieldset>
 
-      <fieldset disabled={!temSessao || ocupado}>
+      <fieldset disabled={ocupado}>
         <legend>Acesso</legend>
 
         <p className="secundario">
@@ -411,7 +365,7 @@ function EdicaoDeUsuario({
         <button
           type="button"
           className={usuario.ativo ? 'btn perigo' : 'btn'}
-          disabled={!temSessao || ocupado}
+          disabled={ocupado}
           onClick={() =>
             void agir(() =>
               api.post(
@@ -432,16 +386,12 @@ function EdicaoDeUsuario({
 
 function FormularioDeUsuario({
   casas,
-  sessoes,
   unidadeInicial,
   aoCriar,
-  aoMudarSessao,
 }: {
   casas: Estabelecimento[];
-  sessoes: SessaoDeSuporte[];
   unidadeInicial: string;
   aoCriar: () => Promise<void>;
-  aoMudarSessao: () => Promise<void>;
 }) {
   const [unidadeId, setUnidadeId] = useState(unidadeInicial);
   const [perfis, setPerfis] = useState<PerfilDaUnidade[]>([]);
@@ -482,7 +432,7 @@ function FormularioDeUsuario({
 
   const cpfCompleto = apenasDigitos(form.cpf).length === 11;
   const cpfErrado = cpfCompleto && !cpfValido(form.cpf);
-  const temSessao = unidadeId !== '' && sessaoVigente(sessoes, unidadeId) !== null;
+  
 
   /**
    * O que ainda falta, nomeado — igual a `Usuarios.tsx`.
@@ -542,16 +492,8 @@ function FormularioDeUsuario({
         </label>
       </fieldset>
 
-      {unidadeId && (
-        <ExigeSessao
-          unidadeId={unidadeId}
-          casas={casas}
-          sessoes={sessoes}
-          aoMudarSessao={aoMudarSessao}
-        />
-      )}
 
-      <fieldset disabled={!unidadeId || !temSessao}>
+      <fieldset disabled={!unidadeId}>
         <legend>A pessoa</legend>
 
         {/* Uma grade que se acomoda à largura, e não três `.linha` de duas colunas: a última
@@ -619,7 +561,7 @@ function FormularioDeUsuario({
               perfilNome: perfis.find((p) => p.id === perfilId)?.nome ?? '',
             }))
           }
-          desabilitado={!unidadeId || !temSessao}
+          desabilitado={!unidadeId}
         />
 
         {/* RN-GER-032 — sem campo de senha: o convite por e-mail define. Ver Usuarios.tsx. */}
@@ -640,13 +582,13 @@ function FormularioDeUsuario({
       <button
         type="submit"
         className="btn bloco"
-        disabled={enviando || cpfErrado || faltando.length > 0 || !temSessao}
+        disabled={enviando || cpfErrado || faltando.length > 0}
       >
         {enviando ? 'Criando…' : 'Criar usuário'}
       </button>
 
       {/* A sessão de suporte tem mensagem própria, acima. Aqui só o que o formulário deve. */}
-      {temSessao && faltando.length > 0 && (
+      {faltando.length > 0 && (
         <p className="ajuda">
           Falta preencher: <strong>{faltando.join(', ')}</strong>.
         </p>

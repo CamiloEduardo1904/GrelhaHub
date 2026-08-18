@@ -50,7 +50,6 @@ public static class DependencyInjection
         // 5. VALIDACAO — o corpo faz sentido? Antes de qualquer coisa tocar o banco.
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ModuloBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TrocaDeSenhaBehavior<,>));
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(SessaoDeSuporteBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PermissaoBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 

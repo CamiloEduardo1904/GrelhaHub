@@ -505,47 +505,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("permissao", (string)null);
                 });
 
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.SessaoDeSuporte", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("AbertaEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dh_abertura");
-
-                    b.Property<DateTimeOffset?>("EncerradaEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dh_encerramento");
-
-                    b.Property<string>("Motivo")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("motivo");
-
-                    b.Property<Guid>("UnidadeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unidade_id");
-
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("usuario_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_sessao_suporte");
-
-                    b.HasIndex("UnidadeId", "AbertaEm")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("ix_sessao_suporte_unidade");
-
-                    b.HasIndex("UsuarioId", "EncerradaEm", "AbertaEm")
-                        .HasDatabaseName("ix_sessao_suporte_aberta");
-
-                    b.ToTable("sessao_suporte", (string)null);
-                });
-
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1148,23 +1107,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_perfil_permissao_permissoes_permissao_id");
 
                     b.Navigation("Permissao");
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.SessaoDeSuporte", b =>
-                {
-                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
-                        .WithMany()
-                        .HasForeignKey("UnidadeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sessao_suporte_unidades_unidade_id");
-
-                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sessao_suporte_usuarios_usuario_id");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>

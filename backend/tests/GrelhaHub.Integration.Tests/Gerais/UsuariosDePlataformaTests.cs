@@ -69,27 +69,41 @@ public sealed class UsuariosDePlataformaTests(AmbienteDeIntegracao ambiente)
         sessao.DeveTrocarSenha.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "RN-GER-030 — criar usuário de plataforma NÃO exige sessão de suporte, mas alterar cliente exige (CA-14)")]
-    public async Task CA14_CriacaoIsentaDeSessaoMasGateContinuaValendo()
+    /// <summary>
+    /// <c>RN-GER-030</c> — <b>reescrito em 18/08/2026</b>, ADR-0020.
+    /// <para>
+    /// A versão anterior provava um PAR: criar usuário de plataforma era isento de sessão de
+    /// suporte, e alterar dado de cliente continuava recusado sem ela. Era o par que mostrava que a
+    /// isenção pertencia à operação e não a um gate desligado por acidente.
+    /// </para>
+    /// <para>
+    /// ⚠ Com a sessão removida, o par perdeu o segundo lado — e a pergunta que sobra é outra, mais
+    /// simples e igualmente importante: <b>a plataforma escreve sobre o cliente, e o rastro fica</b>.
+    /// A recusa por falta de sessão virou registro na trilha (ver <c>CA-10</c> em
+    /// <c>UsuariosESuporteTests</c>).
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "RN-GER-030 — a plataforma cria o próprio usuário e escreve sobre o cliente (CA-14)")]
+    public async Task CA14_PlataformaCriaEEscreveSobreOCliente()
     {
         var restaurante = await CadastrarRestauranteAsync("Brasa da Isencao", "22222222000191");
 
         using var suporte = await SuporteAsync();
 
-        // Sem nenhuma sessão de suporte aberta: a criação passa...
+        // Criar colega de plataforma: dado da própria casa, sem unidade envolvida.
         var criacao = await suporte.PostAsJsonAsync(
             new Uri("/api/v1/plataforma/usuarios", UriKind.Relative),
             Corpo("Suporte Sem Sessao", "sem.sessao@grelhahub.teste"));
 
         criacao.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // ...e a mesma requisição sem sessão sobre o dado de um CLIENTE continua recusada. É este
-        // par que prova que a isenção é da operação e não um gate desligado por acidente.
+        // E alterar dado de um CLIENTE passa direto — sem portão (ADR-0020).
         var alteracao = await suporte.PutAsJsonAsync(
             new Uri($"/api/v1/plataforma/estabelecimentos/{restaurante.UnidadeId}", UriKind.Relative),
             new { RazaoSocial = "Outra Razao LTDA", NomeFantasia = "Outro Nome", Telefone = (string?)null });
 
-        alteracao.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        alteracao.StatusCode.Should().Be(
+            HttpStatusCode.OK, await alteracao.Content.ReadAsStringAsync());
     }
 
     [Fact(DisplayName = "RN-GER-030 — o usuário de plataforma aparece na lista da plataforma e em nenhuma do restaurante (CA-15)")]

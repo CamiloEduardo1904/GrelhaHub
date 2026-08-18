@@ -148,8 +148,6 @@ public sealed class AdministracaoTests(AmbienteDeIntegracao ambiente) : TesteDeI
         // RN-GER-015 — alterar o cadastro de um cliente é SUPORTE, e exige sessão com motivo.
         // Inativar a loja não exige, porque é ato comercial e carrega a própria justificativa: a
         // linha divisória de `SessaoDeSuporteBehavior.OperacoesLiberadas` é comercial × suporte.
-        await AbrirSessaoAsync(suporte, restaurante.UnidadeId);
-
         var alterado = await suporte.PutAsJsonAsync(
             new Uri($"/api/v1/plataforma/estabelecimentos/{restaurante.UnidadeId}", UriKind.Relative),
             new { RazaoSocial = "Loja Admin Alimentos LTDA", NomeFantasia = "Loja Renomeada", Telefone = "(11) 90000-0000" });
@@ -402,12 +400,6 @@ public sealed class AdministracaoTests(AmbienteDeIntegracao ambiente) : TesteDeI
     }
 
     // ── auxiliares ──────────────────────────────────────────────────────────────────
-
-    private static async Task AbrirSessaoAsync(HttpClient suporte, Guid unidadeId) =>
-        (await suporte.PostAsJsonAsync(
-            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
-            new { UnidadeId = unidadeId, Motivo = "Cliente pediu correcao do cadastro por telefone" }))
-            .EnsureSuccessStatusCode();
 
     /// <summary>Tenta o login e devolve a resposta crua — o teste quer o status e o corpo.</summary>
     private async Task<HttpResponseMessage> TentarLoginAsync(string email, string senha)

@@ -97,12 +97,6 @@ public sealed class TrocaDeSenhaAposCriacaoTests(AmbienteDeIntegracao ambiente)
 
         using var suporte = Ambiente.CriarCliente(tokenSuporte);
 
-        // RN-GER-015 — escrita de plataforma sobre dado do cliente exige sessão de suporte.
-        (await suporte.PostAsJsonAsync(
-            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
-            new { UnidadeId = restaurante.UnidadeId, Motivo = "Criacao de usuario a pedido do cliente" }))
-            .EnsureSuccessStatusCode();
-
         var email = "pela.plataforma@brasa.teste";
 
         var criacao = await suporte.PostAsJsonAsync(
@@ -315,12 +309,6 @@ public sealed class TrocaDeSenhaAposCriacaoTests(AmbienteDeIntegracao ambiente)
             AmbienteDeIntegracao.EmailDePlataforma, AmbienteDeIntegracao.SenhaDePlataforma);
 
         using var suporte = Ambiente.CriarCliente(tokenSuporte);
-
-        // RN-GER-015 — escrita de plataforma sobre dado do cliente exige sessão de suporte.
-        (await suporte.PostAsJsonAsync(
-            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
-            new { UnidadeId = restaurante.UnidadeId, Motivo = "Criacao de usuario a pedido do cliente" }))
-            .EnsureSuccessStatusCode();
 
         var email = "convidado.plataforma@brasa.teste";
 

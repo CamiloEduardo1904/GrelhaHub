@@ -85,54 +85,6 @@ public sealed class PerfilPermissaoConfiguration : IEntityTypeConfiguration<Perf
     }
 }
 
-/// <summary>
-/// <c>RN-GER-015</c> — sessão de suporte da plataforma sobre uma unidade. ADR-0013.
-/// <para>
-/// <b>Sem filtro global de unidade</b>, e é deliberado: a sessão é registro <b>da plataforma</b>
-/// sobre um cliente, não registro do cliente. Sujeitá-la ao recorte a esconderia justamente de
-/// quem precisa auditá-la.
-/// </para>
-/// </summary>
-public sealed class SessaoDeSuporteConfiguration : IEntityTypeConfiguration<SessaoDeSuporte>
-{
-    public void Configure(EntityTypeBuilder<SessaoDeSuporte> builder)
-    {
-        builder.ToTable("sessao_suporte");
-        builder.HasKey(s => s.Id);
-
-        builder.Property(s => s.Motivo).IsRequired().HasMaxLength(500);
-        builder.Property(s => s.AbertaEm).IsRequired().HasColumnName("dh_abertura");
-        builder.Property(s => s.EncerradaEm).HasColumnName("dh_encerramento");
-
-        builder.HasOne<Usuario>()
-            .WithMany()
-            .HasForeignKey(s => s.UsuarioId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne<Unidade>()
-            .WithMany()
-            .HasForeignKey(s => s.UnidadeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // O behavior consulta "tenho sessão aberta e recente?" a cada escrita de plataforma.
-        builder.HasIndex(s => new { s.UsuarioId, s.EncerradaEm, s.AbertaEm })
-            .HasDatabaseName("ix_sessao_suporte_aberta");
-
-        builder.HasIndex(s => new { s.UnidadeId, s.AbertaEm })
-            .HasDatabaseName("ix_sessao_suporte_unidade")
-            .IsDescending(false, true);
-
-        builder.Ignore(s => s.EstaAberta);
-    }
-}
-
-/// <summary>
-/// <c>RN-GER-033</c> ⚠⚠ — o link de uso único. ADR-0016.
-/// <para>
-/// <b>Sem <c>unidade_id</c>, exceção declarada a <c>RN-GER-009</c>:</b> o token pertence ao
-/// usuário, e o de plataforma não tem unidade. Ver <see cref="TokenDeAcesso"/>.
-/// </para>
-/// </summary>
 public sealed class TokenDeAcessoConfiguration : IEntityTypeConfiguration<TokenDeAcesso>
 {
     public void Configure(EntityTypeBuilder<TokenDeAcesso> builder)

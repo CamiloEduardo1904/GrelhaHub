@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using GrelhaHub.Application.Common.Interfaces;
 using GrelhaHub.Application.Features.Gerais.Autenticar;
-using GrelhaHub.Application.Features.Gerais.SessaoDeSuporte;
 using GrelhaHub.Application.Features.Gerais.Usuarios;
 using GrelhaHub.Integration.Tests.Infraestrutura;
 using Microsoft.EntityFrameworkCore;
@@ -227,8 +226,21 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact(DisplayName = "RN-GER-015 — escrita de plataforma exige sessão de suporte com motivo (CA-10)")]
-    public async Task CA10_EscritaDePlataformaExigeSessao()
+    /// <summary>
+    /// <c>RN-GER-015</c> — <b>revisada em 18/08/2026</b>, ADR-0020.
+    /// <para>
+    /// A versão anterior deste teste provava o contrário: que a escrita de plataforma era RECUSADA
+    /// sem sessão de suporte aberta. A sessão foi removida — era um portão aberto por quem ele
+    /// deveria conter, e o motivo digitado para destravar um botão não é finalidade declarada.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>O que a regra garante continua igual, e é isto que o teste passa a afirmar:</b> nenhuma
+    /// operação de plataforma sobre dado de cliente acontece sem rastro. O que mudou é o
+    /// mecanismo — de pré-condição para registro —, e o registro sempre foi o controle forte.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "RN-GER-015 — escrita de plataforma passa direto e FICA NA TRILHA (CA-10)")]
+    public async Task CA10_EscritaDePlataformaFicaNaTrilha()
     {
         var restaurante = await CadastrarRestauranteAsync("Suporte Burger", "11111111000191");
         var produtoId = await CriarProdutoAsync(restaurante, "Ancho", 78.00m);
@@ -253,45 +265,43 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
 
         using var suporte = Ambiente.CriarCliente(plataforma);
 
-        // LER é rotina de suporte: passa sem sessão.
+        // Ler continua sendo rotina de suporte.
         (await suporte.GetAsync(new Uri("/api/v1/pedidos", UriKind.Relative)))
-            .StatusCode.Should().Be(HttpStatusCode.OK, "ler para diagnosticar não exige sessão");
+            .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // ESCREVER, não.
-        var semSessao = await suporte.PostAsJsonAsync(
+        // E escrever passa direto — sem portão, e SEM deixar de ser registrado.
+        var cancelamento = await suporte.PostAsJsonAsync(
             new Uri($"/api/v1/pedidos/{pedidoId}/cancelar", UriKind.Relative),
-            new { Motivo = "Suporte cancelando sem sessao" });
+            new { Motivo = "Cliente relatou pedido travado por telefone" });
 
-        semSessao.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await semSessao.Content.ReadAsStringAsync()).Should().Contain("RN-GER-015");
+        cancelamento.StatusCode.Should().Be(
+            HttpStatusCode.OK, await cancelamento.Content.ReadAsStringAsync());
 
-        // Abre a sessão, com motivo.
-        var abertura = await suporte.PostAsJsonAsync(
-            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
-            new { UnidadeId = restaurante.UnidadeId, Motivo = "Cliente relatou pedido travado por telefone" });
-
-        abertura.EnsureSuccessStatusCode();
-
-        var sessao = await abertura.Content.ReadFromJsonAsync<SessaoDeSuporteDto>();
-        sessao!.Motivo.Should().Be("Cliente relatou pedido travado por telefone");
-        sessao.ValidaAte.Should().BeAfter(sessao.AbertaEm);
-
-        // Agora a mesma escrita passa.
-        var comSessao = await suporte.PostAsJsonAsync(
-            new Uri($"/api/v1/pedidos/{pedidoId}/cancelar", UriKind.Relative),
-            new { Motivo = "Pedido travado, cancelado a pedido do cliente" });
-
-        comSessao.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // E o registro fica: unidade, usuário, instante e motivo.
+        // ⚠ O CORAÇÃO DA REGRA REVISADA: a operação existe na trilha, com autor e valores.
         await using var db = Ambiente.CriarContexto(Guid.Empty);
 
-        var registrada = await db.SessoesDeSuporte.AsNoTracking().SingleAsync();
+        var naTrilha = await db.Trilha
+            .AsNoTracking()
+            .Where(t => t.RegistroId == pedidoId)
+            .ToListAsync();
 
-        registrada.UnidadeId.Should().Be(restaurante.UnidadeId);
-        registrada.UsuarioId.Should().NotBeEmpty();
-        registrada.Motivo.Should().Contain("travado");
-        registrada.EstaAberta.Should().BeTrue();
+        naTrilha.Should().NotBeEmpty(
+            "escrita de plataforma sem rastro é o que RN-GER-015 sempre proibiu — o que mudou "
+            + "foi o mecanismo, não a garantia");
+
+        naTrilha.Should().Contain(
+            t => t.UsuarioId != null && t.UsuarioId != Guid.Empty,
+            "a trilha nomeia QUEM operou, e é isso que a sessão de suporte tentava garantir antes");
+
+        naTrilha.Should().Contain(
+            t => t.UnidadeId == restaurante.UnidadeId,
+            "e sobre qual casa a plataforma operou");
+
+        // ⚠ O motivo NÃO se perdeu: onde o porquê importa, ele é obrigatório no próprio comando —
+        // cancelar exige motivo (RN-VEN-018) — e chega à trilha pelo caminho normal.
+        naTrilha.Should().Contain(
+            t => t.ValoresNovos != null && t.ValoresNovos.Contains("travado", StringComparison.OrdinalIgnoreCase),
+            "o motivo do cancelamento fica gravado no próprio registro, e a trilha o carrega");
     }
 
     [Fact(DisplayName = "RN-GER-016 — o usuário de plataforma não aparece na listagem do restaurante (CA-11)")]

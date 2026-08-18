@@ -60,7 +60,8 @@ public sealed class SeparacaoDeCqrsTests
     /// escrever o nome — e alguém vai perguntar na revisão.
     /// </para>
     /// <para>
-    /// <b>Inventário aberto em 18/08/2026 com 15 nomes.</b> Quando chegar a zero, os dois testes
+    /// <b>Inventário aberto em 18/08/2026 com 15 nomes.</b> Dois saíram por conversão e um por
+    /// REMOÇÃO — a sessão de suporte deixou de existir (ADR-0020), e a catraca cobrou a baixa. Quando chegar a zero, os dois testes
     /// viram um só e esta lista sai.
     /// </para>
     /// </summary>
@@ -73,7 +74,6 @@ public sealed class SeparacaoDeCqrsTests
         "ListarEstabelecimentosHandler",
         "ListarModulosDaUnidadeHandler",
         "ListarPerfisHandler",
-        "ListarSessoesDeSuporteHandler",
         "ListarUsuariosDeSuporteHandler",
         "ListarUsuariosHandler",
         "ObterCardapioPublicoHandler",

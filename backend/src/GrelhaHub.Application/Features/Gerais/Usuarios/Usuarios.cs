@@ -155,9 +155,13 @@ public sealed class CriarUsuarioHandler(
         // unidade explicitamente (SPEC-GER-007 §4).
         if (contexto.EhPlataforma)
         {
+            // ⚠ O ID da regra vai junto: é ele que liga o erro visto na tela ao catálogo, e esta
+            // recusa vinha sem ele. Só apareceu quando a sessão de suporte saiu — o gate dela
+            // devolvia 403 ANTES, e o motivo real desta recusa nunca chegava a ser visto.
             throw new RegraDeNegocioException(
                 "O usuário de plataforma cria usuário pela rota de plataforma, informando a " +
-                "unidade. Esta rota cria usuário na unidade de quem está autenticado.");
+                "unidade. Esta rota cria usuário na unidade de quem está autenticado.",
+                "RN-GER-016");
         }
 
         // RN-GER-023 — o validator já garantiu que é válido; aqui só materializa. `De` lançaria

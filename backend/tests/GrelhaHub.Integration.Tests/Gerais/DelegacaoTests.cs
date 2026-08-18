@@ -283,13 +283,19 @@ public sealed class DelegacaoTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
                 SenhaInicial = Senha,
             });
 
-        // 403, e por um motivo MELHOR do que o que eu esperava: `RN-GER-015` chega antes.
-        // A escrita de plataforma exige sessão de suporte aberta com motivo, e o behavior recusa
-        // no pipeline — a mensagem de "use a rota de plataforma" nem é alcançada. A ordem dos
-        // gates está certa: sessão de suporte é pergunta mais externa que qual rota usar.
-        resposta.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // ⚠ ERA 403, vindo de `RN-GER-015`: o gate da sessão de suporte recusava no pipeline e a
+        // mensagem de "use a rota de plataforma" nunca era alcançada. Com a sessão removida
+        // (ADR-0020), a recusa REAL aparece — 422 com o motivo de verdade.
+        //
+        // E o gate a mais escondia um defeito: esta recusa não carregava o ID da regra. Um erro
+        // mascarado por outro erro é o pior tipo de cobertura, porque o teste ficava verde.
+        resposta.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity,
+            await resposta.Content.ReadAsStringAsync());
 
-        (await resposta.Content.ReadAsStringAsync()).Should().Contain("RN-GER-015");
+        var corpo = await resposta.Content.ReadAsStringAsync();
+
+        corpo.Should().Contain("rota de plataforma", "a mensagem diz o que fazer, não só que não pode");
+        corpo.Should().Contain("RN-GER-016", "o ID da regra liga o erro da tela ao catálogo");
     }
 
     // ── auxiliares ──────────────────────────────────────────────────────────────────

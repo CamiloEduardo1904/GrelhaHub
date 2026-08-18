@@ -16,7 +16,6 @@ public interface IAppDbContext
     DbSet<Usuario> Usuarios { get; }
     DbSet<Parametro> Parametros { get; }
     DbSet<Perfil> Perfis { get; }
-    DbSet<SessaoDeSuporte> SessoesDeSuporte { get; }
 
     /// <summary><c>RN-GER-033</c> — os links de uso único (convite e redefinição de senha).</summary>
     DbSet<TokenDeAcesso> TokensDeAcesso { get; }

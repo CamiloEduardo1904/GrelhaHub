@@ -6,15 +6,12 @@ import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import { CadastroDeOperacao } from './CadastroDeOperacao';
 import { Operacao } from '../admin/Operacao';
 import { OperacaoDaCasa } from './OperacaoDaCasa';
-import { SessaoDeSuporteDaCasa } from './SessaoDeSuporteDaCasa';
 import {
   COM_CODIGO,
   comDependencias,
   dependentesDe,
-  sessaoVigente,
   type Estabelecimento,
   type ModuloDoCatalogo,
-  type SessaoDeSuporte,
 } from './tipos';
 
 /**
@@ -30,22 +27,19 @@ type Aba = 'operacao' | 'painel' | 'dados' | 'modulos';
 export function Estabelecimentos() {
   const [lista, setLista] = useState<Estabelecimento[]>([]);
   const [catalogo, setCatalogo] = useState<ModuloDoCatalogo[]>([]);
-  const [sessoes, setSessoes] = useState<SessaoDeSuporte[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [vendo, setVendo] = useState<string | null>(null);
   const [cadastrando, setCadastrando] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
-      const [casas, modulos, abertas] = await Promise.all([
+      const [casas, modulos] = await Promise.all([
         api.get<Estabelecimento[]>('/v1/plataforma/estabelecimentos'),
         api.get<ModuloDoCatalogo[]>('/v1/plataforma/modulos'),
-        api.get<SessaoDeSuporte[]>('/v1/plataforma/sessoes-de-suporte'),
       ]);
 
       setLista(casas.data);
       setCatalogo(modulos.data);
-      setSessoes(abertas.data);
       setErro(null);
     } catch (e) {
       setErro(mensagemDeErro(e));
@@ -152,7 +146,6 @@ export function Estabelecimentos() {
         <DetalheDaCasa
           casa={casaAberta}
           catalogo={catalogo}
-          sessao={sessaoVigente(sessoes, casaAberta.id)}
           aoMudar={carregar}
         />
       )}
@@ -164,12 +157,10 @@ export function Estabelecimentos() {
 function DetalheDaCasa({
   casa,
   catalogo,
-  sessao,
   aoMudar,
 }: {
   casa: Estabelecimento;
   catalogo: ModuloDoCatalogo[];
-  sessao: SessaoDeSuporte | null;
   aoMudar: () => Promise<void>;
 }) {
   const [aba, setAba] = useState<Aba>('operacao');
@@ -212,22 +203,19 @@ function DetalheDaCasa({
         ))}
       </nav>
 
-      {/* A operação é LEITURA e não passa pela sessão de suporte (RN-GER-015 guarda a escrita). */}
       {aba === 'operacao' && <OperacaoDaCasa casa={casa} />}
 
       {aba === 'painel' && <Operacao unidadeId={casa.id} />}
 
-      {/* ⚠ Enumerado, e não `aba !== 'operacao'`. A sessão de suporte guarda a ESCRITA
-          (`RN-GER-015`); as duas abas de leitura — horário e painel — não a exigem. Com a
-          negação, a aba nova entrava aqui por padrão e pediria sessão de suporte para ver um
-          gráfico: é o tipo de condição que envelhece errado a cada aba acrescentada. */}
+      {/* ⚠ Enumerado, e não por negação: condição escrita como "tudo menos X" adota
+          silenciosamente toda aba nova, e foi assim que o painel entrou num bloco que não era
+          dele. Lista explícita envelhece melhor. */}
       {(aba === 'dados' || aba === 'modulos') && (
         <>
-          <SessaoDeSuporteDaCasa casa={casa} sessao={sessao} aoMudar={aoMudar} />
 
           {aba === 'dados' && (
             <>
-              <DadosDaCasa casa={casa} temSessao={sessao !== null} aoMudar={aoMudar} />
+              <DadosDaCasa casa={casa} aoMudar={aoMudar} />
 
               {/* RN-GER-036 / RN-GER-037 — endereço e horário. Fica sob a mesma sessão de
                   suporte do bloco acima: é dado do cliente sendo alterado em nome dele. */}
@@ -246,11 +234,9 @@ function DetalheDaCasa({
 
 function DadosDaCasa({
   casa,
-  temSessao,
   aoMudar,
 }: {
   casa: Estabelecimento;
-  temSessao: boolean;
   aoMudar: () => Promise<void>;
 }) {
   const [form, setForm] = useState({
@@ -301,7 +287,7 @@ function DadosDaCasa({
       <form onSubmit={salvar} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {/* RN-GER-015 — alterar o cadastro de um cliente é SUPORTE, e exige sessão. Inativar não:
             é ato comercial e carrega justificativa própria. */}
-        <fieldset disabled={!temSessao || ocupado}>
+        <fieldset disabled={false}>
           <legend>Dados cadastrais</legend>
 
           <div className="linha">
@@ -343,7 +329,7 @@ function DadosDaCasa({
           <strong>não são alteráveis</strong>: o link já circulou, e o CNPJ é o do contrato.
         </p>
 
-        <button type="submit" className="btn" disabled={!temSessao || ocupado}>
+        <button type="submit" className="btn" disabled={false}>
           <IconeLapis />
           Salvar dados
         </button>

@@ -44,17 +44,9 @@ public sealed class HorarioEViradaTests(AmbienteDeIntegracao ambiente) : TesteDe
     /// isenções do <c>SessaoDeSuporteBehavior</c>: a primeira versão deste teste tomou 403 aqui, e
     /// o 403 estava certo.
     /// </summary>
-    private static async Task AbrirSessaoAsync(HttpClient suporte, Guid unidadeId) =>
-        (await suporte.PostAsJsonAsync(
-            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
-            new { UnidadeId = unidadeId, Motivo = "Cadastro de horario de funcionamento a pedido do cliente" }))
-            .EnsureSuccessStatusCode();
-
     private static async Task<HttpResponseMessage> DefinirAsync(
         HttpClient plataforma, Guid unidadeId, string? abre, string? fecha)
     {
-        await AbrirSessaoAsync(plataforma, unidadeId);
-
         var corpo = Semana(abre, fecha);
 
         return await plataforma.PutAsJsonAsync(

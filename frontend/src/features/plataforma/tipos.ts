@@ -31,20 +31,6 @@ export interface ModuloDoCatalogo {
 }
 
 /**
- * `RN-GER-015` — a sessão que autoriza o suporte a **escrever** no dado de um restaurante.
- * Ler para diagnosticar é rotina e não exige nada.
- */
-export interface SessaoDeSuporte {
-  id: string;
-  unidadeId: string;
-  restaurante: string;
-  motivo: string;
-  abertaEm: string;
-  validaAte: string;
-  encerradaEm: string | null;
-}
-
-/**
  * `RN-GER-020` — o fecho transitivo de `siglas` sobre o grafo, incluindo as próprias.
  *
  * O grafo vem do servidor (`GET /v1/plataforma/modulos`): uma cópia dele aqui divergiria do banco,
@@ -90,20 +76,3 @@ export function dependentesDe(
  * interface de quem vende.
  */
 export const COM_CODIGO = new Set(['GER', 'VEN']);
-
-/** A sessão vigente de uma unidade, ou `null`. */
-export function sessaoVigente(
-  sessoes: SessaoDeSuporte[],
-  unidadeId: string,
-): SessaoDeSuporte | null {
-  const agora = Date.now();
-
-  return (
-    sessoes.find(
-      (s) =>
-        s.unidadeId === unidadeId &&
-        s.encerradaEm === null &&
-        new Date(s.validaAte).getTime() > agora,
-    ) ?? null
-  );
-}

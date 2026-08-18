@@ -10,7 +10,6 @@ using GrelhaHub.Application.Features.Gerais.CadastrarRestaurante;
 using GrelhaHub.Application.Features.Gerais.ObterMeuRestaurante;
 using GrelhaHub.Application.Features.Gerais.Modulos;
 using GrelhaHub.Application.Features.Gerais.Parametros;
-using GrelhaHub.Application.Features.Gerais.SessaoDeSuporte;
 using GrelhaHub.Application.Features.Gerais.Usuarios;
 using GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 using GrelhaHub.Application.Features.Vendas.CancelarEExcluirPedido;
@@ -273,33 +272,6 @@ public sealed class UsuariosController(ISender sender) : ControllerBase
     public async Task<IActionResult> TrocarSenha(TrocarSenhaCommand comando, CancellationToken ct)
     {
         await sender.Send(comando, ct);
-        return NoContent();
-    }
-}
-
-/// <summary>
-/// Sessão de suporte — <c>RN-GER-015</c>, ADR-0013. Só a plataforma.
-/// </summary>
-[ApiController]
-[Route("api/v1/plataforma/sessoes-de-suporte")]
-[Authorize]
-public sealed class SessaoDeSuporteController(ISender sender) : ControllerBase
-{
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<SessaoDeSuporteDto>>> Listar(
-        [FromQuery] Guid? unidadeId, CancellationToken ct) =>
-        Ok(await sender.Send(new ListarSessoesDeSuporteQuery(unidadeId), ct));
-
-    /// <summary>Abre a sessão que autoriza ESCRITA no dado de uma unidade. Motivo obrigatório.</summary>
-    [HttpPost]
-    public async Task<ActionResult<SessaoDeSuporteDto>> Abrir(
-        AbrirSessaoDeSuporteCommand comando, CancellationToken ct) =>
-        Ok(await sender.Send(comando, ct));
-
-    [HttpPost("{id:guid}/encerrar")]
-    public async Task<IActionResult> Encerrar(Guid id, CancellationToken ct)
-    {
-        await sender.Send(new EncerrarSessaoDeSuporteCommand(id), ct);
         return NoContent();
     }
 }
