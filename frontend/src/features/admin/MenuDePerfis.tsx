@@ -79,7 +79,7 @@ export function MenuDePerfis({
                         {/* O código fica visível: é ele que aparece no erro do servidor
                             ("falta a permissão pedido.cancelar"), e ligar um ao outro é o que
                             permite ao suporte responder sem adivinhar. */}
-                        <span className="chave"> {permissao.codigo}</span>
+                        <span className="chave">{permissao.codigo}</span>
                       </li>
                     ))}
                   </ul>

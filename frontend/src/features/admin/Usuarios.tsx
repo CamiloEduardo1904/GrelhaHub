@@ -79,7 +79,7 @@ export function Usuarios() {
       {erro && <p className="erro">{erro}</p>}
 
       {podeGerenciar && (
-        <div className="painel-cartao">
+        <div className="painel-cartao largo">
           <div className="comanda-id">
             <h2 className="wordmark" style={{ fontSize: '1.1rem' }}>
               Equipe
@@ -253,7 +253,11 @@ function FormularioDeUsuario({
       <fieldset>
         <legend>Novo usuário</legend>
 
-        <div className="linha">
+        {/* Os quatro campos de identificação juntos, numa grade que se acomoda à largura.
+            Antes o e-mail vinha DEPOIS do menu de perfis, separado do resto do cadastro por
+            seis cartões de permissão — quem preenchia de cima para baixo escolhia o acesso no
+            meio de digitar quem a pessoa é. Identificação primeiro, acesso depois. */}
+        <div className="grade-usuario">
           <label>
             Nome
             <input {...campo('nome')} required autoComplete="off" />
@@ -263,9 +267,7 @@ function FormularioDeUsuario({
             Sobrenome
             <input {...campo('sobrenome')} required autoComplete="off" />
           </label>
-        </div>
 
-        <div className="linha">
           <label>
             CPF
             <input
@@ -278,6 +280,10 @@ function FormularioDeUsuario({
             />
           </label>
 
+          <label>
+            E-mail
+            <input type="email" {...campo('email')} required autoComplete="off" />
+          </label>
         </div>
 
         {/* RN-GER-010 — o menu de perfis, com o que cada um concede. Substituiu o `<select>`:
@@ -288,14 +294,6 @@ function FormularioDeUsuario({
           selecionado={form.perfilId}
           aoSelecionar={(perfilId) => setForm((atual) => ({ ...atual, perfilId }))}
         />
-
-        <div className="linha">
-          <label>
-            E-mail
-            <input type="email" {...campo('email')} required autoComplete="off" />
-          </label>
-
-        </div>
 
         {/* RN-GER-032 / RN-GER-033 — NÃO se digita senha aqui, e a ausência do campo é o ponto.
             O usuário recebe um link de uso único por e-mail e define a própria senha: a senha que

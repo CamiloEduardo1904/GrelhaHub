@@ -540,7 +540,10 @@ function FormularioDeUsuario({
       <fieldset disabled={!unidadeId || !temSessao}>
         <legend>A pessoa</legend>
 
-        <div className="linha">
+        {/* Uma grade que se acomoda à largura, e não três `.linha` de duas colunas: a última
+            delas tinha UM campo e deixava metade da linha vazia. Mesma correção de
+            `Usuarios.tsx`, e o mesmo motivo — `.linha` só descreve bem par que anda junto. */}
+        <div className="grade-usuario">
           <label>
             Nome
             <input
@@ -558,9 +561,6 @@ function FormularioDeUsuario({
               required
             />
           </label>
-        </div>
-
-        <div className="linha">
           <label>
             CPF
             <input
@@ -588,9 +588,6 @@ function FormularioDeUsuario({
               ))}
             </select>
           </label>
-        </div>
-
-        <div className="linha">
           <label>
             E-mail
             <input
@@ -600,7 +597,6 @@ function FormularioDeUsuario({
               required
             />
           </label>
-
         </div>
 
         {/* RN-GER-032 — sem campo de senha: o convite por e-mail define. Ver Usuarios.tsx. */}
