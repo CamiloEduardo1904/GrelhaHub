@@ -75,7 +75,8 @@ public sealed record ResumoDaOperacaoDto(
 /// A visão resolve os dois de uma vez.
 /// </para>
 /// </summary>
-public sealed class ResumoDaOperacaoHandler(ILeituraDb leitura, IRelogio relogio)
+public sealed class ResumoDaOperacaoHandler(
+    ILeituraDb leitura, IRelogio relogio, IContextoDeExecucao contexto)
     : IRequestHandler<ResumoDaOperacaoQuery, ResumoDaOperacaoDto>
 {
     /// <summary>
@@ -107,10 +108,13 @@ public sealed class ResumoDaOperacaoHandler(ILeituraDb leitura, IRelogio relogio
                 $"O período do painel não pode passar de {MaximoDeDias} dias.", "RN-VEN-050");
         }
 
-        // ⚠ O recorte por unidade NÃO é feito aqui: o filtro global do contexto de leitura já o
-        // aplica, como no de escrita (RN-GER-009). O que sobra para o handler é o recorte
-        // OPCIONAL que só a plataforma informa (RN-GER-014 / RN-GER-016).
-        var unidade = request.UnidadeId;
+        // ⚠⚠ RN-GER-016 — o recorte passa por `UnidadeDaConsulta.Recorte`, e NÃO pelo
+        // `request.UnidadeId` cru. A diferença aparece quando um RESTAURANTE informa a unidade do
+        // vizinho: o helper IGNORA o parâmetro e devolve a própria; usar o valor cru faria o filtro
+        // do handler (`= vizinho`) intersectar com o filtro global do contexto (`= minha`) e
+        // devolver ZERO — o restaurante veria a própria lista vazia por ter mandado um id que não é
+        // dele. Foi assim que a conversão quebrou `AcessoTests`, e é por isso que o helper existe.
+        var unidade = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
 
         var porDia = await leitura.OperacaoPorDia
             .Where(d => unidade == null || d.UnidadeId == unidade)

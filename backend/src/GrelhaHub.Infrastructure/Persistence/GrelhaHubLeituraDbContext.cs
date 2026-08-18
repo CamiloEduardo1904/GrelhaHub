@@ -56,15 +56,24 @@ public sealed class GrelhaHubLeituraDbContext(
     }
 
     /// <summary>
-    /// Mapeia um modelo de leitura à sua visão, sem chave e com o recorte de unidade.
+    /// Mapeia um modelo de leitura à sua visão, sem chave.
+    /// <para>
+    /// ⚠⚠ O recorte por unidade só é aplicado a quem declara <see cref="IRecortadoPorUnidade"/>.
+    /// A primeira versão filtrava <b>tudo</b>, e isso quebrava as rotas anônimas: o cardápio
+    /// público resolve a casa pelo <b>slug</b>, e nesse instante ainda não há unidade no contexto —
+    /// o filtro devolveria zero linhas e o cliente leria "restaurante não encontrado" para uma casa
+    /// que existe. Mesmo desenho do lado da escrita, onde só <c>IPertenceAUnidade</c> é filtrado.
+    /// </para>
     /// </summary>
     private void Visao<T>(ModelBuilder modelBuilder, string visao)
         where T : class
     {
-        modelBuilder.Entity<T>()
-            .HasNoKey()
-            .ToView(visao)
-            .HasQueryFilter(RecorteDeUnidade<T>());
+        var entidade = modelBuilder.Entity<T>().HasNoKey().ToView(visao);
+
+        if (typeof(IRecortadoPorUnidade).IsAssignableFrom(typeof(T)))
+        {
+            entidade.HasQueryFilter(RecorteDeUnidade<T>());
+        }
     }
 
     /// <summary>

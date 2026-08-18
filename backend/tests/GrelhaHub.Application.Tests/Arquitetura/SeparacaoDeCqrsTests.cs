@@ -72,7 +72,6 @@ public sealed class SeparacaoDeCqrsTests
         "ListarCatalogoDeModulosHandler",
         "ListarEstabelecimentosHandler",
         "ListarModulosDaUnidadeHandler",
-        "ListarPedidosHandler",
         "ListarPerfisHandler",
         "ListarSessoesDeSuporteHandler",
         "ListarUsuariosDeSuporteHandler",

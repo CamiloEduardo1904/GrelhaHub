@@ -28,7 +28,7 @@ public sealed record PedidoResumoLeitura(
     int QuantidadeDeItens,
     DateTimeOffset CriadoEm,
     DateOnly DataOperacional,
-    string? Observacao);
+    string? Observacao) : IRecortadoPorUnidade;
 
 /// <param name="Total">Já multiplicado: <c>preco_praticado × quantidade</c>, calculado pela visão.</param>
 public sealed record ItemDePedidoLeitura(
@@ -38,7 +38,7 @@ public sealed record ItemDePedidoLeitura(
     int Quantidade,
     decimal PrecoPraticado,
     decimal Total,
-    string? Observacao);
+    string? Observacao) : IRecortadoPorUnidade;
 
 /// <summary>
 /// Um dia operacional de uma unidade, com os números já separados por <c>RN-VEN-049</c>.
@@ -52,11 +52,31 @@ public sealed record OperacaoDoDiaLeitura(
     int PedidosFinalizados,
     int PedidosEmAndamento,
     decimal ValorEmAndamento,
-    int PedidosCancelados);
+    int PedidosCancelados) : IRecortadoPorUnidade;
 
 public sealed record ProdutoVendidoLeitura(
     Guid UnidadeId,
     DateOnly DataOperacional,
     string NomeProduto,
     int Quantidade,
-    decimal Total);
+    decimal Total) : IRecortadoPorUnidade;
+
+/// <summary>
+/// O marcador de <b>recorte por unidade</b> no lado da leitura — <c>RN-GER-009</c>.
+/// <para>
+/// ⚠⚠ <b>Existe porque a primeira versão do contexto de leitura filtrava TUDO</b>, exigindo
+/// <c>UnidadeId</c> de todo modelo. Parecia mais seguro e quebrava as rotas anônimas: o cardápio
+/// público resolve a casa <b>pelo slug</b>, e nesse instante ainda não há unidade no contexto — o
+/// filtro devolveria zero linhas e o cliente veria "restaurante não encontrado" para uma casa que
+/// existe.
+/// </para>
+/// <para>
+/// É o mesmo desenho do lado da escrita, onde só entidade que implementa <c>IPertenceAUnidade</c>
+/// recebe o filtro global. Modelo que descreve a PRÓPRIA unidade, ou catálogo compartilhado entre
+/// todas (módulo, parâmetro), não é recortado — e a ausência do marcador é a declaração disso.
+/// </para>
+/// </summary>
+public interface IRecortadoPorUnidade
+{
+    Guid UnidadeId { get; }
+}

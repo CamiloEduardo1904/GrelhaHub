@@ -1,5 +1,6 @@
 using GrelhaHub.Application.Common.Exceptions;
 using GrelhaHub.Application.Common.Interfaces;
+using GrelhaHub.Application.Common.Leitura;
 using GrelhaHub.Domain.Common;
 using GrelhaHub.Domain.Vendas;
 using MediatR;
@@ -61,12 +62,30 @@ public sealed record PedidoResumoDto(
 
 public sealed record ItemResumoDto(string Produto, int Quantidade, decimal PrecoPraticado, string? Observacao);
 
+/// <summary>
+/// ADR-0019 — lê do modelo de <b>leitura</b>.
+/// <para>
+/// ⚠ <b>O total sai da visão, e isso não recria a segunda definição que a versão anterior evitava.</b>
+/// O comentário de antes dizia: "carrega o agregado em vez de projetar o total em SQL, senão o
+/// <c>Sum</c> vira uma SEGUNDA definição de <c>RN-VEN-039</c>". A preocupação estava certa — duas
+/// fórmulas divergem no dia em que taxa de serviço entrar. O que muda é que agora a fórmula tem
+/// <b>um lugar só de novo</b>: a visão <c>vw_pedido_resumo</c>. Não é o handler somando por conta
+/// própria; é o banco somando no único lugar onde a soma está escrita para leitura.
+/// </para>
+/// <para>
+/// ⚠ Quando <c>RN-VEN-039</c> ganhar taxa ou desconto, muda <b>a visão</b> — e o teste de paridade
+/// entre ela e <c>Pedido.Total</c> é o que impede a divergência de passar despercebida.
+/// </para>
+/// </summary>
 public sealed class ListarPedidosHandler(
-    IAppDbContext db, IRelogio relogio, IContextoDeExecucao contexto)
+    ILeituraDb leitura, IRelogio relogio, IContextoDeExecucao contexto)
     : IRequestHandler<ListarPedidosQuery, IReadOnlyList<PedidoResumoDto>>
 {
-    public async Task<IReadOnlyList<PedidoResumoDto>> Handle(ListarPedidosQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<PedidoResumoDto>> Handle(
+        ListarPedidosQuery request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         // RN-GER-006 — o recorte é por data_operacional (coluna GERADA), nunca por data de
         // criação: senão o pedido da 01h30 de domingo sumiria do painel de sábado.
         var de = request.De ?? relogio.DiaOperacionalDeHoje();
@@ -78,71 +97,57 @@ public sealed class ListarPedidosHandler(
                 "A data final do período não pode ser anterior à inicial.", "RN-GER-006");
         }
 
-        // RN-GER-014 / ADR-0013 — o recorte por unidade passou a ser POSSÍVEL, e continua
-        // opcional para a plataforma.
-        //
-        // Ver a base inteira numa lista é o que o ADR-0013 decidiu, e `AcessoTests` CA-9 afirma.
-        // O que faltava era o suporte conseguir focar em UMA casa: sem isso, atender um cliente
-        // por telefone significava olhar os pedidos de três clientes de uma vez, sem coluna
-        // dizendo de quem era cada linha. Para o restaurante o parâmetro é ignorado (RN-GER-016).
-        var recorte = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
+        // ⚠⚠ RN-GER-016 — o recorte passa por `UnidadeDaConsulta.Recorte`, e NÃO pelo
+        // `request.UnidadeId` cru. A diferença aparece quando um RESTAURANTE informa a unidade do
+        // vizinho: o helper IGNORA o parâmetro e devolve a própria; usar o valor cru faria o filtro
+        // do handler (`= vizinho`) intersectar com o filtro global do contexto (`= minha`) e
+        // devolver ZERO — o restaurante veria a própria lista vazia por ter mandado um id que não é
+        // dele. Foi assim que a conversão quebrou `AcessoTests`, e é por isso que o helper existe.
+        var unidade = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
+        var status = (int?)request.Status;
 
-        var consulta = db.Pedidos
-            .AsNoTracking()
-            .Where(p => recorte == null || p.UnidadeId == recorte)
-            .Where(p => p.DataOperacional >= de && p.DataOperacional <= ate);
-
-        if (request.Status is { } status)
-        {
-            consulta = consulta.Where(p => p.Status == status);
-        }
-
-        // Carrega o agregado em vez de projetar o total em SQL.
-        //
-        // Antes, o total saía de um `Sum` na consulta — uma SEGUNDA definição de RN-VEN-039,
-        // que passaria a divergir de `Pedido.Total` no dia em que taxa de serviço ou desconto
-        // entrassem na fórmula. Agora a regra tem um lugar só. O recorte que importa continua
-        // no banco: dia operacional e status.
-        var pedidos = await consulta
-            .Include(p => p.Itens)
-            .OrderByDescending(p => p.Numero)
+        var pedidos = await leitura.PedidosResumo
+            .Where(p => unidade == null || p.UnidadeId == unidade)
+            .Where(p => p.DataOperacional >= de && p.DataOperacional <= ate)
+            .Where(p => status == null || p.Status == status)
+            .OrderByDescending(p => p.DataOperacional)
+            .ThenByDescending(p => p.Numero)
             .ToListAsync(cancellationToken);
 
-        var idsDeClientes = pedidos
-            .Where(pedido => pedido.ClienteId.HasValue)
-            .Select(pedido => pedido.ClienteId!.Value)
-            .Distinct()
-            .ToList();
-
-        // Uma consulta para todos os clientes do dia, em vez de uma por pedido.
-        var clientes = await db.Clientes
-            .AsNoTracking()
-            .Where(cliente => idsDeClientes.Contains(cliente.Id))
-            .ToDictionaryAsync(cliente => cliente.Id, cancellationToken);
-
-        return pedidos.Select(pedido =>
+        if (pedidos.Count == 0)
         {
-            var cliente = pedido.ClienteId is { } id && clientes.TryGetValue(id, out var achado)
-                ? achado
-                : null;
+            return [];
+        }
 
-            return new PedidoResumoDto(
-                pedido.Id,
-                pedido.UnidadeId,
-                pedido.Numero,
-                pedido.Canal.ToString(),
-                pedido.Status.ToString(),
-                cliente?.Nome,
-                cliente?.Telefone,
-                pedido.Total.Valor,
-                pedido.Itens.Count,
-                pedido.CriadoEm,
-                pedido.DataOperacional,
-                pedido.Observacao,
-                pedido.Itens
-                    .Select(item => new ItemResumoDto(
-                        item.NomeProduto, item.Quantidade, item.PrecoPraticado.Valor, item.Observacao))
-                    .ToList());
-        }).ToList();
+        // Uma consulta para os itens de todos os pedidos, em vez de uma por pedido — o mesmo
+        // cuidado que a versão anterior tinha com os clientes.
+        var ids = pedidos.Select(p => p.Id).ToList();
+
+        var itens = await leitura.ItensDePedido
+            .Where(i => ids.Contains(i.PedidoId))
+            .ToListAsync(cancellationToken);
+
+        var porPedido = itens.GroupBy(i => i.PedidoId).ToDictionary(g => g.Key, g => g.ToList());
+
+        return
+        [
+            .. pedidos.Select(p => new PedidoResumoDto(
+                p.Id,
+                p.UnidadeId,
+                p.Numero,
+                ((CanalVenda)p.Canal).ToString(),
+                ((StatusPedido)p.Status).ToString(),
+                p.NomeCliente,
+                p.TelefoneCliente,
+                p.Total,
+                p.QuantidadeDeItens,
+                p.CriadoEm,
+                p.DataOperacional,
+                p.Observacao,
+                porPedido.TryGetValue(p.Id, out var doPedido)
+                    ? [.. doPedido.Select(i => new ItemResumoDto(
+                        i.NomeProduto, i.Quantidade, i.PrecoPraticado, i.Observacao))]
+                    : []))
+        ];
     }
 }
