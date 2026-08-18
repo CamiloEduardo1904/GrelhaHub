@@ -15,7 +15,8 @@ namespace GrelhaHub.Integration.Tests.Infraestrutura;
 /// de provar a configuração do teste.
 /// </para>
 /// </summary>
-internal sealed class ApiDeTestes(string stringDeConexao, string chaveJwt) : WebApplicationFactory<Program>
+internal sealed class ApiDeTestes(string stringDeConexao, string stringDeLog, string chaveJwt)
+    : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -28,6 +29,10 @@ internal sealed class ApiDeTestes(string stringDeConexao, string chaveJwt) : Web
             new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GrelhaHub"] = stringDeConexao,
+
+                // ADR-0017 — o banco de log. Sem isto a API nem sobe, por decisão: sistema sem
+                // onde gravar a trilha não deveria aceitar a primeira requisição.
+                ["ConnectionStrings:GrelhaHubLog"] = stringDeLog,
                 ["Jwt:Chave"] = chaveJwt,
 
                 // O log de requisição do Serilog polui a saída do runner e esconde a
@@ -49,6 +54,7 @@ internal sealed class ApiDeTestes(string stringDeConexao, string chaveJwt) : Web
             }));
 
         builder.UseSetting("ConnectionStrings:GrelhaHub", stringDeConexao);
+        builder.UseSetting("ConnectionStrings:GrelhaHubLog", stringDeLog);
         builder.UseSetting("Jwt:Chave", chaveJwt);
 
         // ADR-0016 — O CORREIO É O ÚNICO DUBLÊ DA SUÍTE, e a exceção é declarada: a alternativa

@@ -118,6 +118,49 @@ backend/src/
 └── GrelhaHub.Api/             controllers, autenticação, injeção de dependência
 ```
 
+### Escrita e leitura são dois caminhos — ADR-0019
+
+O sistema separa **quem mudou o quê** de **quem perguntou o quê**, e a separação é física, não uma
+convenção:
+
+```mermaid
+flowchart TB
+    subgraph W["ESCRITA — o modelo rico"]
+        C["Command"] --> CH["Handler"]
+        CH --> AG["Agregado de domínio<br/><small>Pedido, Produto, Usuário</small>"]
+        AG --> WC["IAppDbContext<br/><small>rastreado, transacional</small>"]
+    end
+
+    subgraph R["LEITURA — o modelo chato"]
+        Q["Query"] --> QH["Handler"]
+        QH --> RC["ILeituraDb<br/><small>sem rastreio, SEM SaveChanges</small>"]
+        RC --> VW["visões do banco"]
+    end
+```
+
+| | Escrita | Leitura |
+|---|---------|---------|
+| Trabalha com | Agregados de domínio, com regras | Tipos **sem chave**, feitos para a tela |
+| Contexto | `IAppDbContext` | `ILeituraDb` |
+| Grava? | Sim | **A interface não tem o método** |
+| Onde soma | Não soma: a regra decide | Na **visão do banco** |
+
+**Três regras, e nenhuma delas depende de disciplina:**
+
+1. Handler de consulta **não recebe** o contexto de escrita — a interface não é registrada para ele.
+2. Handler de comando **não recebe** o de leitura: regra se decide sobre o agregado, nunca sobre uma
+   projeção que pode não refletir o que a própria transação acabou de mudar.
+3. Os modelos de leitura **não têm chave**, e o framework recusa gravar entidade sem chave.
+
+> ⚠ **A separação é verificada por teste, não combinada em reunião.** `SeparacaoDeCqrsTests` varre
+> os 49 handlers por reflexão e recusa a build se alguma das regras acima for quebrada. Isto existe
+> porque o projeto declarou "CQRS" num documento e entregou outra coisa por dois meses **sem
+> ninguém notar** — a divergência não apareceu porque nada a media.
+>
+> A conversão das consultas é grande e foi feita por partes. O que falta está **nomeado** no teste,
+> numa lista que só anda para baixo: um teste recusa infrator fora dela, outro recusa nome nela que
+> já foi convertido. É o que impede "por partes" de virar "pela metade, para sempre".
+
 ### Um caso de uso, por dentro
 
 Cada operação é uma pasta com três arquivos que se leem em ordem:
@@ -150,6 +193,50 @@ Três peças interceptam **toda** gravação, sem nenhum caso de uso precisar ch
 > ⚠ **A ordem importa.** O de unidade roda **antes** do de auditoria: invertido, a trilha
 > registraria a unidade vazia do registro que acabou de nascer.
 
+### A trilha atravessa dois bancos — ADR-0017
+
+A trilha de auditoria mora num **banco separado**. Isso põe em risco a propriedade que a torna
+confiável: *não existe operação sem registro* — que funcionava porque os dois gravavam na mesma
+transação.
+
+Bancos diferentes não compartilham transação. A saída é uma **caixa de saída**:
+
+```mermaid
+sequenceDiagram
+    participant API
+    participant APP as banco grelhahub
+    participant W as serviço em segundo plano
+    participant LOG as banco grelhahub_log
+
+    API->>APP: TRANSAÇÃO<br/>grava a operação + grava a caixa de saída
+    Note over APP: ou as duas, ou nenhuma —<br/>a garantia continua aqui
+    W->>APP: lê os pendentes
+    W->>LOG: copia para a trilha
+    W->>APP: apaga da caixa
+```
+
+**Se a API cair no meio, nada se perde**: a linha continua na caixa e a próxima volta a encontra.
+
+| Decisão | Por quê |
+|---------|---------|
+| Copiar **e depois** apagar | Invertido, uma falha entre as duas perderia a trilha — que é o que a ponte existe para impedir |
+| Mesmo `id` dos dois lados | Torna a cópia **idempotente**: o serviço pode copiar e cair antes de apagar, e a segunda tentativa não duplica |
+| Validar na **entrada** | Lixo recusado na caixa nunca chega ao banco de log, e não entope a fila bloqueando tudo atrás |
+| Nunca descartar por tentativas | Trilha perdida é o que se quer evitar. O contador serve para o alerta: dez tentativas significa banco de log fora do ar, e isso precisa de gente |
+
+> ⚠ **O preço, declarado:** a trilha chega ao banco de log com **segundos de atraso**. Quem consultar
+> a auditoria de algo que acabou de acontecer pode não ver ainda.
+
+### O que quebrou também vira dado
+
+Toda exceção não tratada é gravada em `log_excecao`, com tipo, pilha, rota e o **identificador da
+requisição** — o mesmo que o cliente recebe no corpo do erro. É por ele que o suporte encontra a
+falha sem adivinhar horário.
+
+> ⚠ O registro **nunca lança**. Ele roda dentro do tratador de exceções: uma falha ali substituiria a
+> exceção original por outra, e o usuário receberia um erro sobre o registro do erro — perdendo
+> justamente a causa que se queria guardar.
+
 ### Como um erro vira mensagem
 
 | Situação | Resposta | O que o usuário lê |
@@ -178,9 +265,9 @@ Três peças interceptam **toda** gravação, sem nenhum caso de uso precisar ch
 
 | Tipo | Quantidade | O que provam |
 |------|-----------:|--------------|
-| Domínio | 76 | As regras isoladas: dia operacional, dinheiro, CPF |
-| Aplicação | 13 | Fecho de dependência entre módulos, modelo do e-mail |
-| Integração | 200 | **PostgreSQL de verdade**, subindo num contêiner, com a API real |
+| Domínio | 92 | As regras isoladas: dia operacional, dinheiro, CPF |
+| Aplicação | 18 | Fecho de dependência, modelo do e-mail, e a **separação de CQRS verificada** |
+| Integração | 209 | **PostgreSQL de verdade** — dois bancos, num contêiner, com a API real |
 
 **Nada de banco em memória.** O provider em memória não executa restrição, gatilho nem coluna
 calculada — daria falsa confiança exatamente nas regras que mais importam.

@@ -120,12 +120,6 @@ public sealed class SemPermissaoException(string permissao)
 public sealed class TrocaDeSenhaPendenteException()
     : Exception("Troque a sua senha antes de continuar.");
 
-/// <summary>
-/// <c>RN-GER-015</c> — o usuario de plataforma tentou ESCREVER sem sessao de suporte aberta.
-/// ADR-0013.
-/// </summary>
-public sealed class SessaoDeSuporteExigidaException()
-    : Exception("Abra uma sessão de suporte, com motivo, antes de alterar o dado de um restaurante.");
 
 /// <summary>
 /// <c>RN-GER-024</c> ⚠⚠ — o usuário tem <c>usuario.gerenciar</c>, mas o perfil que ele tentou

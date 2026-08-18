@@ -52,6 +52,24 @@ public static class DependencyInjection
 
         services.AddScoped<ILeituraDb>(sp => sp.GetRequiredService<GrelhaHubLeituraDbContext>());
 
+        // ADR-0017 — o BANCO DE LOG: trilha de auditoria e exceções.
+        //
+        // ⚠ Connection string PRÓPRIA. Sem ela configurada o sistema não sobe, e isso é
+        // deliberado: diferente do SMTP (RN-GER-032), que é ausência tolerável, um sistema sem
+        // onde gravar a trilha não deveria aceitar a primeira requisição — a operação gravaria e
+        // o registro não, que é exatamente o que RN-GER-015 proíbe.
+        var conexaoDeLog = configuration.GetConnectionString("GrelhaHubLog")
+            ?? throw new InvalidOperationException(
+                "Connection string 'GrelhaHubLog' não configurada (ADR-0017). Ver .env.example.");
+
+        services.AddDbContext<GrelhaHubLogDbContext>(options =>
+            options.UseNpgsql(conexaoDeLog).UseSnakeCaseNamingConvention());
+
+        services.AddScoped<ILogDb>(sp => sp.GetRequiredService<GrelhaHubLogDbContext>());
+
+        // O worker que leva a trilha da outbox para o banco de log.
+        services.AddHostedService<ServicoDeDrenagemDaOutbox>();
+
         services.AddSingleton<IRelogio, Relogio>();
 
         // SPEC-GER-003 — o cache atravessa requisições (singleton); o serviço depende do

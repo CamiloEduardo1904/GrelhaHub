@@ -278,7 +278,9 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
             HttpStatusCode.OK, await cancelamento.Content.ReadAsStringAsync());
 
         // ⚠ O CORAÇÃO DA REGRA REVISADA: a operação existe na trilha, com autor e valores.
-        await using var db = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db = Ambiente.CriarContextoDeLog();
 
         var naTrilha = await db.Trilha
             .AsNoTracking()

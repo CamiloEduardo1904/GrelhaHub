@@ -1,5 +1,7 @@
 using FluentValidation;
 using GrelhaHub.Application.Common.Exceptions;
+using GrelhaHub.Application.Common.Interfaces;
+using GrelhaHub.Domain.Gerais;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +17,9 @@ namespace GrelhaHub.Api.Seguranca;
 /// </para>
 /// </summary>
 public sealed partial class TratadorDeExcecoes(
-    ILogger<TratadorDeExcecoes> logger, IHostEnvironment ambiente) : IExceptionHandler
+    ILogger<TratadorDeExcecoes> logger,
+    IHostEnvironment ambiente,
+    IServiceScopeFactory escopos) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
@@ -46,6 +50,14 @@ public sealed partial class TratadorDeExcecoes(
         if (problema.Status >= StatusCodes.Status500InternalServerError)
         {
             FalhaNaoTratada(logger, httpContext.Request.Path, exception);
+
+            // ADR-0017 — a falha vira DADO, e não só linha de log do contêiner.
+            //
+            // ⚠ Antes disto, o vestígio de uma exceção em produção era a saída de log do
+            // contêiner — que o comando de logs trunca e o reinício apaga. Não dava para responder
+            // "quantas vezes isso aconteceu esta semana", que é a primeira pergunta de qualquer
+            // investigação.
+            await RegistrarAsync(httpContext, exception, problema.Status, cancellationToken);
         }
         else
         {
@@ -92,14 +104,6 @@ public sealed partial class TratadorDeExcecoes(
             Title = "Troca de senha pendente",
             Detail = "Troque a sua senha antes de continuar.",
             Extensions = { ["regra"] = "RF-SEG-005", ["trocarSenha"] = true },
-        },
-
-        SessaoDeSuporteExigidaException sessao => new ProblemDetails
-        {
-            Status = StatusCodes.Status403Forbidden,
-            Title = "Sessão de suporte exigida",
-            Detail = sessao.Message,
-            Extensions = { ["regra"] = "RN-GER-015" },
         },
 
         SemPermissaoException permissao => new ProblemDetails
@@ -182,6 +186,66 @@ public sealed partial class TratadorDeExcecoes(
 
     [LoggerMessage(EventId = 5000, Level = LogLevel.Error, Message = "Falha não tratada em {Rota}")]
     private static partial void FalhaNaoTratada(ILogger logger, string rota, Exception excecao);
+
+    /// <summary>
+    /// Grava a exceção no banco de log — ADR-0017.
+    /// <para>
+    /// ⚠⚠ <b>NUNCA lança.</b> Este método roda DENTRO do tratador de exceções: uma falha aqui
+    /// substituiria a exceção original por outra, e o usuário receberia um erro sobre o registro do
+    /// erro — perdendo justamente a causa que se queria guardar. Se a gravação falhar, a exceção
+    /// original continua no log de aplicação; o que se perde é a linha na tabela.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Escopo PRÓPRIO</b>, e não o da requisição: foi uma exceção que trouxe o fluxo até aqui,
+    /// e o contexto de persistência da requisição pode carregar mudanças que não gravam.
+    /// </para>
+    /// </summary>
+    private async Task RegistrarAsync(
+        HttpContext httpContext,
+        Exception excecao,
+        int? status,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var escopo = escopos.CreateScope();
+
+            var logDb = escopo.ServiceProvider.GetRequiredService<ILogDb>();
+            var contexto = escopo.ServiceProvider.GetService<IContextoDeExecucao>();
+
+            var unidade = contexto?.UnidadeId;
+
+            logDb.Excecoes.Add(new LogDeExcecao(
+                excecao.GetType().FullName ?? excecao.GetType().Name,
+                excecao.Message,
+                excecao.ToString(),
+                httpContext.Request.Path.Value,
+                httpContext.Request.Method,
+                status,
+
+                // Guid.Empty não é unidade: é a ausência dela, e gravá-la mentiria dizendo que a
+                // falha pertence a uma casa.
+                unidade == Guid.Empty ? null : unidade,
+                contexto?.UsuarioId,
+
+                // O mesmo identificador que o cliente recebe no corpo do erro — é por ele que o
+                // suporte encontra a linha sem precisar adivinhar horário.
+                httpContext.TraceIdentifier,
+                DateTimeOffset.UtcNow));
+
+            await logDb.GravarAsync(cancellationToken);
+        }
+        catch (Exception falha)
+        {
+            FalhaAoRegistrarExcecao(logger, falha);
+        }
+    }
+
+    [LoggerMessage(EventId = 1702, Level = LogLevel.Error,
+        Message = "ADR-0017 — não foi possível gravar a exceção no banco de log. A exceção " +
+                  "ORIGINAL continua registrada no log de aplicação acima; o que se perdeu foi a " +
+                  "linha na tabela.")]
+    private static partial void FalhaAoRegistrarExcecao(ILogger logger, Exception excecao);
 
     [LoggerMessage(
         EventId = 4010,

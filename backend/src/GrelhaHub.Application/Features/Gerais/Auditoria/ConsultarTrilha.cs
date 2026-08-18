@@ -73,16 +73,31 @@ public sealed class ConsultarTrilhaValidator : AbstractValidator<ConsultarTrilha
     }
 }
 
-public sealed class ConsultarTrilhaHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0017 + ADR-0019 — lê do <b>banco de log</b>, e não do banco da aplicação.
+/// <para>
+/// ⚠ A trilha mudou de banco, e este handler foi junto. Ele já não usava agregado nenhum — só
+/// projetava — então a conversão ao lado da leitura foi consequência da mudança de banco, e não
+/// trabalho a mais: <c>ILogDb</c> não expõe o contexto de escrita, e a catraca do ADR-0019 pôde
+/// dar baixa nele.
+/// </para>
+/// <para>
+/// ⚠⚠ <b>O recorte por unidade é EXPLÍCITO aqui, e precisa ser.</b> O banco de log não tem filtro
+/// global — de propósito: ele registra também o que a plataforma fez sobre o dado do cliente, e
+/// sujeitá-lo ao recorte esconderia justamente o que precisa ser auditado. O preço é que esquecer
+/// o <c>Where</c> aqui vaza a trilha de uma casa para outra, e nenhum filtro salva.
+/// </para>
+/// </summary>
+public sealed class ConsultarTrilhaHandler(
+    ILogDb logDb, ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ConsultarTrilhaQuery, TrilhaResponse>
 {
     public async Task<TrilhaResponse> Handle(
         ConsultarTrilhaQuery request, CancellationToken cancellationToken)
     {
-        // `log_auditoria` NÃO está sob o filtro global — ela registra também o que não pertence a
-        // unidade alguma. O recorte aqui é explícito, e o usuário de plataforma vê todas as
+        // O recorte é explícito — ver o resumo da classe. O usuário de plataforma vê todas as
         // unidades porque é ele quem dá suporte (RN-GER-014, ADR-0013).
-        var consulta = db.Trilha.AsNoTracking();
+        var consulta = logDb.Trilha.AsNoTracking();
 
         if (!contexto.EhPlataforma)
         {
@@ -176,6 +191,11 @@ public sealed class ConsultarTrilhaHandler(IAppDbContext db, IContextoDeExecucao
     /// que mais importa auditar.
     /// </para>
     /// </summary>
+    /// <para>
+    /// ⚠⚠ <b>DUAS CONSULTAS, EM DOIS BANCOS.</b> A trilha está no banco de log e o usuário no da
+    /// aplicação — não há mais <c>JOIN</c> entre eles, e o ADR-0017 registrou esse custo ao separar.
+    /// O que era uma junção virou uma segunda ida ao banco, com os ids que a primeira devolveu.
+    /// </para>
     private async Task<Dictionary<Guid, string>> NomesDosAutoresAsync(
         IEnumerable<Guid?> ids, CancellationToken cancellationToken)
     {
@@ -186,10 +206,8 @@ public sealed class ConsultarTrilhaHandler(IAppDbContext db, IContextoDeExecucao
             return [];
         }
 
-        return await db.Usuarios
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(usuario => distintos.Contains(usuario.Id))
-            .ToDictionaryAsync(usuario => usuario.Id, usuario => usuario.Nome, cancellationToken);
+        return await leitura.Autores
+            .Where(autor => distintos.Contains(autor.Id))
+            .ToDictionaryAsync(autor => autor.Id, autor => autor.Nome, cancellationToken);
     }
 }

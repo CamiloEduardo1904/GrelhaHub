@@ -1,6 +1,8 @@
 # 01 — Modelo de dados
 
-> **Extraído do modelo real do sistema em 18/08/2026.** 19 tabelas, 15 relacionamentos.
+> **Extraído do modelo real do sistema em 18/08/2026 (segunda extração do dia).**
+> **Três bancos** — 18 tabelas na aplicação com 13 relacionamentos, 2 no banco de log, 5 visões de
+> leitura.
 > Nada aqui foi escrito de memória: os tipos, as chaves e os índices vieram do snapshot do
 > mapeamento objeto-relacional.
 
@@ -31,10 +33,10 @@ flowchart TB
         PA["Parâmetros"]
         HO["Horário da casa"]
     end
-    subgraph R["O QUE FICOU REGISTRADO"]
+    subgraph R["O QUE FICOU REGISTRADO<br/><small>banco separado</small>"]
         LO["Trilha de auditoria"]
-        SE["Sessões de suporte"]
-        TK["Tokens de acesso"]
+        EX["Log de exceções"]
+        TK["Tokens de acesso<br/><small>este fica na aplicação</small>"]
     end
 
     Q --> V --> P
@@ -47,8 +49,8 @@ flowchart TB
 - **O que foi vendido** — o pedido, seus itens e o cliente que pediu.
 - **Como o sistema se comporta** — o que a casa contratou, quanto é a taxa de entrega, que horas
   abre. É o que muda de casa para casa **sem mudar o código**.
-- **O que ficou registrado** — quem alterou o quê, quando o suporte entrou, que links de acesso
-  foram emitidos.
+- **O que ficou registrado** — quem alterou o quê, e o que quebrou. ⚠ **Estes vivem num banco
+  próprio** — `grelhahub_log`, ADR-0017: crescem a cada gravação e têm retenção diferente do resto.
 
 ### As três ideias que explicam quase tudo
 
@@ -104,8 +106,7 @@ erDiagram
     unidade ||--o{ unidade_horario : "abre em"
     unidade ||--o{ unidade_modulo : "contrata"
     unidade ||--o{ parametro_valor : "configura"
-    unidade ||--o{ sessao_suporte : "recebe suporte em"
-    unidade ||--o{ log_auditoria : "registra"
+    unidade ||--o{ outbox_auditoria : "registra"
 
     perfil ||--o{ usuario : "classifica"
     perfil ||--o{ perfil_permissao : "concede"
@@ -123,9 +124,43 @@ erDiagram
     parametro ||--o{ parametro_valor : "tem vigência"
 
     usuario ||--o{ token_acesso : "recebe link de"
-    usuario ||--o{ sessao_suporte : "abre"
-    usuario ||--o{ log_auditoria : "é autor de"
+    usuario ||--o{ outbox_auditoria : "é autor de"
 ```
+
+### O banco de log, separado — ADR-0017
+
+Ele **não tem relacionamento com o diagrama acima**, e isso é a consequência mais visível da
+separação: não existe `JOIN` entre a trilha e o dado operacional. A trilha guarda `unidade_id`,
+`entidade` e `registro_id` como **valores**, não como chaves estrangeiras — quem quer saber "quem
+alterou este pedido" faz duas consultas, em dois bancos.
+
+```mermaid
+erDiagram
+    log_auditoria {
+        uuid id PK
+        uuid unidade_id "valor, não FK"
+        string entidade "nome da tabela"
+        uuid registro_id "qual linha"
+        string operacao "Criacao, Alteracao, Cancelamento, Exclusao"
+        jsonb valores_anteriores
+        jsonb valores_novos
+        date data_operacional "transportada, nunca recalculada"
+    }
+    log_excecao {
+        uuid id PK
+        string tipo "o nome da exceção"
+        string mensagem
+        text pilha
+        string rota
+        string correlacao "liga ao erro que o usuário viu"
+        timestamptz dh_ocorrencia
+    }
+```
+
+> ⚠ **`data_operacional` na trilha é coluna comum aqui, não calculada.** No banco da aplicação o
+> PostgreSQL a calcula a partir do fuso e da virada da própria linha. Neste banco não existem
+> `unidade` nem `pedido` para consultar — o valor chega pronto. Recalcular aqui seria uma segunda
+> definição da mesma regra, e das piores: divergiria em silêncio.
 
 ### Como ler as cardinalidades
 
@@ -335,32 +370,87 @@ mais tarde da semana.
 
 ### Grupo 5 — O que ficou registrado
 
-#### `log_auditoria` — a trilha
+#### `outbox_auditoria` — a ponte, no banco da aplicação
+
+A trilha **nasce aqui**, dentro da transação da operação, e é levada para o banco de log por um
+serviço em segundo plano. É **fila, não histórico**: esvazia sozinha, e só cresce quando o banco de
+log está fora do ar.
 
 | Coluna | Tipo | | O que guarda |
 |--------|------|---|--------------|
-| `id` | `uuid` | 🔑 | |
-| `unidade_id` / `usuario_id` | `uuid` | 🔗 | Quem fez |
-| `entidade` | `varchar(100)` | | Em que tabela |
-| `registro_id` | `uuid` | | Em qual linha |
-| `operacao` | `varchar(20)` | | Inclusão, alteração, exclusão |
+| `id` | `uuid` | 🔑 | **O mesmo id que a linha terá no banco de log** — é ele que impede a cópia dupla |
+| `unidade_id` / `usuario_id` | `uuid` | ⭘ | Quem fez |
+| `entidade` / `registro_id` | | | Em que tabela e em qual linha |
+| `operacao` | `varchar(20)` | | `Criacao`, `Alteracao`, `Cancelamento`, `Exclusao` |
 | `valores_anteriores` / `valores_novos` | `jsonb` | ⭘ | O antes e o depois |
-| `justificativa` | `varchar(500)` | ⭘ | |
-| `dh_ocorrencia` | `timestamptz` | | |
-| `data_operacional` | `date` | ⚙ | Calculada pelo banco |
+| `data_operacional` | `date` | | Calculada no banco da aplicação e **transportada** |
+| `dh_enfileiramento` | `timestamptz` | | A fila é lida do mais antigo para o mais novo |
+| `tentativas` / `ultimo_erro` | | ⭘ | ⚠ A linha **nunca** é descartada por excesso de tentativas — trilha perdida é o que a ponte existe para impedir. O contador serve para o alerta |
 
-> ⚠ **A trilha é imutável, e o banco impõe isso.** Existe um gatilho que **recusa** qualquer
-> tentativa de alterar ou apagar uma linha de auditoria, e outro que recusa esvaziar a tabela.
-> Trilha que o próprio sistema pode reescrever não é trilha.
+> ⚠ **As validações ficam na ENTRADA da ponte**, não na saída: `ck_outbox_operacao` e
+> `ck_outbox_valores` recusam lixo aqui. Uma linha impossível que passasse ficaria entupindo a fila,
+> bloqueando tudo atrás dela.
 
-#### `sessao_suporte` e `token_acesso`
+#### `log_auditoria` — a trilha, no banco de log
 
-`sessao_suporte` registra quando a equipe GrelhaHub abriu acesso ao dado de um cliente, com motivo
-e horário de encerramento — **escrita da plataforma sobre dado do cliente exige sessão aberta**.
+Mesmas colunas do quadro acima, do outro lado da ponte.
 
-`token_acesso` guarda os links de convite e de "esqueci minha senha". Guarda **apenas o hash** do
-token — quem lê a tabela não consegue entrar na conta de ninguém. Emitir um novo invalida o
-anterior.
+> ⚠ **A trilha é imutável, e o banco impõe isso.** Um gatilho **recusa** qualquer `UPDATE` ou
+> `DELETE`, e outro recusa esvaziar a tabela — porque `TRUNCATE` não dispara gatilho de linha, e é
+> justamente o comando que apagaria tudo de uma vez. Trilha que o próprio sistema pode reescrever
+> não é trilha.
+>
+> Os dois gatilhos **atravessaram a mudança de banco**. Sem recriá-los do outro lado, a trilha
+> passaria a aceitar alteração em silêncio.
+
+#### `log_excecao` — o que quebrou
+
+Antes disto, o vestígio de uma falha em produção era a saída de log do contêiner — que o reinício
+apaga. Agora dá para perguntar **"o que mais quebrou esta semana"** com uma consulta.
+
+| Coluna | Tipo | | O que guarda |
+|--------|------|---|--------------|
+| `tipo` | `varchar(200)` | | O nome da exceção — é por ele que se agrupa |
+| `mensagem` / `pilha` | | | A pilha não tem teto: truncá-la corta o quadro que diz onde quebrou |
+| `rota` / `metodo` / `status_http` | | ⭘ | |
+| `unidade_id` / `usuario_id` | `uuid` | ⭘ | ⚠ **Opcionais de propósito** — boa parte das falhas acontece antes de existir unidade no contexto (login, rota anônima). Exigi-las deixaria as falhas mais externas sem onde ser gravadas |
+| `correlacao` | `varchar(100)` | ⭘ | O identificador da requisição. **É por ele que o suporte liga esta linha ao erro que o usuário viu** |
+
+#### `token_acesso` — os links de acesso
+
+Guarda os links de convite e de "esqueci minha senha", e **apenas o hash** do token: quem lê a
+tabela não consegue entrar na conta de ninguém. Emitir um novo invalida o anterior.
+
+> ⚠ **`sessao_suporte` não existe mais** (ADR-0020). Ela exigia que a equipe GrelhaHub abrisse uma
+> sessão com motivo antes de escrever no dado de um cliente — um portão aberto por quem ele deveria
+> conter. O controle passou a ser a trilha, que sempre foi o mecanismo forte.
+
+---
+
+## Parte 3.1 — As visões de leitura — ADR-0019
+
+A **consulta** não lê as tabelas acima: lê visões feitas para a tela que as consome. É onde a
+agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o banco à aplicação.
+
+| Visão | Responde |
+|-------|----------|
+| `vw_pedido_resumo` | Uma linha por pedido, com o total **já somado** e a contagem de itens |
+| `vw_pedido_item` | Os itens, com o total da linha calculado |
+| `vw_operacao_dia` | Faturamento, contagem e valor em andamento por (unidade, dia operacional) |
+| `vw_produto_vendido` | Quanto de cada produto saiu — agrupado pelo **nome praticado na venda** |
+| `vw_autor` | Id e nome, só para dizer quem fez algo na trilha |
+
+> ⚠⚠ **Toda visão recortada por unidade expõe `unidade_id`**, e o contexto de leitura recusa mapear
+> uma que não a tenha. Vazamento entre restaurantes na **leitura** é invisível: o número continua
+> plausível, só que somando a casa do vizinho.
+>
+> ⚠ **`vw_autor` é a exceção declarada** — ela **não** é recortada. O autor de um registro pode ser
+> usuário de plataforma, que não tem unidade; filtrar ali exibiria um traço no lugar do nome de quem
+> mexeu, justamente no caso que mais importa auditar. Por isso ela carrega **só id e nome**.
+>
+> ⚠ **A exclusão lógica é repetida no SQL das visões.** O filtro automático que esconde registro
+> excluído vale para o modelo de escrita e **não alcança visão** — é o `WHERE dh_exclusao IS NULL`
+> dentro de cada uma que faz o pedido excluído sumir da leitura.
 
 ---
 
@@ -378,7 +468,8 @@ O sistema valida em **duas camadas**, deliberadamente:
 | **Coluna calculada** | `pedido.data_operacional`, `log_auditoria.data_operacional` | A regra do dia operacional não depende de ninguém lembrar |
 | **Restrição de valor** | `ck_modulo_codigo`, `ck_parametro_tipo`, `ck_log_operacao` | O código do módulo tem duas ou três letras maiúsculas; a operação da trilha é uma das três |
 | **Restrição contra ciclo** | `ck_modulo_dependencia_ciclo` | Um módulo não depende de si mesmo |
-| **Gatilho** | `trg_log_auditoria_imutavel` | Ninguém altera nem apaga a trilha |
+| **Gatilho** | `trg_log_auditoria_imutavel` **no banco de log** | Ninguém altera nem apaga a trilha |
+| **Restrição na ponte** | `ck_outbox_operacao`, `ck_outbox_valores` | Lixo é recusado na ENTRADA, e não entope a fila |
 | **Exclusão por vigência** | `ex_parametro_valor_vigencia`, `ex_unidade_modulo_vigencia` | Dois valores do mesmo parâmetro não valem ao mesmo tempo |
 
 ### Índices que existem por um motivo

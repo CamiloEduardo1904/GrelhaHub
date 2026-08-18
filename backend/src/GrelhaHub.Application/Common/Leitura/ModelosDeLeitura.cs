@@ -62,6 +62,22 @@ public sealed record ProdutoVendidoLeitura(
     decimal Total) : IRecortadoPorUnidade;
 
 /// <summary>
+/// Só o necessário para dizer QUEM fez — ADR-0017.
+/// <para>
+/// ⚠⚠ <b>Não implementa <see cref="IRecortadoPorUnidade"/>, e o nome estreito é a proteção.</b>
+/// A trilha registra também o que a PLATAFORMA fez, e o usuário de plataforma não tem unidade
+/// (<c>RN-GER-014</c>) — recortar aqui exibiria "—" no lugar do nome de quem mexeu, justamente no
+/// caso que mais importa auditar.
+/// </para>
+/// <para>
+/// Como consequência este modelo <b>enxerga todos os usuários</b>, e por isso ele se chama
+/// "para autoria" e carrega só id e nome: quem precisar listar usuário usa outro caminho, com
+/// recorte. Modelo largo com nome genérico é convite a vazamento entre casas.
+/// </para>
+/// </summary>
+public sealed record AutorLeitura(Guid Id, string Nome);
+
+/// <summary>
 /// O marcador de <b>recorte por unidade</b> no lado da leitura — <c>RN-GER-009</c>.
 /// <para>
 /// ⚠⚠ <b>Existe porque a primeira versão do contexto de leitura filtrava TUDO</b>, exigindo

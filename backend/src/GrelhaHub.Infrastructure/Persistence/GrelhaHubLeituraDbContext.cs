@@ -36,6 +36,8 @@ public sealed class GrelhaHubLeituraDbContext(
 
     public IQueryable<ProdutoVendidoLeitura> ProdutosVendidos => Set<ProdutoVendidoLeitura>();
 
+    public IQueryable<AutorLeitura> Autores => Set<AutorLeitura>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         ArgumentNullException.ThrowIfNull(optionsBuilder);
@@ -53,6 +55,7 @@ public sealed class GrelhaHubLeituraDbContext(
         Visao<ItemDePedidoLeitura>(modelBuilder, "vw_pedido_item");
         Visao<OperacaoDoDiaLeitura>(modelBuilder, "vw_operacao_dia");
         Visao<ProdutoVendidoLeitura>(modelBuilder, "vw_produto_vendido");
+        Visao<AutorLeitura>(modelBuilder, "vw_autor");
     }
 
     /// <summary>

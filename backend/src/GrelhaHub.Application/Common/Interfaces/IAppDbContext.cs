@@ -31,7 +31,15 @@ public interface IAppDbContext
     /// </para>
     /// </summary>
     DbSet<HorarioDeFuncionamento> HorariosDeFuncionamento { get; }
-    DbSet<LogAuditoria> Trilha { get; }
+    /// <summary>
+    /// ADR-0017 — a ponte para o banco de log. A trilha NÃO mora mais aqui.
+    /// <para>
+    /// ⚠ O interceptador de auditoria grava nesta tabela, dentro da transação da operação, e um
+    /// serviço em segundo plano a copia para o banco de log. É o que preserva "ou os dois gravam,
+    /// ou nenhum grava" entre dois bancos que não compartilham transação.
+    /// </para>
+    /// </summary>
+    DbSet<OutboxDeAuditoria> OutboxDeAuditoria { get; }
     DbSet<Permissao> Permissoes { get; }
     DbSet<Modulo> Modulos { get; }
     DbSet<ModuloDependencia> DependenciasDeModulo { get; }

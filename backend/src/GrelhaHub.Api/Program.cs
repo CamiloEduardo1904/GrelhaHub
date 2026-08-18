@@ -112,6 +112,30 @@ if (modoMigrar || modoSemear)
                 await banco.Database.MigrateAsync();
                 Log.Information("Migrations aplicadas.");
             }
+
+            // ADR-0017 — o BANCO DE LOG tem migrations PRÓPRIAS, e elas não vêm de carona.
+            //
+            // ⚠⚠ Esquecer estas linhas é o defeito mais provável desta mudança: a API sobe (a
+            // connection string existe), a operação grava na outbox, e o worker falha em toda
+            // volta porque log_auditoria não existe do outro lado. A trilha ficaria acumulando na
+            // outbox sem ninguém notar — que é exatamente o cenário que o contador de tentativas
+            // da outbox existe para denunciar.
+            var bancoDeLog = escopoMigracao.ServiceProvider
+                .GetRequiredService<GrelhaHubLogDbContext>();
+
+            var pendentesDeLog = (await bancoDeLog.Database.GetPendingMigrationsAsync()).ToList();
+
+            if (pendentesDeLog.Count == 0)
+            {
+                Log.Information("Banco de log: nenhuma migration pendente.");
+            }
+            else
+            {
+                Log.Information("Banco de log: aplicando {Total} migration(s): {Nomes}",
+                    pendentesDeLog.Count, string.Join(", ", pendentesDeLog));
+                await bancoDeLog.Database.MigrateAsync();
+                Log.Information("Banco de log: migrations aplicadas.");
+            }
         }
 
         if (modoSemear)

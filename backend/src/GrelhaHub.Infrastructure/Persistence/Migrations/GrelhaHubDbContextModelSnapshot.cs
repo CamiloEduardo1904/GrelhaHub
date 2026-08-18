@@ -190,77 +190,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateOnly>("DataOperacional")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("date")
-                        .HasColumnName("data_operacional")
-                        .HasComputedColumnSql("(((dh_ocorrencia AT TIME ZONE 'America/Sao_Paulo') - interval '4 hours')::date)", true);
-
-                    b.Property<string>("Entidade")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entidade");
-
-                    b.Property<string>("Justificativa")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("justificativa");
-
-                    b.Property<DateTimeOffset>("OcorridoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dh_ocorrencia");
-
-                    b.Property<string>("Operacao")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("operacao");
-
-                    b.Property<Guid>("RegistroId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("registro_id");
-
-                    b.Property<Guid?>("UnidadeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unidade_id");
-
-                    b.Property<Guid?>("UsuarioId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("usuario_id");
-
-                    b.Property<string>("ValoresAnteriores")
-                        .HasMaxLength(200)
-                        .HasColumnType("jsonb")
-                        .HasColumnName("valores_anteriores");
-
-                    b.Property<string>("ValoresNovos")
-                        .HasMaxLength(200)
-                        .HasColumnType("jsonb")
-                        .HasColumnName("valores_novos");
-
-                    b.HasKey("Id")
-                        .HasName("pk_log_auditoria");
-
-                    b.HasIndex("UsuarioId")
-                        .HasDatabaseName("ix_log_auditoria_usuario_id");
-
-                    b.HasIndex("UnidadeId", "UsuarioId", "DataOperacional")
-                        .HasDatabaseName("ix_log_usuario");
-
-                    b.HasIndex("UnidadeId", "Entidade", "RegistroId", "OcorridoEm")
-                        .IsDescending(false, false, false, true)
-                        .HasDatabaseName("ix_log_registro");
-
-                    b.ToTable("log_auditoria", (string)null);
-                });
-
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Modulo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -316,6 +245,84 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_modulo_dependencia_depende_de_id");
 
                     b.ToTable("modulo_dependencia", (string)null);
+                });
+
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.OutboxDeAuditoria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("DataOperacional")
+                        .HasColumnType("date")
+                        .HasColumnName("data_operacional");
+
+                    b.Property<DateTimeOffset>("EnfileiradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_enfileiramento");
+
+                    b.Property<string>("Entidade")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entidade");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<DateTimeOffset>("OcorridoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_ocorrencia");
+
+                    b.Property<string>("Operacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("operacao");
+
+                    b.Property<Guid>("RegistroId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registro_id");
+
+                    b.Property<int>("Tentativas")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("tentativas");
+
+                    b.Property<string>("UltimoErro")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("ultimo_erro");
+
+                    b.Property<Guid?>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.Property<string>("ValoresAnteriores")
+                        .HasMaxLength(200)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("valores_anteriores");
+
+                    b.Property<string>("ValoresNovos")
+                        .HasMaxLength(200)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("valores_novos");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_auditoria");
+
+                    b.HasIndex("EnfileiradoEm")
+                        .HasDatabaseName("ix_outbox_auditoria_fila");
+
+                    b.ToTable("outbox_auditoria", (string)null);
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Parametro", b =>
@@ -1023,21 +1030,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_unidade_horario_unidades_unidade_id");
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.LogAuditoria", b =>
-                {
-                    b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
-                        .WithMany()
-                        .HasForeignKey("UnidadeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_log_auditoria_unidades_unidade_id");
-
-                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_log_auditoria_usuarios_usuario_id");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.ModuloDependencia", b =>

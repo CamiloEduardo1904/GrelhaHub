@@ -86,10 +86,34 @@ teste. É isso que torna o projeto defensável: **nenhuma decisão é só "a gen
 
 | Camada | O que usamos | Por quê, em uma frase |
 |--------|--------------|------------------------|
-| Banco | **PostgreSQL** | Colunas calculadas, restrições e tipos de data e hora que o resto não tem |
+| Banco | **PostgreSQL**, em **três bancos** | Colunas calculadas, restrições e tipos de data e hora que o resto não tem — e três bancos porque o que mora em cada um cresce e é guardado por motivos diferentes |
 | Backend | **.NET 10** + ASP.NET Core | Tipagem forte no lugar onde o dinheiro é calculado |
 | Frontend | **React + TypeScript** | O painel roda em tablet de cozinha; nada de instalar aplicativo |
 | Entrega | **Docker + Nginx**, uma VPS | Um comando sobe o sistema inteiro |
+
+### Os três bancos, e por que não é um só — ADR-0017
+
+| Banco | O que guarda | Cresce com | Quanto tempo fica |
+|-------|--------------|-----------|-------------------|
+| `grelhahub` | O negócio: pedido, produto, usuário | O uso do sistema | Para sempre |
+| `grelhahub_log` | A trilha de auditoria e as exceções | **Cada gravação** e cada falha | Política própria |
+| `grelhahub_arquivo` | Os binários das imagens *(planejado — ADR-0018)* | Fotos de produto | Segue o metadado |
+
+O motivo é prático: a trilha era a tabela que mais crescia, e com tudo junto o *backup* do banco de
+negócio carregava três anos de histórico toda vez. Separados, cada um tem o seu ritmo.
+
+> ### ⚠ A trilha atravessa dois bancos sem perder a garantia
+>
+> A regra é: **não existe operação sem registro**. Isso funcionava porque os dois gravavam na mesma
+> transação — ou as duas coisas, ou nenhuma.
+>
+> Bancos diferentes não compartilham transação. A solução é uma **caixa de saída**: a operação grava
+> o registro numa fila dentro da própria transação, e um serviço em segundo plano o leva para o
+> banco de log segundos depois. Se o sistema cair no meio, o registro continua na fila e a próxima
+> volta o encontra.
+>
+> **O que se paga:** a trilha chega com **segundos de atraso**. Quem consultar a auditoria de algo
+> que acabou de acontecer pode não ver ainda. Está declarado no ADR-0017.
 
 ---
 
@@ -99,4 +123,10 @@ Os números de tabelas, colunas e tipos deste capítulo **foram extraídos do mo
 sistema, não escritos de memória. Quando o banco mudar, este documento fica desatualizado e
 precisa ser regerado — e é por isso que ele diz sempre a data da última extração.
 
-**Última extração: 18/08/2026** — 19 tabelas, 15 relacionamentos.
+**Última extração: 18/08/2026 (segunda).** **Três bancos**: 18 tabelas na aplicação com 13
+relacionamentos, 2 tabelas no banco de log, e 5 visões de leitura.
+
+> ⚠ A primeira extração deste documento dizia "19 tabelas". A diferença não é erro de contagem: no
+> mesmo dia a arquitetura mudou três vezes — a trilha saiu para banco próprio (ADR-0017), a sessão
+> de suporte foi removida (ADR-0020) e a leitura ganhou visões (ADR-0019). É por isso que este
+> documento diz a DATA da extração em vez de fingir ser atemporal.

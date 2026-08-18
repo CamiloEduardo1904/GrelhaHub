@@ -73,7 +73,17 @@ public sealed class InterceptorDeAuditoria(IContextoDeExecucao contexto, IRelogi
         {
             if (Montar(entrada, agora, usuarioId) is { } registro)
             {
-                db.Add(registro);
+                // ⚠⚠ VAI PARA A OUTBOX, e não para a trilha — ADR-0017.
+                //
+                // A trilha mudou de banco. O que NÃO pode mudar é a propriedade que a torna
+                // confiável: ou a operação e o registro gravam juntos, ou nenhum grava. Bancos
+                // diferentes não têm transação em comum, então a linha é gravada AQUI, dentro
+                // desta mesma transação, e um worker a copia para o banco de log depois.
+                //
+                // ⚠ Escrever direto no banco de log seria mais simples e teria um custo que não
+                // se aceita numa trilha: a operação grava, a escrita do log falha, e ninguém
+                // fica sabendo.
+                db.Add(new OutboxDeAuditoria(registro));
             }
         }
     }

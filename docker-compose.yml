@@ -58,6 +58,16 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__GrelhaHub: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+
+      # ADR-0017 — o banco de LOG: trilha de auditoria e exceções.
+      #
+      # Mesma instância do PostgreSQL, banco separado: a VPS é única (ADR-0006), e três
+      # contêineres de banco triplicariam memória para isolar uma falha que a máquina não isola.
+      # O que se ganha é o que doía: migrations, backup, retenção e crescimento separados.
+      #
+      # O banco é criado pelo step de migrations do pipeline: o MigrateAsync do EF Core o cria
+      # quando ele não existe. Sem passo manual na VPS.
+      ConnectionStrings__GrelhaHubLog: "Host=db;Port=5432;Database=${POSTGRES_DB}_log;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Jwt__Chave: ${JWT_CHAVE}
       Jwt__Emissor: ${JWT_EMISSOR:-grelhahub-api}
       Jwt__Audiencia: ${JWT_AUDIENCIA:-grelhahub-web}

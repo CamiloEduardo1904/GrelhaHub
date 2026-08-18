@@ -8,9 +8,12 @@
 # Sem `root = true` de propósito: localmente este arquivo COMPLEMENTA o da raiz;
 # no container, onde não há pai, ele vale sozinho.
 
-# Migrations são geradas pelo `dotnet ef` — não seguem o estilo do projeto e não
+# Migrations são geradas pelo dotnet ef — não seguem o estilo do projeto e não
+# ⚠ MigrationsLog entrou aqui em 18/08/2026: o banco de log tem migrations próprias (ADR-0017),
+# e a pasta nova ficava FORA da exclusão. O sintoma é build de Release vermelho por IDE0161 e
+# CA1861 em arquivo que ninguém escreveu — quem criar um quarto contexto vai passar por isto.
 # devem ser editadas a mão. Analisar código gerado só produz ruído.
-[**/Migrations/*.cs]
+[**/{Migrations,MigrationsLog}/*.cs]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
 dotnet_diagnostic.IDE0161.severity = none

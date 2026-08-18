@@ -42,7 +42,7 @@ Não implemente "provisoriamente".
 | `docs/README.md` | Mapa e estado atual |
 | `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 180 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | 16 decisões e 4 em aberto |
+| `docs/adr/README.md` | 20 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
@@ -213,6 +213,23 @@ vertical. ⚠ **A lista é agrupada por dia operacional, e o agrupamento é obri
 único por (unidade, dia operacional) e REINICIA a cada virada — sem o divisor, a comanda #1 de hoje
 e a #1 de ontem aparecem lado a lado, idênticas. Foi o que o filtro revelou no dia em que entrou.
 
+
+⚠⚠ **18/08/2026 — três mudanças estruturais no mesmo dia**, todas com ADR:
+
+- **ADR-0017 — três bancos.** `grelhahub` (negócio), `grelhahub_log` (trilha + exceções) e
+  `grelhahub_arquivo` (binários, ainda por implementar). A trilha atravessa por **outbox**: ela é
+  gravada na transação da operação e copiada por um worker. ⚠ **A trilha chega com segundos de
+  atraso** — teste que a consulta precisa chamar `Ambiente.DrenarOutboxAsync()` antes, e o helper
+  usa o MESMO código do worker.
+- **ADR-0019 — CQRS de verdade.** A leitura tem `ILeituraDb` (sem `SaveChanges`, modelos sem chave,
+  visões do banco). `SeparacaoDeCqrsTests` recusa a build se um handler cruzar os lados. ⚠ A
+  conversão é **por partes**, e o que falta está nomeado numa lista-catraca dentro do teste.
+- **ADR-0020 — a sessão de suporte foi REMOVIDA.** `RN-GER-015` foi revisada: o controle é a
+  trilha, não o portão. Não existe mais `sessao_suporte`, nem behavior, nem tela.
+
+⚠ **Cobertura: 90,2% de linha, 69,9% de ramo** — medida com `cobertura.runsettings` E o filtro de
+classe do relatório. Sem os dois, o número mente: ver o aviso acima.
+
 A arquitetura ganhou documento próprio em [`docs/arquitetura/`](docs/arquitetura/) — modelo de
 dados com diagrama e dicionário completo, backend e frontend, **extraídos do modelo real** e
 escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
@@ -222,7 +239,7 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **289 testes** — 76 de domínio + 13 de aplicação + 200 de integração |
+| `dotnet test -c Release` | ✔ **319 testes** — 92 de domínio + 18 de aplicação + 209 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

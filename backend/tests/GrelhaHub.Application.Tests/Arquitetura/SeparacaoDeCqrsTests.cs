@@ -68,7 +68,6 @@ public sealed class SeparacaoDeCqrsTests
     private static readonly HashSet<string> PendentesDeConversao =
     [
         "ConsultarPedidoPublicoHandler",
-        "ConsultarTrilhaHandler",
         "ListarCardapioInternoHandler",
         "ListarCatalogoDeModulosHandler",
         "ListarEstabelecimentosHandler",

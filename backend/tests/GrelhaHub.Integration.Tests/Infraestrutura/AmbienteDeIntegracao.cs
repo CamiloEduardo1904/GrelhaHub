@@ -64,6 +64,25 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
 
     public string StringDeConexao => _postgres.GetConnectionString();
 
+    /// <summary>
+    /// ADR-0017 — o banco de LOG, no mesmo contêiner e com nome próprio.
+    /// <para>
+    /// ⚠ Mesma instância porque é assim que a produção roda (VPS única, ADR-0006): subir um
+    /// segundo contêiner no teste mediria uma topologia que não existe.
+    /// </para>
+    /// </summary>
+    public string StringDeLog =>
+        new Npgsql.NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
+        {
+            // ⚠ MONTADO, e não uma substituição de texto na connection string. A primeira versão
+            // trocava a substring "Database=grelhahub_testes" — e quando o Testcontainers devolve
+            // a chave com outro nome ou outra caixa, a troca não acontece EM SILÊNCIO: o contexto
+            // de log passa a apontar para o banco da APLICAÇÃO, e o erro que aparece é
+            // "relation log_auditoria does not exist", que manda investigar a migration errada.
+            // Aconteceu em 18/08/2026, e custou uma rodada inteira da suíte para diagnosticar.
+            Database = "grelhahub_testes_log",
+        }.ConnectionString;
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -71,7 +90,16 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
         await using var db = CriarContexto(Guid.Empty);
         await db.Database.MigrateAsync();
 
-        _api = new ApiDeTestes(StringDeConexao, ChaveJwt);
+        // ⚠ O banco de log não nasce com o contêiner — o Testcontainers cria um só —, e não
+        // precisa de CREATE DATABASE: o MigrateAsync do EF Core cria o banco quando ele não
+        // existe. Testado removendo o CREATE daqui, e é o que permite o deploy funcionar sem passo
+        // manual na VPS. As migrations dele são OUTRO conjunto (ADR-0017).
+        await using (var log = CriarContextoDeLog())
+        {
+            await log.Database.MigrateAsync();
+        }
+
+        _api = new ApiDeTestes(StringDeConexao, StringDeLog, ChaveJwt);
 
         // Força a construção do host agora: se a configuração estiver errada, o erro aparece
         // aqui e não disfarçado como falha do primeiro teste da suíte.
@@ -106,6 +134,41 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
     }
 
     public IServiceScope CriarEscopo() => _api!.CriarEscopo();
+
+    /// <summary>
+    /// O contexto do banco de LOG, para asserção direta na trilha — ADR-0017.
+    /// <para>
+    /// ⚠ Sem interceptor nenhum: este banco não audita a si mesmo, e não tem filtro de unidade.
+    /// </para>
+    /// </summary>
+    public GrelhaHubLogDbContext CriarContextoDeLog() =>
+        new(new DbContextOptionsBuilder<GrelhaHubLogDbContext>()
+            .UseNpgsql(StringDeLog)
+            .UseSnakeCaseNamingConvention()
+            .Options);
+
+    /// <summary>
+    /// Copia a outbox para o banco de log <b>agora</b>, e devolve quantas linhas passaram.
+    /// <para>
+    /// ⚠⚠ <b>O teste não pode esperar o worker.</b> A drenagem roda a cada cinco segundos em
+    /// produção (ADR-0017), e um teste que asserta a trilha logo depois da operação passaria ou
+    /// falharia conforme o instante — o pior tipo de teste, porque a falha parece regressão.
+    /// </para>
+    /// <para>
+    /// Chama o <b>mesmo código</b> que o worker chama, e não uma cópia: se a cópia mudar, o teste
+    /// muda junto.
+    /// </para>
+    /// </summary>
+    public async Task<int> DrenarOutboxAsync()
+    {
+        using var escopo = CriarEscopo();
+
+        return await Infrastructure.Persistence.ServicoDeDrenagemDaOutbox.CopiarAsync(
+            escopo.ServiceProvider.GetRequiredService<Application.Common.Interfaces.IAppDbContext>(),
+            escopo.ServiceProvider.GetRequiredService<Application.Common.Interfaces.ILogDb>(),
+            tamanhoDoLote: 1000,
+            CancellationToken.None);
+    }
 
     /// <summary>
     /// Contexto de persistência para asserção direta no banco, escopado em
@@ -164,6 +227,24 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
         await using (var db = CriarContexto(Guid.Empty))
         {
             await db.Database.ExecuteSqlRawAsync(SqlDeLimpeza);
+        }
+
+        // ⚠⚠ O BANCO DE LOG TAMBÉM É RESÍDUO — ADR-0017. A trilha de um teste anterior faria o
+        // seguinte contar registros que não são dele, e o sintoma seria "passa sozinho, falha na
+        // suíte": a pior assinatura de defeito que existe.
+        //
+        // ⚠ O gatilho de imutabilidade recusa DELETE e TRUNCATE sobre a trilha — que é exatamente
+        // o que a limpeza precisa fazer. Desligá-lo AQUI, e só aqui, é concessão de teste: a
+        // alternativa seria não criar o gatilho, e aí a PRODUÇÃO ficaria sem a garantia para que o
+        // harness ficasse cômodo.
+        await using (var log = CriarContextoDeLog())
+        {
+            await log.Database.ExecuteSqlRawAsync(
+                """
+                ALTER TABLE log_auditoria DISABLE TRIGGER USER;
+                TRUNCATE TABLE log_auditoria, log_excecao RESTART IDENTITY CASCADE;
+                ALTER TABLE log_auditoria ENABLE TRIGGER USER;
+                """);
         }
 
         await SemearPlataformaAsync();
@@ -237,17 +318,9 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
              WHERE schemaname = 'public'
                AND tablename <> ALL (ARRAY[{string.Join(", ", TabelasDeReferencia.Select(t => $"'{t}'"))}]);
 
-            -- SPEC-GER-005 — `trg_log_auditoria_sem_truncate` recusa TRUNCATE sobre a trilha, que é
-            -- exatamente o que a limpeza precisa fazer. Desligar o gatilho AQUI, e só aqui, é
-            -- concessão de teste: a alternativa seria não criar o gatilho, e aí a produção ficaria
-            -- sem a garantia para que o harness ficasse cômodo.
-            ALTER TABLE log_auditoria DISABLE TRIGGER USER;
-
             IF alvos IS NOT NULL THEN
                 EXECUTE 'TRUNCATE TABLE ' || alvos || ' RESTART IDENTITY CASCADE';
             END IF;
-
-            ALTER TABLE log_auditoria ENABLE TRIGGER USER;
         END $$;
         """;
 }

@@ -111,7 +111,9 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
             new { Motivo = "Cliente desistiu na porta" }))
             .EnsureSuccessStatusCode();
 
-        await using var db = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db = Ambiente.CriarContextoDeLog();
 
         var registro = await db.Trilha
             .AsNoTracking()
@@ -153,11 +155,20 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         var pedido = await db.Pedidos.SingleAsync(p => p.Id == pedidoId);
         pedido.Cancelar("Cancelamento que vai falhar por causa da trilha");
 
-        // Força a auditoria a falhar: uma linha de trilha inválida na mesma transação. O `CHECK`
-        // ck_log_operacao recusa operação fora do domínio, e é o banco que derruba tudo.
-        db.Trilha.Add(new LogAuditoria(
+        // ⚠⚠ ADR-0017 — A TRILHA MUDOU DE BANCO, E ESTE TESTE MUDOU DE ALVO SEM MUDAR DE
+        // PERGUNTA. Antes ele forçava uma linha inválida em `log_auditoria`; agora força na
+        // OUTBOX, que é onde a trilha nasce dentro da transação da operação.
+        //
+        // A pergunta continua a mesma, e é a que justifica o padrão existir: se o registro falha,
+        // a operação cai junto? O `CHECK` ck_outbox_operacao recusa operação fora do domínio, e é
+        // o banco que derruba tudo — exatamente como antes.
+        //
+        // ⚠ A validação ficou na ENTRADA da ponte de propósito: lixo recusado na outbox nunca
+        // chega ao banco de log, e o worker não precisa saber o que fazer com uma linha que não
+        // pode copiar.
+        db.OutboxDeAuditoria.Add(new OutboxDeAuditoria(new LogAuditoria(
             restaurante.UnidadeId, "pedido", pedidoId,
-            (OperacaoDeAuditoria)99, null, "{}", null, null, DateTimeOffset.UtcNow));
+            (OperacaoDeAuditoria)99, null, "{}", null, null, DateTimeOffset.UtcNow)));
 
         var gravar = async () => await db.SaveChangesAsync();
 
@@ -170,7 +181,7 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
             .Status.Should().Be(Domain.Vendas.StatusPedido.Aberto,
                 "o cancelamento foi desfeito junto com a trilha que falhou");
 
-        (await conferencia.Trilha.AsNoTracking()
+        (await conferencia.OutboxDeAuditoria.AsNoTracking()
             .CountAsync(l => l.RegistroId == pedidoId && l.Operacao == OperacaoDeAuditoria.Cancelamento))
             .Should().Be(0);
     }
@@ -233,7 +244,9 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
             }))
             .EnsureSuccessStatusCode();
 
-        await using var db2 = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db2 = Ambiente.CriarContextoDeLog();
 
         var registros = await db2.Trilha.AsNoTracking()
             .Where(l => l.Entidade == "usuario")
@@ -271,27 +284,38 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
             new { Motivo = "Cancelamento a ser auditado" }))
             .EnsureSuccessStatusCode();
 
-        await using var db = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db = Ambiente.CriarContextoDeLog();
 
         var registro = await db.Trilha.FirstAsync(l => l.RegistroId == pedidoId);
 
-        // Alterar: recusado por ProtegerATrilha.
+        // ⚠⚠ ADR-0017 — QUEM RECUSA MUDOU, E PARA MELHOR. Antes era o interceptador da aplicação,
+        // que lançava InvalidOperationException antes de o SQL sair. A trilha mudou de banco, e o
+        // contexto de log não tem interceptador nenhum — o que recusa agora é o GATILHO do
+        // PostgreSQL, e a exceção chega embrulhada em DbUpdateException.
+        //
+        // A garantia ficou mais forte, não mais fraca: a proteção da aplicação valia para quem
+        // passasse por ela; a do banco vale para qualquer cliente que abra a conexão.
         db.Entry(registro).Property(nameof(LogAuditoria.Justificativa)).CurrentValue = "reescrito";
 
         var alterar = async () => await db.SaveChangesAsync();
 
-        (await alterar.Should().ThrowAsync<InvalidOperationException>())
-            .WithMessage("*imutável*");
+        (await alterar.Should().ThrowAsync<DbUpdateException>())
+            .WithInnerException<Npgsql.PostgresException>()
+            .WithMessage("*imutavel*");
 
         db.Entry(registro).State = EntityState.Unchanged;
 
-        // Excluir: recusado por RecusarExclusaoFisica.
+        // Excluir: mesma história do UPDATE acima. O interceptador que recusava exclusão física
+        // (RN-GER-002) vive no contexto da APLICAÇÃO; aqui quem recusa é o gatilho do banco.
         db.Trilha.Remove(registro);
 
         var excluir = async () => await db.SaveChangesAsync();
 
-        (await excluir.Should().ThrowAsync<InvalidOperationException>())
-            .WithMessage("*RN-GER-002*");
+        (await excluir.Should().ThrowAsync<DbUpdateException>())
+            .WithInnerException<Npgsql.PostgresException>()
+            .WithMessage("*imutavel*");
     }
 
     [Fact(DisplayName = "SPEC-GER-005 — o BANCO recusa UPDATE e DELETE na trilha, não só a aplicação (CA-7)")]
@@ -301,7 +325,9 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         var produtoId = await CriarProdutoAsync(restaurante, "Blindado", 39.00m);
         var pedidoId = await CriarPedidoAnonimoAsync(restaurante.Slug, produtoId);
 
-        await using var db = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db = Ambiente.CriarContextoDeLog();
 
         (await db.Trilha.AsNoTracking().CountAsync(l => l.RegistroId == pedidoId))
             .Should().BeGreaterThan(0, "o pedido gerou trilha");
@@ -327,7 +353,7 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         (await truncar.Should().ThrowAsync<Npgsql.PostgresException>())
             .WithMessage("*log_auditoria e imutavel*");
 
-        await using var conferencia = Ambiente.CriarContexto(Guid.Empty);
+        await using var conferencia = Ambiente.CriarContextoDeLog();
 
         (await conferencia.Trilha.AsNoTracking().CountAsync(l => l.RegistroId == pedidoId))
             .Should().BeGreaterThan(0, "nada saiu da trilha");
@@ -339,6 +365,14 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         var restaurante = await CadastrarRestauranteAsync("Trilha Burger", "11111111000191");
 
         using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        // ⚠⚠ ADR-0017 — A TRILHA CHEGA COM ATRASO, e este teste é onde isso aparece primeiro.
+        //
+        // A operação grava na outbox dentro da própria transação; um worker a copia para o banco
+        // de log segundos depois. Consultar sem drenar leria um banco vazio — e o teste falharia
+        // dizendo "a carga do restaurante já gerou trilha", mandando investigar a auditoria quando
+        // o que faltou foi a ponte. É o custo declarado no ADR, e ele é visível aqui.
+        await Ambiente.DrenarOutboxAsync();
 
         // O administrador consulta.
         var doAdmin = await gestao.GetFromJsonAsync<TrilhaResponse>(
@@ -377,7 +411,9 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
             }))
             .EnsureSuccessStatusCode();
 
-        await using var db = Ambiente.CriarContexto(Guid.Empty);
+        await Ambiente.DrenarOutboxAsync();
+
+        await using var db = Ambiente.CriarContextoDeLog();
 
         var registros = await db.Trilha.AsNoTracking()
             .Where(l => l.Entidade == "parametro_valor")

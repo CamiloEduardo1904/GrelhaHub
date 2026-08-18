@@ -58,4 +58,10 @@ public interface ILeituraDb
     /// </para>
     /// </summary>
     IQueryable<ProdutoVendidoLeitura> ProdutosVendidos { get; }
+
+    /// <summary>
+    /// <c>vw_autor</c> — id e nome, sem recorte de unidade. Ver <see cref="AutorLeitura"/> para o
+    /// porquê, que não é conveniência.
+    /// </summary>
+    IQueryable<AutorLeitura> Autores { get; }
 }

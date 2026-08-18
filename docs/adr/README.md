@@ -26,6 +26,10 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0014](0014-modularidade-comercial.md) | Modularidade comercial: módulo habilitado por unidade | Aceito |
 | [0015](0015-armazenamento-de-imagem.md) | Imagem em volume de disco, servida pelo Nginx — não `bytea`, não objeto remoto | Aceito |
 | [0016](0016-envio-de-email-transacional.md) | E-mail transacional por SMTP próprio, enfileirado em memória — o envio nunca entra na transação | Aceito |
+| [0017](0017-tres-bancos-aplicacao-arquivo-e-log.md) | **Três bancos** — aplicação, arquivo e log. A trilha atravessa por *outbox*, para não perder "não existe operação sem registro" | Aceito |
+| [0018](0018-imagem-como-binario-no-banco.md) | Imagem como **binário no banco**, servida em base64 — substitui o ADR-0015 | Aceito |
+| [0019](0019-cqrs-com-modelo-de-leitura-proprio.md) | **CQRS de verdade**: a leitura ganha modelo próprio, lido de visões. Emenda o ADR-0002, que declarou a sigla sem a separação | Aceito |
+| [0020](0020-a-trilha-substitui-a-sessao-de-suporte.md) | **A sessão de suporte é removida**: o controle passa a ser a trilha, não o portão. Emenda o ADR-0013 | Aceito |
 
 ## Decisões ainda em aberto
 

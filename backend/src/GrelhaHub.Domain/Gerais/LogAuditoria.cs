@@ -117,6 +117,26 @@ public sealed class LogAuditoria : Entidade, IPossuiDiaOperacional
 
     /// <summary><c>RN-GER-006</c> ⚠⚠ — coluna gerada. A aplicação lê, nunca escreve.</summary>
     public DateOnly DataOperacional { get; private set; }
+
+    /// <summary>
+    /// Preserva o <c>Id</c> ao atravessar a ponte entre os bancos — ADR-0017.
+    /// <para>
+    /// ⚠⚠ <b>Existe para UM chamador</b>: <c>OutboxDeAuditoria.ParaTrilha()</c>. A cópia da outbox
+    /// para o banco de log precisa ser IDEMPOTENTE — o worker pode gravar no log e cair antes de
+    /// apagar da outbox, e a segunda tentativa não pode duplicar a linha. O que garante isso é o id
+    /// ser o mesmo dos dois lados.
+    /// </para>
+    /// <para>
+    /// ⚠ Não use em nenhum outro lugar. Trilha com id escolhido de fora é trilha que se pode
+    /// sobrescrever, e o gatilho de imutabilidade do banco de log não protege contra um id
+    /// reaproveitado de propósito.
+    /// </para>
+    /// </summary>
+    public LogAuditoria PreservandoId(Guid id)
+    {
+        Id = id;
+        return this;
+    }
 }
 
 /// <summary>
