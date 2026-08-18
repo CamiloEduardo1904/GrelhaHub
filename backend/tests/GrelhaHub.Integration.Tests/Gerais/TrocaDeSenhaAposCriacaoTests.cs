@@ -290,4 +290,72 @@ public sealed class TrocaDeSenhaAposCriacaoTests(AmbienteDeIntegracao ambiente)
         var sessao = await login.Content.ReadFromJsonAsync<AutenticarResponse>();
         sessao!.DeveTrocarSenha.Should().BeFalse();
     }
+
+    /// <summary>
+    /// <c>RN-GER-032</c> — o mesmo convite, pela rota da PLATAFORMA.
+    /// <para>
+    /// ⚠ Este teste existe por causa de um defeito real: o corpo da rota declarava
+    /// <c>string SenhaInicial</c> — sem <c>?</c> —, e tipo de referência não-anulável em corpo de
+    /// requisição ganha um <c>[Required]</c> implícito do model binding. O comando aceitava a
+    /// ausência e mandava o convite; a requisição morria em <c>400</c> antes de chegar nele.
+    /// </para>
+    /// <para>
+    /// <b>O que deixou o defeito passar:</b> o único teste desta rota mandava <c>SenhaInicial</c>.
+    /// O caminho da tela — sem senha — nunca foi exercido AQUI, só na rota de unidade, que liga no
+    /// comando direto e por isso não tinha o problema. Rota que reembrulha o comando num corpo
+    /// próprio precisa do seu próprio teste: o contrato dela não é o do comando.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "RN-GER-032 — criado pela PLATAFORMA sem senha inicial recebe o convite")]
+    public async Task CriadoPelaPlataformaSemSenha_RecebeConvite()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Brasa Convite Plataforma", "36363636000191");
+
+        var tokenSuporte = await AutenticarAsync(
+            AmbienteDeIntegracao.EmailDePlataforma, AmbienteDeIntegracao.SenhaDePlataforma);
+
+        using var suporte = Ambiente.CriarCliente(tokenSuporte);
+
+        // RN-GER-015 — escrita de plataforma sobre dado do cliente exige sessão de suporte.
+        (await suporte.PostAsJsonAsync(
+            new Uri("/api/v1/plataforma/sessoes-de-suporte", UriKind.Relative),
+            new { UnidadeId = restaurante.UnidadeId, Motivo = "Criacao de usuario a pedido do cliente" }))
+            .EnsureSuccessStatusCode();
+
+        var email = "convidado.plataforma@brasa.teste";
+
+        // SEM `senhaInicial` — o corpo que a tela manda.
+        var criacao = await suporte.PostAsJsonAsync(
+            new Uri($"/api/v1/plataforma/estabelecimentos/{restaurante.UnidadeId}/usuarios",
+                UriKind.Relative),
+            new
+            {
+                Nome = "Convidado",
+                Sobrenome = "Pela Plataforma",
+                Cpf = CpfDeTeste.Gerar(95),
+                Email = email,
+                PerfilNome = "Gerente",
+            });
+
+        criacao.StatusCode.Should().Be(
+            HttpStatusCode.OK, await criacao.Content.ReadAsStringAsync());
+
+        var token = ApiDeTestes.CaixaDeSaida.UltimoToken(email);
+        token.Should().NotBeNullOrWhiteSpace("criar usuário dispara o convite (RN-GER-032)");
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        (await anonimo.PostAsJsonAsync(
+            new Uri("/api/v1/autenticacao/definir-senha", UriKind.Relative),
+            new { Token = token, NovaSenha = SenhaNova }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var login = await anonimo.PostAsJsonAsync(
+            "/api/v1/autenticacao/login", new AutenticarCommand(email, SenhaNova));
+
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var sessao = await login.Content.ReadFromJsonAsync<AutenticarResponse>();
+        sessao!.DeveTrocarSenha.Should().BeFalse("a senha escolhida pelo dono encerra a pendência (RN-GER-035)");
+    }
 }

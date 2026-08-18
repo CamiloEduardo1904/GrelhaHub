@@ -164,7 +164,14 @@ public sealed record CriarUsuarioDePlataformaCorpo(
     string Cpf,
     string Email,
     string PerfilNome,
-    string SenhaInicial)
+
+    /// <summary>
+    /// <c>RN-GER-032</c> — OPCIONAL, e a interrogação no tipo aqui é a regra inteira. Tipo de referência
+    /// não-anulável em corpo de requisição ganha um <c>[Required]</c> implícito do model binding:
+    /// o comando aceitava <c>null</c> e mandava o convite por e-mail, mas a requisição morria com
+    /// 400 "The SenhaInicial field is required" antes de chegar no handler.
+    /// </summary>
+    string? SenhaInicial = null)
 {
     public CriarUsuarioDePlataformaCommand ParaComando(Guid unidadeId) =>
         new(unidadeId, Nome, Sobrenome, Cpf, Email, PerfilNome, SenhaInicial);
