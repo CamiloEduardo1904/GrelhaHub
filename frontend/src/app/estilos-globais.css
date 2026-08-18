@@ -1931,68 +1931,7 @@ button.link-discreto {
   display: none;
 }
 
-@media print {
-  /* Esconde a aplicação inteira e mostra só o cartaz. É o que substitui uma biblioteca
-     de PDF: o navegador já sabe imprimir e salvar em PDF, e o que faltava era dizer a
-     ele o que sai na folha. */
-  body * {
-    visibility: hidden;
-  }
-
-  .cartaz-impressao,
-  .cartaz-impressao * {
-    visibility: visible;
-  }
-
-  .cartaz-impressao {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1.25rem;
-    position: absolute;
-    inset: 0;
-    /* Papel branco, tinta preta. O tema escuro da aplicação gastaria um cartucho por
-       cartaz e sairia cinza em impressora comum. */
-    background: #fff;
-    color: #000;
-    padding: 2rem;
-  }
-
-  .cartaz-logo {
-    max-height: 140px;
-    max-width: 60%;
-    object-fit: contain;
-  }
-
-  .cartaz-nome {
-    font-family: var(--peso);
-    font-size: 2.4rem;
-    line-height: 1.1;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: -0.02em;
-  }
-
-  .cartaz-chamada {
-    font-family: var(--mono);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 0.85rem;
-  }
-
-  .cartaz-link {
-    font-family: var(--mono);
-    font-size: 0.9rem;
-    word-break: break-all;
-    text-align: center;
-  }
-
-  @page {
-    margin: 12mm;
-  }
-}
-
+@media
 /* ---------------------------------------------------------------- acompanhamento
    A tela do cliente usa a mesma capa do cardápio (RN-GER-026, RN-GER-037). */
 
@@ -2017,8 +1956,59 @@ button.link-discreto {
   font-size: 1.05rem;
 }
 
-/* ---------------------------------------------------------------- horário da semana
-   RN-GER-036 — uma linha por dia, com as colunas alinhadas entre as linhas. */
+@media
+/* ============================================================================
+   CADASTRO DE OPERAÇÃO — endereço e horário (RN-GER-036, RN-GER-037)
+
+   Refeito em 18/08/2026. O que estava errado antes: `.linha` de duas colunas
+   iguais para campos de larguras muito diferentes — CEP, número e UF ficavam do
+   tamanho da rua, o `flex: 2` num filho de grade não fazia nada, e na coluna
+   estreita da plataforma tudo quebrava em linhas de um campo. E os horários
+   usavam `<input type="time">`, que traz o relógio e a tipografia do navegador:
+   sete linhas parecendo formulário de outro produto (ADR-0012).
+   ============================================================================ */
+
+.operacao-cadastro {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+/* Grade por ÁREA: cada campo tem a largura do dado que carrega, e o arranjo muda
+   em dois pontos de quebra em vez de empilhar tudo de uma vez. */
+.grade-endereco {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 9rem 1fr 6rem;
+  grid-template-areas:
+    'cep rua numero'
+    'complemento bairro bairro'
+    'cidade cidade uf';
+}
+
+.campo-cep { grid-area: cep; }
+.campo-rua { grid-area: rua; }
+.campo-numero { grid-area: numero; }
+.campo-complemento { grid-area: complemento; }
+.campo-bairro { grid-area: bairro; }
+.campo-cidade { grid-area: cidade; }
+.campo-uf { grid-area: uf; }
+
+/* Coluna estreita — o detalhe da casa na plataforma cabe em ~26rem. */
+@media (max-width: 52rem) {
+  .grade-endereco {
+    grid-template-columns: 1fr 6rem;
+    grid-template-areas:
+      'cep numero'
+      'rua rua'
+      'complemento complemento'
+      'bairro bairro'
+      'cidade uf';
+  }
+}
+
+/* ---------------------------------------------------------------- a semana */
 
 .semana {
   list-style: none;
@@ -2026,46 +2016,362 @@ button.link-discreto {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
 .semana .dia {
   display: grid;
-  /* Colunas fixas: sem grade, "Segunda" e "Quarta-feira" empurrariam os campos de hora
-     para posições diferentes em cada linha, e a lista pareceria torta. */
-  grid-template-columns: auto 7rem 1fr auto 1fr auto;
+  /* marca | dia | abre | às | fecha | alternador. Colunas fixas: sem elas,
+     "Segunda" e "Quarta" empurram os campos para posições diferentes em cada
+     linha, e a lista parece torta — foi o desalinho que apareceu na tela. */
+  grid-template-columns: auto 5.5rem 1fr auto 1fr 6.5rem;
   align-items: center;
   gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: var(--traco);
+  border-color: transparent;
+}
+
+/* Faixa zebrada leve: em sete linhas quase idênticas, é o que ajuda o olho a não
+   pular de dia. Sem cor nova — a mesma superfície um passo acima. */
+.semana .dia:nth-child(odd) {
+  background: var(--surface-2);
+}
+
+.semana .dia-marca {
+  display: inline-flex;
+  align-items: center;
 }
 
 .semana .dia-nome {
   font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--text);
+}
+
+.semana .dia-nome .curto {
+  display: none;
 }
 
 .semana .ate {
+  font-family: var(--mono);
+  font-size: 0.72rem;
   color: var(--muted);
-  font-size: 0.8rem;
 }
 
-.semana .dia input {
+/* O campo de hora: mono, tabular, centrado, e com as cores da interface — o
+   `type="time"` trazia fundo branco e ícone do navegador (CHAPA-11: quem declara
+   background declara color). */
+.campo-hora {
+  width: 100%;
+  min-height: var(--toque-admin);
   margin-top: 0;
+  padding: 0.35rem 0.5rem;
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-align: center;
 }
 
-/* Dia fechado: os campos ficam apagados, e o texto continua legível (CHAPA-10 — nada de
-   opacity em texto). */
-.semana .dia.fechado input {
+.campo-hora::placeholder {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+.campo-hora[aria-invalid='true'] {
+  border-color: var(--erro);
+}
+
+/* Dia fechado: os campos ficam vazios e o rótulo vai para --muted. Nada de
+   `opacity` em texto (CHAPA-10) — o contraste composto não aparece em ferramenta
+   de verificação. */
+.semana .dia.fechado .dia-nome {
   color: var(--muted);
 }
 
-@media (max-width: 40rem) {
+.semana .dia .chip {
+  justify-content: center;
+  min-height: var(--toque-admin);
+}
+
+/* Fieldset desabilitado — sem permissão de alterar (RN-GER-010). O navegador já
+   apaga os controles; o que falta é o texto continuar legível. */
+.operacao-cadastro fieldset:disabled .dia-nome,
+.operacao-cadastro fieldset:disabled legend {
+  color: var(--muted);
+}
+
+.operacao-cadastro .virada {
+  border-left: 4px solid var(--ambar-chama);
+  padding-left: 0.75rem;
+}
+
+@media (max-width: 44rem) {
   .semana .dia {
-    grid-template-columns: auto 1fr 1fr;
-    grid-template-areas:
-      'marca nome nome'
-      'abre abre fecha';
-    row-gap: 0.35rem;
+    grid-template-columns: auto 3rem 1fr auto 1fr;
+    grid-template-areas: none;
+    row-gap: 0.4rem;
+  }
+
+  /* O nome do dia vira abreviação, em vez de quebrar em duas linhas. */
+  .semana .dia-nome .longo {
+    display: none;
+  }
+
+  .semana .dia-nome .curto {
+    display: inline;
+  }
+
+  /* O alternador desce e ocupa a linha inteira: 48px de alvo (RNF-010) não cabem
+     na sexta coluna de uma tela de 360px. */
+  .semana .dia .chip {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ============================================================================
+   MENU DE PERFIS — RN-GER-010 / RN-GER-024
+
+   Substituiu o `<select>` de perfil: escolher perfil é conceder acesso, e a
+   palavra "Gerente" num `<option>` não diz o que está sendo entregue.
+   ============================================================================ */
+
+.perfis {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Cartões que se acomodam: três numa tela larga, um no celular, sem ponto de
+     quebra escrito à mão. */
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.6rem;
+}
+
+.perfil-cartao {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* CHAPA-02 — o escolhido ganha a sombra sólida e a borda âmbar. Um por grupo. */
+.perfil-cartao.ativo {
+  border-color: var(--ambar-chama);
+  background: var(--surface-2);
+  box-shadow: var(--elev-1);
+}
+
+.perfil-topo {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.perfil-topo strong {
+  font-size: 1rem;
+}
+
+.perfil-topo .dado {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* CHAPA-10 — descrição é prosa: cor do texto, nunca --muted. */
+.perfil-descricao {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.perfil-permissoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+/* O código da permissão, ao lado da descrição: é ele que aparece na mensagem de
+   erro do servidor, e ligar um ao outro é o que permite ao suporte responder sem
+   adivinhar. */
+.perfil-permissoes .chave {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.menu-perfis:disabled .perfil-cartao {
+  cursor: default;
+}
+
+/* ============================================================================
+   CARTAZ DO QR — RN-VEN-036
+
+   Refeito em 18/08/2026. A primeira versão saía "branco largado": tipografia
+   preta no papel, sem nenhum traço da identidade, e com o cabeçalho e o rodapé
+   do NAVEGADOR — data, título da página e a URL do painel — impressos por cima.
+
+   Duas correções, e cada uma tem um mecanismo próprio:
+
+   1. `@page { margin: 0 }` faz o navegador esconder cabeçalho e rodapé. É o
+      único jeito por CSS; com margem, ele reserva a faixa e escreve nela.
+      A margem do conteúdo passa a ser padding nosso, controlado aqui.
+
+   2. `print-color-adjust: exact` obriga a imprimir o fundo carvão e o âmbar.
+      Sem isso, o navegador "economiza tinta" e descarta todo background — e o
+      que sobra é exatamente o branco largado de antes.
+   ============================================================================ */
+
+.cartaz-impressao {
+  display: none;
+}
+
+@media print {
+  /* Esconde a aplicação e mostra só o cartaz. `visibility` e não `display` para
+     não recalcular o layout da árvore inteira no meio da impressão. */
+  body * {
+    visibility: hidden;
+  }
+
+  .cartaz-impressao,
+  .cartaz-impressao * {
+    visibility: visible;
+  }
+
+  .cartaz-impressao {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    color: #161210;
+
+    /* Sem isto o navegador descarta os fundos — a faixa de marca desapareceria e
+       o cartaz voltaria a ser papel branco com letra preta. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* A faixa de marca: carvão de ponta a ponta, com as listras. */
+  .cartaz-faixa {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 14mm 16mm 10mm;
+    background: #161210;
+    color: #f4ece2;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .cartaz-listras {
+    display: inline-flex;
+    gap: 3px;
+    align-items: flex-end;
+  }
+
+  .cartaz-listras i {
+    display: block;
+    width: 6px;
+    height: 34px;
+    background: #d95b1e;
+  }
+
+  /* CHAPA — a barra da ligadura em cor de destaque diferente das demais. Uma só. */
+  .cartaz-listras i.quente {
+    background: #f2a03d;
+    height: 42px;
+  }
+
+  .cartaz-marca {
+    font-family: var(--peso);
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+    text-transform: none;
+  }
+
+  .cartaz-marca span {
+    color: #d95b1e;
+  }
+
+  .cartaz-corpo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8mm;
+    padding: 10mm 16mm 16mm;
+    text-align: center;
+  }
+
+  .cartaz-logo {
+    max-height: 120px;
+    max-width: 55%;
+    object-fit: contain;
+  }
+
+  .cartaz-nome {
+    font-family: var(--peso);
+    font-size: 2.6rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+    letter-spacing: -0.025em;
+  }
+
+  .cartaz-chamada {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: #6b5a4c;
+  }
+
+  /* Sombra sólida deslocada, em carvão — o mesmo gesto da interface, no papel. */
+  .cartaz-qr {
+    padding: 5mm;
+    background: #fff;
+    border: 2px solid #161210;
+    box-shadow: 5px 5px 0 #161210;
+    line-height: 0;
+  }
+
+  .cartaz-instrucao {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .cartaz-link {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    word-break: break-all;
+    color: #6b5a4c;
+  }
+
+  /* Margem ZERO na página: é o que faz o navegador parar de imprimir a data, o
+     título e a URL. O respiro vem do padding do cartaz. */
+  @page {
+    size: A4 portrait;
+    margin: 0;
   }
 }

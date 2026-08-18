@@ -61,7 +61,11 @@ public sealed class UnidadeConfiguration : IEntityTypeConfiguration<Unidade>
             .HasColumnName("hora_virada_operacional")
             .HasColumnType("interval")
             .IsRequired()
-            .HasDefaultValueSql("interval '4 hours'");
+            .HasDefaultValueSql("interval '4 hours'")
+
+            // Mesmo sentinel do pedido, pela mesma razão: 00h00 é virada válida e não pode ser
+            // confundida com "não informado".
+            .HasSentinel(TimeSpan.MinValue);
 
         // RN-GER-037 — o endereço. Tudo nulável: as unidades anteriores a esta regra não têm.
         builder.Property(u => u.Cep).HasMaxLength(8);
@@ -290,7 +294,20 @@ public sealed class PedidoConfiguration : IEntityTypeConfiguration<Pedido>
             .HasColumnName("hora_virada_operacional")
             .HasColumnType("interval")
             .IsRequired()
-            .HasDefaultValueSql("interval '4 hours'");
+            .HasDefaultValueSql("interval '4 hours'")
+
+            // ⚠⚠ SENTINEL, e sem ele a regra falha em silêncio no caso mais importante.
+            //
+            // Com `HasDefaultValueSql`, o EF Core omite do INSERT a propriedade cujo valor é igual
+            // ao *sentinel* — que por padrão é o default do CLR. Para `TimeSpan` isso é
+            // `TimeSpan.Zero`, que é EXATAMENTE a virada de quem fecha antes da meia-noite
+            // (RN-GER-036). O resultado: a casa cadastra 00h00, o pedido nasce sem a coluna, o
+            // banco aplica `4 hours`, e o dia operacional sai errado sem erro nenhum.
+            //
+            // `TimeSpan.MinValue` nunca é uma virada válida — o construtor de `Pedido` recebe
+            // sempre um valor entre 00h00 e 23h59 —, então usá-lo como sentinel faz toda virada
+            // real ser escrita explicitamente.
+            .HasSentinel(TimeSpan.MinValue);
 
         builder.Property(p => p.FusoOperacional)
             .HasColumnName("fuso_operacional")

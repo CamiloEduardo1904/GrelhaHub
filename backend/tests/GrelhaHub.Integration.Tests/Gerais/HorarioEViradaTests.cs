@@ -98,40 +98,56 @@ public sealed class HorarioEViradaTests(AmbienteDeIntegracao ambiente) : TesteDe
         var produtoId = await CriarProdutoAsync(restaurante, "Duplo", 30.00m);
 
         using var plataforma = await PlataformaAsync();
-
-        // Casa que fecha 03h00: vira às 03h00.
-        await DefinirAsync(plataforma, restaurante.UnidadeId, "18:00", "03:00");
-
         using var anonimo = Ambiente.CriarCliente();
 
-        var pedido = await anonimo.PostAsJsonAsync(
-            new Uri($"/api/publico/{restaurante.Slug}/pedidos", UriKind.Relative),
+        // ⚠ NENHUM horário cadastrado aqui, e a ausência é o que torna este teste determinístico.
+        //
+        // A primeira versão marcava 18h00–03h00 e lançava o pedido em seguida: passou às 02h e
+        // falhou às 08h, porque `RN-VEN-048` — escrita nesta mesma entrega — recusa pedido fora do
+        // horário. Teste que depende da hora do relógio da máquina é teste que acusa defeito
+        // inexistente na primeira vez que alguém roda a suíte de manhã.
+        //
+        // Sem horário, a casa está sempre aberta (RN-VEN-048) e o pedido carrega a virada PADRÃO.
+        var primeiro = await LancarPedidoAsync(anonimo, restaurante.Slug, produtoId, "Antes");
+        primeiro.EnsureSuccessStatusCode();
+
+        await using (var db = Ambiente.CriarContexto(restaurante.UnidadeId))
+        {
+            var gravado = await db.Pedidos.AsNoTracking().SingleAsync();
+            gravado.HoraDeViradaOperacional.Should().Be(TimeSpan.FromHours(4));
+        }
+
+        // 00h00 às 00h00: atravessa a meia-noite (fecha <= abre) e cobre as 24 horas — a casa fica
+        // aberta em qualquer instante em que a suíte rode, e a virada vai a 00h00.
+        var definicao = await DefinirAsync(plataforma, restaurante.UnidadeId, "00:00", "00:00");
+        definicao.StatusCode.Should().Be(
+            HttpStatusCode.OK, await definicao.Content.ReadAsStringAsync());
+
+        var segundo = await LancarPedidoAsync(anonimo, restaurante.Slug, produtoId, "Depois");
+        segundo.EnsureSuccessStatusCode();
+
+        await using var depois = Ambiente.CriarContexto(restaurante.UnidadeId);
+
+        var pedidos = await depois.Pedidos.AsNoTracking().OrderBy(p => p.Numero).ToListAsync();
+        pedidos.Should().HaveCount(2);
+
+        // ⚠ O ponto da regra: o pedido de antes NÃO foi reclassificado, e o de depois já nasce
+        // com a régua nova. Editar horário muda o futuro; o relatório fechado fica como estava.
+        pedidos[0].HoraDeViradaOperacional.Should().Be(TimeSpan.FromHours(4));
+        pedidos[1].HoraDeViradaOperacional.Should().Be(TimeSpan.Zero);
+    }
+
+    private static async Task<HttpResponseMessage> LancarPedidoAsync(
+        HttpClient anonimo, string slug, Guid produtoId, string nome) =>
+        await anonimo.PostAsJsonAsync(
+            new Uri($"/api/publico/{slug}/pedidos", UriKind.Relative),
             new
             {
-                NomeCliente = "Cliente da Madrugada",
+                NomeCliente = nome,
                 Telefone = "11988887777",
                 Observacao = (string?)null,
                 Itens = new[] { new { ProdutoId = produtoId, Quantidade = 1, Observacao = (string?)null } },
             });
-
-        pedido.EnsureSuccessStatusCode();
-
-        await using var db = Ambiente.CriarContexto(restaurante.UnidadeId);
-
-        var gravado = await db.Pedidos.AsNoTracking().FirstAsync();
-        gravado.HoraDeViradaOperacional.Should().Be(TimeSpan.FromHours(3));
-
-        var diaAntes = gravado.DataOperacional;
-
-        // ⚠ O ponto da regra: a casa muda o horário, e o pedido de ontem continua no mesmo dia.
-        await DefinirAsync(plataforma, restaurante.UnidadeId, "11:00", "23:00");
-
-        await using var depois = Ambiente.CriarContexto(restaurante.UnidadeId);
-        var mesmoPedido = await depois.Pedidos.AsNoTracking().FirstAsync();
-
-        mesmoPedido.HoraDeViradaOperacional.Should().Be(TimeSpan.FromHours(3));
-        mesmoPedido.DataOperacional.Should().Be(diaAntes);
-    }
 
     [Fact(DisplayName = "RN-VEN-048 — fora do horário, a vitrine não aceita pedido (CA-3)")]
     public async Task CA3_ForaDoHorarioRecusa()

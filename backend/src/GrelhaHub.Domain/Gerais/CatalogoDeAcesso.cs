@@ -34,6 +34,13 @@ public static class CatalogoDeAcesso
         new("usuario.gerenciar", "Criar, alterar e desativar usuários", CodigoDeModulo.Gerais),
         new("modulo.visualizar", "Consultar módulos contratados", CodigoDeModulo.Gerais),
 
+        // RN-GER-036 / RN-GER-037 — o cadastro da própria casa: endereço e horário de
+        // funcionamento. Duas permissões e não uma, pelo mesmo motivo de `usuario.*`: ler o
+        // horário é rotina de quem atende ("a gente abre às 18h"), e mudá-lo move a régua do
+        // dia operacional (RN-GER-006) — que é decisão de quem responde pelo faturamento.
+        new("unidade.visualizar", "Ver endereço e horário de funcionamento", CodigoDeModulo.Gerais),
+        new("unidade.gerenciar", "Alterar endereço e horário de funcionamento", CodigoDeModulo.Gerais),
+
         // RN-GER-012 — a trilha guarda valores anteriores de campos sensíveis. Abri-la ao
         // atendente contornaria a restrição de custo por outra porta.
         new("auditoria.consultar", "Consultar a trilha de auditoria", CodigoDeModulo.Gerais),
@@ -81,6 +88,10 @@ public static class CatalogoDeAcesso
             // esta linha tem de sair com ela.
             "usuario.gerenciar",
             "modulo.visualizar",
+
+            // RN-GER-036 — o gerente cadastra o horário: é ele que responde pelo faturamento do
+            // dia, e a virada do dia operacional sai desse cadastro.
+            "unidade.visualizar", "unidade.gerenciar",
             "auditoria.consultar",
             "cardapio.visualizar", "cardapio.gerenciar",
             "pedido.visualizar", "pedido.avancar", "pedido.cancelar",
@@ -93,6 +104,9 @@ public static class CatalogoDeAcesso
         [
             "parametro.visualizar",
             "modulo.visualizar",
+
+            // Só LER o horário: quem atende o telefone precisa responder "a gente abre às 18h".
+            "unidade.visualizar",
             "cardapio.visualizar",
             "pedido.visualizar", "pedido.avancar",
         ]),

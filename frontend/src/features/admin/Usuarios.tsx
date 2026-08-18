@@ -3,7 +3,8 @@ import { Dialogo } from '../../components/Dialogo';
 import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
-import type { Perfil, UsuarioDaUnidade } from '../../services/tipos';
+import type { UsuarioDaUnidade } from '../../services/tipos';
+import { MenuDePerfis, type PerfilDaUnidade } from './MenuDePerfis';
 import { lerSessao, pode } from './sessao';
 
 /**
@@ -25,12 +26,9 @@ import { lerSessao, pode } from './sessao';
  * já cadastrados. Numa unidade recém-criada só há o administrador, então o gerente nunca
  * conseguiria criar o primeiro operador.
  */
-interface PerfilDaUnidade {
-  id: string;
-  nome: Perfil;
-  descricao: string;
-  delegavel: boolean;
-}
+// O tipo vive com o componente que o consome: quem acrescentar campo na API mexe nos dois no
+// mesmo arquivo.
+export type { PerfilDaUnidade } from './MenuDePerfis';
 
 export function Usuarios() {
   const sessao = lerSessao();
@@ -281,22 +279,16 @@ function FormularioDeUsuario({
             />
           </label>
 
-          <label>
-            Perfil
-            <select
-              value={form.perfilId}
-              onChange={(e) => setForm((atual) => ({ ...atual, perfilId: e.target.value }))}
-              required
-            >
-              <option value="">Escolha…</option>
-              {perfis.map((perfil) => (
-                <option key={perfil.id} value={perfil.id}>
-                  {perfil.nome}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
+
+        {/* RN-GER-010 — o menu de perfis, com o que cada um concede. Substituiu o `<select>`:
+            escolher perfil é conceder acesso, e a palavra "Gerente" num `<option>` não diz o
+            que está sendo entregue. */}
+        <MenuDePerfis
+          perfis={perfis}
+          selecionado={form.perfilId}
+          aoSelecionar={(perfilId) => setForm((atual) => ({ ...atual, perfilId }))}
+        />
 
         <div className="linha">
           <label>

@@ -313,7 +313,25 @@ public sealed class TrocarSenhaHandler(IAppDbContext db, IContextoDeExecucao con
     }
 }
 
-public sealed record PerfilDaUnidadeDto(Guid Id, string Nome, string Descricao, bool Delegavel);
+public sealed record PerfilDaUnidadeDto(
+    Guid Id,
+    string Nome,
+    string Descricao,
+    bool Delegavel,
+
+    /// <summary>
+    /// <c>RN-GER-010</c> — o que este perfil concede, em linguagem de gente.
+    /// <para>
+    /// <b>Vem do servidor porque a tela precisa EXPLICAR a escolha</b>, não só executá-la: quem
+    /// atribui um perfil está concedendo acesso, e escolher 'Gerente' sem saber o que ele abre é
+    /// assinar em branco. Uma cópia dessa lista no JavaScript divergiria do catálogo na primeira
+    /// permissão nova — o mesmo argumento que trouxe `Delegavel` para cá (SPEC-GER-007 §11.1).
+    /// </para>
+    /// </summary>
+    IReadOnlyList<PermissaoDoPerfilDto> Permissoes);
+
+/// <summary>Uma permissão do perfil — o código para o gate, a descrição para a pessoa.</summary>
+public sealed record PermissaoDoPerfilDto(string Codigo, string Descricao);
 
 /// <summary>
 /// <c>SPEC-GER-007</c> — os perfis da unidade, com a marca de quem <b>quem está pedindo</b> pode
@@ -349,7 +367,27 @@ public sealed class ListarPerfisHandler(IAppDbContext db, IContextoDeExecucao co
             .AsNoTracking()
             .Where(p => recorte == null || p.UnidadeId == recorte)
             .OrderBy(p => p.Nome)
-            .Select(p => new { p.Id, p.Nome, p.Descricao })
+            .Select(p => new
+            {
+                p.Id,
+                p.Nome,
+                p.Descricao,
+
+                // RN-GER-010 — o que o perfil concede. Projetado no banco: trazer o agregado
+                // inteiro carregaria a tabela de junção de todos os perfis da unidade.
+                // ⚠ `OrderBy` na ORIGEM, antes do `Select`.
+                //
+                // Ordenar por propriedade de um record já construído não atravessa a árvore de
+                // expressão: o EF Core não sabe traduzir `x.Codigo` de um DTO que só existe em
+                // memória, e a consulta falha em tempo de execução — 500 sem pista, porque o
+                // erro não é de compilação. Mesma família da armadilha do `Guid?` em
+                // SPEC-VEN-003 §11.7.
+                Permissoes = p.Permissoes
+                    .OrderBy(concedida => concedida.Permissao!.Codigo)
+                    .Select(concedida => new PermissaoDoPerfilDto(
+                        concedida.Permissao!.Codigo, concedida.Permissao!.Descricao))
+                    .ToList(),
+            })
             .ToListAsync(cancellationToken);
 
         var perfilDeQuemPede = await db.Usuarios
@@ -364,7 +402,8 @@ public sealed class ListarPerfisHandler(IAppDbContext db, IContextoDeExecucao co
                 p.Id,
                 p.Nome,
                 p.Descricao,
-                MatrizDeDelegacao.PodeAtribuir(perfilDeQuemPede, p.Nome)))
+                MatrizDeDelegacao.PodeAtribuir(perfilDeQuemPede, p.Nome),
+                p.Permissoes))
             .ToList();
     }
 }

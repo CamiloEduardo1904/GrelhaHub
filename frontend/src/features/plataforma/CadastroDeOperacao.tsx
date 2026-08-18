@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CampoDeHora } from '../../components/CampoDeHora';
 import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
+import { lerSessao, pode } from '../admin/sessao';
 
 /**
  * Endereço e horário de funcionamento — `RN-GER-036` ⚠⚠, `RN-GER-037`.
  *
- * **A tela mostra a virada do dia operacional que saiu do horário, e não deixa editá-la.** Ela é
- * derivada (`RN-GER-006`): o campo editável seria uma segunda fonte da mesma verdade. Mas escondê-la
- * seria pior — é a consequência mais importante deste cadastro, e quem mexe no horário precisa ver
- * que a régua do relatório mudou junto.
+ * **A tela mostra a virada do dia operacional e não deixa editá-la.** Ela é derivada
+ * (`RN-GER-006`): campo editável seria uma segunda fonte da mesma verdade. Mas escondê-la seria
+ * pior — é a consequência mais importante deste cadastro, e quem mexe no horário precisa ver que a
+ * régua do relatório mudou junto.
+ *
+ * **`RN-GER-010`** — sem `unidade.gerenciar` a tela é somente leitura: os campos ficam
+ * desabilitados e o botão não existe. Esconder é conveniência; o servidor recusa de todo jeito.
  */
 
 interface Endereco {
@@ -35,18 +40,24 @@ interface Operacao {
 }
 
 const DIAS = [
-  { indice: 0, nome: 'Domingo' },
-  { indice: 1, nome: 'Segunda' },
-  { indice: 2, nome: 'Terça' },
-  { indice: 3, nome: 'Quarta' },
-  { indice: 4, nome: 'Quinta' },
-  { indice: 5, nome: 'Sexta' },
-  { indice: 6, nome: 'Sábado' },
+  { indice: 0, nome: 'Domingo', curto: 'Dom' },
+  { indice: 1, nome: 'Segunda', curto: 'Seg' },
+  { indice: 2, nome: 'Terça', curto: 'Ter' },
+  { indice: 3, nome: 'Quarta', curto: 'Qua' },
+  { indice: 4, nome: 'Quinta', curto: 'Qui' },
+  { indice: 5, nome: 'Sexta', curto: 'Sex' },
+  { indice: 6, nome: 'Sábado', curto: 'Sáb' },
 ];
 
 const VAZIO: Endereco = {};
 
 export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
+  const sessao = lerSessao();
+
+  // RN-GER-010 — a plataforma não tem perfil de unidade e passa pelo bypass do servidor; para ela
+  // a tela é sempre editável. Para o restaurante, quem manda é a permissão.
+  const podeEditar = (sessao?.ehPlataforma ?? false) || pode(sessao, 'unidade.gerenciar');
+
   const [endereco, setEndereco] = useState<Endereco>(VAZIO);
   const [horarios, setHorarios] = useState<HorarioDoDia[]>([]);
   const [virada, setVirada] = useState<string | null>(null);
@@ -81,7 +92,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
   function alterarDia(indice: number, mudanca: Partial<HorarioDoDia>) {
     setHorarios((atuais) => {
       const outros = atuais.filter((h) => h.diaDaSemana !== indice);
-      const atual = doDia(indice);
+      const atual = atuais.find((h) => h.diaDaSemana === indice) ?? { diaDaSemana: indice };
 
       return [...outros, { ...atual, ...mudanca }].sort((a, b) => a.diaDaSemana - b.diaDaSemana);
     });
@@ -90,10 +101,10 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
   /**
    * ViaCEP — preenche o que der e **nunca bloqueia**.
    *
-   * ⚠ Se a API estiver fora do ar, o cadastro continua: os campos são editáveis do mesmo jeito, e
-   * o aviso explica por que nada foi preenchido. Um formulário que depende de serviço de terceiro
-   * para gravar endereço é um formulário que para de funcionar sem aviso no dia em que o terceiro
-   * cai — e quem está cadastrando não tem como saber que o problema não é ele.
+   * ⚠ Se o serviço estiver fora do ar, o cadastro continua: os campos seguem editáveis e o aviso
+   * explica por que nada foi preenchido. Formulário que depende de terceiro para gravar endereço
+   * para de funcionar sem avisar no dia em que o terceiro cai — e quem cadastra não tem como saber
+   * que o problema não é ele.
    */
   async function buscarCep(cep: string) {
     const digitos = cep.replace(/\D/gu, '');
@@ -126,7 +137,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
 
       setEndereco((atual) => ({
         ...atual,
-        // Só preenche o que veio: sobrescrever com vazio apagaria o que a pessoa já digitou.
+        // Só o que veio: sobrescrever com vazio apagaria o que a pessoa já digitou.
         logradouro: dados.logradouro || atual.logradouro,
         bairro: dados.bairro || atual.bairro,
         cidade: dados.localidade || atual.cidade,
@@ -146,16 +157,12 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
       const { data } = await api.put<Operacao>('/v1/restaurante/operacao', {
         unidadeId,
         endereco,
-        // A semana inteira, sempre: a virada é derivada do conjunto, e mandar um dia só
-        // deixaria a régua dependente da ordem das chamadas.
+        // A semana inteira, sempre: a virada é derivada do conjunto, e mandar um dia só deixaria
+        // a régua dependente da ordem das chamadas.
         horarios: DIAS.map(({ indice }) => {
           const dia = doDia(indice);
 
-          return {
-            diaDaSemana: indice,
-            abre: dia.abre || null,
-            fecha: dia.fecha || null,
-          };
+          return { diaDaSemana: indice, abre: dia.abre || null, fecha: dia.fecha || null };
         }),
       });
 
@@ -170,12 +177,15 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
   }
 
   return (
-    <form className="placa form" onSubmit={salvar}>
-      <fieldset>
+    <form className="placa form operacao-cadastro" onSubmit={salvar}>
+      <fieldset disabled={!podeEditar}>
         <legend>Endereço</legend>
 
-        <div className="linha">
-          <label>
+        {/* Grade nomeada, e não `.linha` de duas colunas: CEP, número e UF têm largura própria —
+            um campo de UF com a largura da rua parece defeito, e forçar tudo em duas colunas
+            iguais foi o que embaralhou a coluna estreita da plataforma. */}
+        <div className="grade-endereco">
+          <label className="campo-cep">
             CEP
             <input
               className="dado"
@@ -188,7 +198,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             />
           </label>
 
-          <label style={{ flex: 2 }}>
+          <label className="campo-rua">
             Rua
             <input
               value={endereco.logradouro ?? ''}
@@ -196,7 +206,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             />
           </label>
 
-          <label>
+          <label className="campo-numero">
             Número
             <input
               className="dado"
@@ -204,12 +214,8 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
               onChange={(e) => setEndereco((a) => ({ ...a, numero: e.target.value }))}
             />
           </label>
-        </div>
 
-        {avisoCep && <p className="erro">{avisoCep}</p>}
-
-        <div className="linha">
-          <label>
+          <label className="campo-complemento">
             Complemento
             <input
               value={endereco.complemento ?? ''}
@@ -217,7 +223,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             />
           </label>
 
-          <label>
+          <label className="campo-bairro">
             Bairro
             <input
               value={endereco.bairro ?? ''}
@@ -225,7 +231,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             />
           </label>
 
-          <label>
+          <label className="campo-cidade">
             Cidade
             <input
               value={endereco.cidade ?? ''}
@@ -233,7 +239,7 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             />
           </label>
 
-          <label style={{ maxWidth: '6rem' }}>
+          <label className="campo-uf">
             UF
             <input
               className="dado"
@@ -244,50 +250,65 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
           </label>
         </div>
 
-        <p>
-          O CEP consulta os Correios e preenche o resto. <strong>Se a consulta falhar</strong>, os
-          campos continuam editáveis — o cadastro não depende dela.
+        {avisoCep && <p className="erro">{avisoCep}</p>}
+
+        <p className="ajuda">
+          O CEP consulta os Correios e preenche o resto. Se a consulta falhar, os campos continuam
+          editáveis — o cadastro não depende dela.
         </p>
       </fieldset>
 
-      <fieldset>
+      <fieldset disabled={!podeEditar}>
         <legend>Horário de funcionamento</legend>
 
         <ul className="semana">
-          {DIAS.map(({ indice, nome }) => {
+          {DIAS.map(({ indice, nome, curto }) => {
             const dia = doDia(indice);
             const fechado = !dia.abre;
 
             return (
               <li key={indice} className={fechado ? 'dia fechado' : 'dia'}>
                 {/* CHAPA-02 — uma barra âmbar marca o dia em que a casa abre. */}
-                <Grelha etapa={fechado ? -1 : 0} de={1} />
-                <span className="dia-nome">{nome}</span>
+                <span className="dia-marca">
+                  <Grelha etapa={fechado ? -1 : 0} de={1} />
+                </span>
 
-                <input
-                  type="time"
-                  className="dado"
-                  aria-label={`Abre ${nome}`}
-                  value={(dia.abre ?? '').slice(0, 5)}
-                  onChange={(e) => alterarDia(indice, { abre: e.target.value || null })}
+                <span className="dia-nome">
+                  <span className="longo">{nome}</span>
+                  <span className="curto">{curto}</span>
+                </span>
+
+                <CampoDeHora
+                  rotulo={`Abre ${nome}`}
+                  valor={dia.abre ?? ''}
+                  aoMudar={(hora) => alterarDia(indice, { abre: hora || null })}
+                  desabilitado={!podeEditar}
                 />
 
                 <span className="ate">às</span>
 
-                <input
-                  type="time"
-                  className="dado"
-                  aria-label={`Fecha ${nome}`}
-                  value={(dia.fecha ?? '').slice(0, 5)}
-                  onChange={(e) => alterarDia(indice, { fecha: e.target.value || null })}
+                <CampoDeHora
+                  rotulo={`Fecha ${nome}`}
+                  valor={dia.fecha ?? ''}
+                  aoMudar={(hora) => alterarDia(indice, { fecha: hora || null })}
+                  desabilitado={!podeEditar}
                 />
 
+                {/* Alternador, e não botão de ação: `aria-pressed` diz o estado, e o chip mostra
+                    qual dos dois vale. Um botão "Fechado" que não muda de aparência deixa a
+                    pessoa sem saber se já clicou. */}
                 <button
                   type="button"
-                  className="btn calada"
-                  onClick={() => alterarDia(indice, { abre: null, fecha: null })}
+                  className="chip"
+                  aria-pressed={fechado}
+                  onClick={() =>
+                    alterarDia(
+                      indice,
+                      fechado ? { abre: '18:00', fecha: '23:00' } : { abre: null, fecha: null },
+                    )
+                  }
                 >
-                  Fechado
+                  {fechado ? 'Fechado' : 'Abre'}
                 </button>
               </li>
             );
@@ -295,14 +316,14 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
         </ul>
 
         {/* RN-GER-006 ⚠⚠ — a consequência que ninguém adivinha olhando para os horários. */}
-        <p>
+        <p className="virada">
           O dia operacional desta casa vira às{' '}
-          <strong className="dado">{(virada ?? '04:00:00').slice(0, 5)}</strong>. Pedido feito
-          antes desse horário conta no dia anterior — é assim que a noite de sábado não vira
-          faturamento de domingo.
+          <strong className="dado">{(virada ?? '04:00:00').slice(0, 5)}</strong>. Pedido feito antes
+          desse horário conta no dia anterior — é assim que a noite de sábado não vira faturamento
+          de domingo.
         </p>
 
-        <p>
+        <p className="ajuda">
           A virada sai do fechamento que passa da meia-noite. Quem fecha antes dela tem dia
           operacional igual ao dia do calendário.
         </p>
@@ -310,9 +331,17 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
 
       {erro && <p className="erro">{erro}</p>}
 
-      <button type="submit" className="btn primario" disabled={salvando}>
-        {salvando ? 'Salvando…' : salvo ? 'Salvo' : 'Salvar endereço e horário'}
-      </button>
+      {podeEditar ? (
+        <button type="submit" className="btn primario" disabled={salvando}>
+          {salvando ? 'Salvando…' : salvo ? 'Salvo' : 'Salvar endereço e horário'}
+        </button>
+      ) : (
+        // RN-GER-010 — sem permissão de alterar, nada de botão que responderia 403.
+        <p className="ajuda">
+          Você pode <strong>ver</strong> este cadastro. Alterar endereço e horário exige o perfil de
+          gerência.
+        </p>
+      )}
     </form>
   );
 }

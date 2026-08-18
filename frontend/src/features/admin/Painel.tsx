@@ -9,11 +9,12 @@ import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
 import { PROXIMA_ACAO, rotaDeAvanco } from '../../services/ciclo';
 import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../services/tipos';
+import { CadastroDeOperacao } from '../plataforma/CadastroDeOperacao';
 import { Cardapio } from './Cardapio';
 import { encerrarSessao, lerSessao, pode } from './sessao';
 import { Usuarios } from './Usuarios';
 
-type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe';
+type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe' | 'loja';
 
 /**
  * A aba de equipe só existe para quem consegue ver usuário (`RN-GER-010`). Esconder é
@@ -24,6 +25,10 @@ const ABAS: { chave: Aba; nome: string; permissao?: string }[] = [
   { chave: 'cardapio', nome: 'Cardápio' },
   { chave: 'equipe', nome: 'Equipe', permissao: 'usuario.visualizar' },
   { chave: 'link', nome: 'Link público' },
+
+  // RN-GER-036 / RN-GER-037 — o cadastro da própria casa. A aba só aparece para quem tem
+  // `unidade.visualizar`: aba que abre em 403 é pior do que aba ausente.
+  { chave: 'loja', nome: 'Loja', permissao: 'unidade.visualizar' },
 ];
 
 export function Painel() {
@@ -128,6 +133,11 @@ export function Painel() {
         {aba === 'link' && restaurante && (
           <LinkPublico restaurante={restaurante} aoMudar={carregar} />
         )}
+
+        {/* RN-GER-036 — o restaurante cadastra o próprio horário. Só existe porque a permissão
+            `unidade.gerenciar` foi semeada nos perfis por migration de dados: entregar a tela
+            antes dela daria um botão que responde 403. */}
+        {aba === 'loja' && <CadastroDeOperacao />}
       </main>
     </div>
   );
@@ -352,18 +362,44 @@ function CartazDoCardapio({
       {/* O cartaz. Fica fora da tela e só existe na impressão — montá-lo em outra janela com
           `window.open` esbarraria no bloqueador de pop-up justamente de quem clicou no botão. */}
       <div className="cartaz-impressao" aria-hidden="true">
-        {urlLogo ? (
-          <img className="cartaz-logo" src={urlLogo} alt="" />
-        ) : (
-          <Grelha etapa={2} de={5} alta />
-        )}
+        {/* A faixa de marca: carvão com as listras âmbar. É o que tira o cartaz do "branco
+            largado" sem gastar um cartucho por folha — tinta onde ela significa algo. */}
+        <div className="cartaz-faixa">
+          <span className="cartaz-listras">
+            {[0, 1, 2, 3, 4].map((barra) => (
+              <i key={barra} className={barra === 1 ? 'quente' : undefined} />
+            ))}
+          </span>
 
-        <strong className="cartaz-nome">{nomeFantasia}</strong>
-        <p className="cartaz-chamada">Cardápio digital</p>
+          <span className="cartaz-marca">
+            Grelha<span>Hub</span>
+          </span>
+        </div>
 
-        <QRCodeSVG value={link} size={320} bgColor="#ffffff" fgColor="#000000" level="M" marginSize={2} />
+        <div className="cartaz-corpo">
+          {urlLogo && <img className="cartaz-logo" src={urlLogo} alt="" />}
 
-        <code className="cartaz-link">{link}</code>
+          <strong className="cartaz-nome">{nomeFantasia}</strong>
+
+          <p className="cartaz-chamada">Cardápio digital</p>
+
+          {/* A moldura do QR repete a sombra sólida deslocada da interface — no papel ela vira
+              um deslocamento em carvão, que é o mesmo gesto sem depender de cor de fundo. */}
+          <div className="cartaz-qr">
+            <QRCodeSVG
+              value={link}
+              size={300}
+              bgColor="#ffffff"
+              fgColor="#161210"
+              level="M"
+              marginSize={2}
+            />
+          </div>
+
+          <p className="cartaz-instrucao">Aponte a câmera do celular</p>
+
+          <code className="cartaz-link">{link}</code>
+        </div>
       </div>
     </div>
   );

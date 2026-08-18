@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Versão | 1.7 |
+| Versão | 1.8 |
 | Decisão | [ADR-0012](adr/0012-direcao-visual-chapa.md) |
 | Situação | **Base oficial** — aplicada ao app em 17/08/2026; §8 (vitrine), o formulário dentro do `<Dialogo />` e a **§9 (movimento)** acrescentados no mesmo dia |
 | Ver funcionando | [`design/proposta-chapa.html`](design/proposta-chapa.html) · [PDF](design/GrelhaHub-Direcao-Chapa.pdf) |
@@ -172,7 +172,7 @@ depender de fonte baixando no meio do serviço.
 
 ## 3. Componentes
 
-Quatro novos. O resto é token.
+Sete novos. O resto é token.
 
 ### `<Grelha etapa={n} de={6} />`
 
@@ -275,6 +275,27 @@ raio de desfoque e cor pastel. Nenhuma regra de CSS alcança aquele calendário:
 | Data que não existe | `31/02` é recusado por **ida e volta** no `Date`, não por faixa de dia |
 | Incompleto | Não é erro enquanto se digita; vira erro ao sair do campo |
 | Atalhos | `.chips` com uma barra âmbar no ativo (`CHAPA-02`) |
+
+### `<CampoDeHora />`
+
+Hora digitada em `HH:MM`, mono com `tabular-nums`. Mesma decisão de `<CampoDeData />` e o mesmo
+motivo: `<input type="time">` traz o ícone de relógio do navegador, o seletor de AM/PM de alguns
+locales e a tipografia do sistema. **Numa lista de sete dias o efeito é pior que num campo isolado**
+— as sete linhas parecem formulário de outro produto.
+
+⚠ `24:00` é recusado. Casa que fecha "às 24h" fecha à meia-noite, que é `00:00`; aceitar `24:00`
+produziria uma virada de dia operacional de 24 horas de deslocamento (`RN-GER-006`).
+
+### `<MenuDePerfis />`
+
+O perfil do usuário e **o que ele concede** — `RN-GER-010`, `RN-GER-024`. Substituiu o `<select>`:
+escolher perfil é conceder acesso, e a palavra "Gerente" num `<option>` não diz o que está sendo
+entregue. Cada perfil é um cartão com a lista de permissões em português, mais o código de cada uma
+— é o código que aparece na mensagem de erro do servidor, e ligar um ao outro é o que permite ao
+suporte responder sem adivinhar.
+
+As permissões **vêm do servidor**. Cópia no TypeScript divergiria do `CatalogoDeAcesso` na primeira
+permissão nova, e a tela passaria a prometer o que o servidor recusa.
 
 ---
 

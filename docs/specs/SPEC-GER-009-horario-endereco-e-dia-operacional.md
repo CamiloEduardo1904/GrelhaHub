@@ -43,11 +43,9 @@ Junto vêm o **endereço** — que a vitrine precisa exibir — e a consequênci
 a régua dependente da ordem das chamadas, e no meio do caminho a casa apuraria por um número que
 ninguém escolheu.
 
-⚠ **As duas rotas são privativas da plataforma, por ora.** O caminho natural é o restaurante editar
-o próprio horário, e falta pouco: uma permissão `unidade.gerenciar` no `CatalogoDeAcesso`. Mas
-permissão nova só chega aos perfis das unidades **já criadas** por migration de dados — o catálogo é
-semeado no ato da criação (`CadastrarRestaurante`) —, e entregar sem essa migration daria ao
-administrador um botão que responde 403. Está na §8.
+As duas rotas são de **quem tem a permissão** (`RN-GER-010`): `unidade.visualizar` para ler,
+`unidade.gerenciar` para gravar — ver §12. O usuário de plataforma passa pelo bypass de
+`PermissaoBehavior` (`RN-GER-014`): não tem perfil de unidade, logo não tem permissão de unidade.
 
 ## 4. Comportamento
 
@@ -126,9 +124,12 @@ está cadastrando não tem como saber que o problema não é ele.
 
 ### CA-2 — O passado não se reclassifica (`RN-GER-006` ⚠⚠)
 
-> **Dado** um pedido criado com a virada de 03h00,
-> **Quando** o horário da casa mudar para fechar às 23h00,
-> **Então** o pedido continua com 03h00 e **no mesmo dia operacional**.
+> **Dado** um pedido criado quando a casa não tinha horário — virada padrão de 04h00 —,
+> **Quando** o horário for cadastrado e a virada passar a 00h00,
+> **Então** o pedido anterior continua com 04h00 e o próximo já nasce com 00h00.
+
+*O cenário usa um horário que cobre as 24 horas de propósito: sem isso o teste depende da hora em
+que a suíte roda — ver §13.*
 
 ### CA-3 — Fora do horário não vende (`RN-VEN-048`)
 
@@ -158,8 +159,9 @@ horário**. O valor não mudou: 04h00.
 
 ## 8. Fora de escopo
 
-- **O restaurante editar o próprio horário** ⚠ — falta a permissão `unidade.gerenciar` e a migration
-  de dados que a concede aos perfis das unidades existentes. Hoje é a plataforma que cadastra
+- ~~O restaurante editar o próprio horário~~ — **entregue em 18/08/2026**, no mesmo dia: as
+  permissões `unidade.visualizar` e `unidade.gerenciar` entraram no `CatalogoDeAcesso` e a
+  migration `PermissoesDaUnidade` as concedeu aos perfis das unidades **já existentes**. Ver §12
 - **Feriado e exceção de data** — o cadastro é semanal. "Fechado no dia 25" é regra nova
 - **Intervalo no meio do dia** (almoço e jantar com fechamento entre eles) — um par por dia
 - **Trilha de auditoria por virada da casa** — ver §4
@@ -185,7 +187,12 @@ horário**. O valor não mudou: 04h00.
 - [x] Vitrine com endereço, "fechado agora" e recusa de pedido no servidor
 - [x] Cadastro de endereço com ViaCEP **não bloqueante** e horário semanal
 - [x] 8 testes de domínio + CA-1 a CA-4 de integração; `DiaOperacionalParidadeTests` segue verde
-- [x] `dotnet build -c Release`, `dotnet test`, `eslint` e `tsc` verdes — **271 testes**
+- [x] Permissões `unidade.visualizar` e `unidade.gerenciar` no catálogo E concedidas às unidades
+      existentes por migration de dados (§12)
+- [x] Aba **Loja** no painel do restaurante, escondida sem permissão; sem `unidade.gerenciar` a tela
+      é somente leitura e o botão de salvar não existe
+- [x] `<CampoDeHora />` no design system — o `input type="time"` trazia o widget do navegador
+- [x] `dotnet build -c Release`, `dotnet test`, `eslint` e `tsc` verdes
 
 ## 11. O que saiu diferente
 
@@ -204,3 +211,56 @@ filho com `Id` preenchido como `Modified`: `UPDATE` de linha que não existe, ze
 o erro chega como `DbUpdateConcurrencyException` — que parece conflito de concorrência e manda
 investigar o lugar errado. É o mesmo defeito que o log de SQL do harness pegou no CA-9 da
 `SPEC-VEN-001`, e a correção é a mesma: **inserir explicitamente** pelo `DbSet`.
+
+## 12. As permissões — `RN-GER-010`
+
+Duas, e a separação é a mesma de `usuario.*`: ler o horário é rotina de quem atende ("a gente abre
+às 18h"); alterá-lo **move a régua do dia operacional** (`RN-GER-006`), que é decisão de quem
+responde pelo faturamento.
+
+| Permissão | Quem recebe | Por quê |
+|-----------|-------------|---------|
+| `unidade.visualizar` | Administrador, Gerente, **Atendente** | Quem atende o telefone precisa responder o horário |
+| `unidade.gerenciar` | Administrador, Gerente | Muda a apuração do dia |
+
+⚠ **Permissão nova exige migration de DADOS**, e é a parte que se esquece. `CadastrarRestaurante`
+semeia perfis e permissões **no ato da criação**: acrescentar ao `CatalogoDeAcesso` alcança só as
+unidades criadas depois. Sem a migration `PermissoesDaUnidade`, o administrador de uma casa que já
+existia veria a aba **Loja** e tomaria 403 — botão que responde "não pode" para quem pode é pior do
+que funcionalidade ausente.
+
+A migration usa `NOT EXISTS` antes de inserir, e os UUIDs são fixos: gerá-los aqui faria a mesma
+migration produzir ids diferentes em cada banco, e comparar ambientes deixaria de ser possível.
+
+### O gate na interface
+
+`RN-GER-010` vale nas duas pontas, e na tela ele é **conveniência**:
+
+- A aba **Loja** só aparece com `unidade.visualizar`
+- Sem `unidade.gerenciar`, os `fieldset` ficam desabilitados e **o botão de salvar não existe** — no
+  lugar dele, uma frase dizendo que alterar exige perfil de gerência
+- O usuário de plataforma passa pelo bypass de `PermissaoBehavior` (`RN-GER-014`): não tem perfil de
+  unidade, logo não tem permissão de unidade
+
+> **O que a tela esconde, o servidor recusa.** Esconder botão é usabilidade; o gate é o
+> `PermissaoBehavior`.
+
+## 13. O defeito que o teste determinístico pegou — o *sentinel* do EF Core ⚠⚠
+
+`CA-2` falhou dizendo "esperava `default`, encontrou `4h`" depois de a casa cadastrar virada de
+**00h00**. A causa não estava na regra nem na derivação:
+
+> Com `HasDefaultValueSql`, o EF Core **omite do `INSERT`** a propriedade cujo valor é igual ao
+> *sentinel* — que por padrão é o default do CLR. Para `TimeSpan` isso é `TimeSpan.Zero`, que é
+> **exatamente a virada de quem fecha antes da meia-noite**.
+
+O efeito seria silencioso e grave: a casa cadastra que fecha 23h30, a virada vira 00h00, o pedido
+nasce sem a coluna, o banco aplica `interval '4 hours'` e **a apuração sai errada sem erro nenhum**.
+Corrigido com `.HasSentinel(TimeSpan.MinValue)` — valor que nunca é uma virada válida.
+
+⚠ **Só apareceu porque o teste ficou determinístico.** A primeira versão de `CA-2` marcava
+18h00–03h00 e lançava o pedido em seguida: passava às 02h e falhava às 08h, porque `RN-VEN-048` —
+escrita na mesma entrega — recusa pedido fora do horário. Ao trocar o horário por um que cobre as
+24 horas (`00:00` às `00:00`, que atravessa a meia-noite), a virada resultante passou a ser `00:00`
+— e foi aí que o sentinel apareceu. **Teste que depende do relógio da máquina não só acusa defeito
+inexistente: ele esconde o defeito real.**

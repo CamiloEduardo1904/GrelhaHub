@@ -162,7 +162,7 @@ public sealed record HorarioDoDiaDto(DayOfWeek DiaDaSemana, TimeOnly? Abre, Time
 /// </para>
 /// </summary>
 [ExigeModulo(CodigoDeModulo.Gerais)]
-[SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
+[ExigePermissao("unidade.gerenciar")]
 public sealed record DefinirOperacaoDaUnidadeCommand(
     Guid? UnidadeId,
     EnderecoDto? Endereco,
@@ -211,15 +211,12 @@ public sealed class DefinirOperacaoDaUnidadeHandler(IAppDbContext db, IContextoD
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        // ⚠ PRIVATIVA DA PLATAFORMA, por ora — e a limitação está declarada.
+        // RN-GER-014 — a plataforma informa QUAL casa; o restaurante mexe na própria, e o
+        // `unidadeId` que ele mandar é ignorado. Mesmo desenho de `ListarUsuariosQuery`.
         //
-        // O caminho natural seria o restaurante editar o próprio horário, e ele existe: bastaria
-        // uma permissão `unidade.gerenciar` no CatalogoDeAcesso. Mas permissão nova só chega aos
-        // perfis das unidades JÁ CRIADAS por migration de dados — `CadastrarRestaurante` semeia o
-        // catálogo no ato da criação —, e entregar a regra sem essa migration deixaria o
-        // administrador vendo um botão que responde 403. Fica na §8 da SPEC-GER-009.
-        ListarEstabelecimentosHandler.ExigirPlataforma(contexto);
-
+        // O gate é a permissão `unidade.gerenciar` (RN-GER-010), e o usuário de plataforma passa
+        // pelo bypass de `PermissaoBehavior`: ele não tem perfil de unidade, logo não tem
+        // permissão de unidade.
         var alvo = contexto.EhPlataforma
             ? request.UnidadeId ?? throw new RegraDeNegocioException(
                 "Informe o estabelecimento.")
@@ -281,7 +278,7 @@ public sealed class DefinirOperacaoDaUnidadeHandler(IAppDbContext db, IContextoD
 
 /// <summary><c>RN-GER-036</c> / <c>RN-GER-037</c> — o que a casa tem cadastrado.</summary>
 [ExigeModulo(CodigoDeModulo.Gerais)]
-[SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
+[ExigePermissao("unidade.visualizar")]
 public sealed record ObterOperacaoDaUnidadeQuery(Guid? UnidadeId = null)
     : IRequest<OperacaoDaUnidadeDto>;
 
@@ -292,8 +289,6 @@ public sealed class ObterOperacaoDaUnidadeHandler(IAppDbContext db, IContextoDeE
         ObterOperacaoDaUnidadeQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        ListarEstabelecimentosHandler.ExigirPlataforma(contexto);
 
         var alvo = contexto.EhPlataforma
             ? request.UnidadeId ?? throw new RegraDeNegocioException("Informe o estabelecimento.")
