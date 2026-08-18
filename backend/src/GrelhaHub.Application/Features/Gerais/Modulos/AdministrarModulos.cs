@@ -25,8 +25,9 @@ public sealed record ModuloDaUnidadeDto(
 public sealed record ListarModulosDaUnidadeQuery(Guid? UnidadeId, DateTimeOffset? Em)
     : IRequest<IReadOnlyList<ModuloDaUnidadeDto>>;
 
+/// <summary>ADR-0019 — convertida ao modelo de leitura em 18/08/2026.</summary>
 public sealed class ListarModulosDaUnidadeHandler(
-    IAppDbContext db, IContextoDeExecucao contexto, IRelogio relogio)
+    ILeituraDb leitura, IContextoDeExecucao contexto, IRelogio relogio)
     : IRequestHandler<ListarModulosDaUnidadeQuery, IReadOnlyList<ModuloDaUnidadeDto>>
 {
     public async Task<IReadOnlyList<ModuloDaUnidadeDto>> Handle(
@@ -46,32 +47,35 @@ public sealed class ListarModulosDaUnidadeHandler(
 
         var instante = request.Em ?? relogio.Agora;
 
-        var catalogo = await db.Modulos.AsNoTracking().OrderBy(m => m.Ordem).ToListAsync(cancellationToken);
+        var catalogo = await leitura.Modulos.OrderBy(m => m.Ordem).ToListAsync(cancellationToken);
 
-        var habilitacoes = await db.ModulosDaUnidade
-            .IgnoreQueryFilters()
-            .AsNoTracking()
+        // ⚠ A visão devolve TODAS as habilitações, inclusive as vencidas — e é o que permite esta
+        // consulta responder "o que estava habilitado em tal data". Uma visão presa a `now()`
+        // tornaria a pergunta impossível, e o parâmetro `Em` viraria decoração.
+        var habilitacoes = await leitura.ModulosDaUnidade
             .Where(h => h.UnidadeId == unidadeId)
             .ToListAsync(cancellationToken);
 
-        return catalogo.Select(modulo =>
+        return [.. catalogo.Select(modulo =>
         {
             var vigente = habilitacoes
                 .Where(h => h.ModuloId == modulo.Id)
                 .OrderByDescending(h => h.VigenciaInicio)
-                .FirstOrDefault(h => h.VigoraEm(instante));
+                .FirstOrDefault(h => h.VigenciaInicio <= instante
+                                  && (h.VigenciaFim == null || h.VigenciaFim > instante));
 
             // RN-GER-019 — o núcleo conta como habilitado mesmo sem linha.
             var habilitado = modulo.Nucleo || vigente is not null;
 
+            // ⚠ `Codigo` já é a SIGLA: a coluna é `varchar(3)` e o conversor grava "VEN".
             return new ModuloDaUnidadeDto(
-                Modulo.Sigla(modulo.Codigo),
+                modulo.Codigo,
                 modulo.Nome,
                 modulo.Nucleo,
                 habilitado,
                 vigente?.VigenciaInicio,
                 vigente?.VigenciaFim);
-        }).ToList();
+        })];
     }
 }
 

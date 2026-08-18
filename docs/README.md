@@ -101,7 +101,7 @@
 |------|----------|
 | Regras catalogadas | **159** — 140 em `HIP`, 19 em `DEC` (decisão de produto), das quais 6 com origem `IMP` |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco. Risco RS5 |
-| ADRs | **15 aceitos**, 4 decisões em aberto. **ADR-0013 revisa o ADR-0005**; ADR-0015 decide o armazenamento de imagem |
+| ADRs | **20 aceitos** (1 substituída), 4 decisões em aberto. **ADR-0013 revisa o ADR-0005**; **ADR-0018 substitui a ADR-0015** e põe a imagem no banco; ADR-0017 separa os três bancos; ADR-0019 conclui o CQRS; ADR-0020 remove a sessão de suporte |
 | Specs | **9 — todas `ENTREGUE`.** `GER-001` a `007` (onda 0), `VEN-001` (fatia vertical) e `VEN-002` (imagem) |
 | Cobertura de regra por spec | **44 de 159** — `RN-EST-021` a `023` têm regra escrita e código pendente (onda 3) |
 | Código entregue | Fatia vertical (`SPEC-VEN-001`) + **onda 0 completa**: unidade e convenções, dia operacional, parâmetros com vigência, usuários e permissões, trilha de auditoria, módulos por unidade. **40 regras com o ID citado em teste** |

@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using GrelhaHub.Application.Common.Modulos;
 using GrelhaHub.Domain.Gerais;
+using GrelhaHub.Domain.Vendas;
 
 namespace GrelhaHub.Application.Features.Vendas.ConsultarPedidoPublico;
 
@@ -34,18 +35,31 @@ public sealed record PedidoPublicoResponse(
 
 public sealed record ItemPublicoDto(string Produto, int Quantidade, decimal PrecoPraticado, decimal Total);
 
-public sealed class ConsultarPedidoPublicoHandler(IAppDbContext db, IContextoDeExecucao contexto, IModulos modulos)
+/// <summary>
+/// ADR-0019 — convertido ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ O que saiu daqui: <c>Include(p =&gt; p.Itens)</c> carregava o agregado inteiro — com todas as
+/// invariantes de <c>Pedido</c> montadas em memória — para responder quatro campos e uma lista.
+/// O total agora vem somado do banco, pela mesma expressão que o painel usa
+/// (<c>vw_pedido_resumo</c>), então painel e acompanhamento não têm como divergir.
+/// </para>
+/// </summary>
+public sealed class ConsultarPedidoPublicoHandler(
+    ILeituraDb leitura, IContextoDeExecucao contexto, IModulos modulos)
     : IRequestHandler<ConsultarPedidoPublicoQuery, PedidoPublicoResponse>
 {
     public async Task<PedidoPublicoResponse> Handle(ConsultarPedidoPublicoQuery request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var slug = (request.Slug ?? string.Empty).Trim().ToLowerInvariant();
 
-        var unidade = await db.Unidades.AsNoTracking()
+        var unidade = await leitura.Unidades
             .FirstOrDefaultAsync(u => u.Slug == slug && u.Ativa, cancellationToken)
             ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
         contexto.DefinirUnidadePublica(unidade.Id);
+
         // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline.
         //
         // O behavior roda antes do handler, quando a unidade ainda não está no contexto: ela só
@@ -57,45 +71,41 @@ public sealed class ConsultarPedidoPublicoHandler(IAppDbContext db, IContextoDeE
             throw new NaoEncontradoException("Restaurante não encontrado.");
         }
 
-
         var telefone = new string((request.Telefone ?? string.Empty).Where(char.IsDigit).ToArray());
 
-        // O número do pedido sozinho é adivinhável. Exigir o telefone junto impede que
-        // alguém liste pedidos alheios variando o número — o mínimo para uma rota anônima.
-        // Carrega o agregado: o total vem de `Pedido.Total`, que é a única definição de
-        // RN-VEN-039. Projetar um `Sum` aqui duplicaria a regra na consulta.
-        var pedido = await db.Pedidos.AsNoTracking()
-            .Include(p => p.Itens)
-            .Where(p => p.Numero == request.Numero)
-            .Where(p => db.Clientes.Any(c => c.Id == p.ClienteId && c.Telefone == telefone))
+        // O número do pedido sozinho é adivinhável. Exigir o telefone junto impede que alguém
+        // liste pedidos alheios variando o número — o mínimo para uma rota anônima.
+        //
+        // ⚠ `TelefoneCliente` vem da visão já ligado ao pedido: o `JOIN` que o handler antigo fazia
+        // com uma subconsulta em `cliente` agora está em `vw_pedido_resumo`.
+        var pedido = await leitura.PedidosResumo
+            .Where(p => p.Numero == request.Numero && p.TelefoneCliente == telefone)
             .OrderByDescending(p => p.CriadoEm)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NaoEncontradoException("Pedido não encontrado.");
 
-        // O nome de quem pediu. Consulta separada e não `Include`: `Cliente` guarda telefone, e
-        // trazer o agregado inteiro para uma rota ANÔNIMA convidaria a devolver mais do que o
-        // nome no dia em que alguém acrescentasse um campo ao DTO (RN-GER-012, mesma doutrina).
-        var nomeCliente = await db.Clientes.AsNoTracking()
-            .Where(c => c.Id == pedido.ClienteId)
-            .Select(c => c.Nome)
-            .FirstOrDefaultAsync(cancellationToken) ?? "Cliente";
+        var itens = await leitura.ItensDePedido
+            .Where(i => i.PedidoId == pedido.Id)
+            .OrderBy(i => i.NomeProduto)
+            .ToListAsync(cancellationToken);
 
         return new PedidoPublicoResponse(
             pedido.Numero,
-            pedido.Status.ToString(),
-            pedido.Total.Valor,
+            ((StatusPedido)pedido.Status).ToString(),
+            pedido.Total,
             pedido.CriadoEm,
-            nomeCliente,
+
+            // A casa registra o nome no ato do pedido (RN-CRM-003); a coalescência cobre o
+            // registro antigo que ficou sem cliente vinculado.
+            pedido.NomeCliente ?? "Cliente",
             pedido.Observacao,
             unidade.NomeFantasia,
             unidade.UrlLogo,
-            unidade.EnderecoResumido(),
-            pedido.Itens
-                .Select(item => new ItemPublicoDto(
-                    item.NomeProduto,
-                    item.Quantidade,
-                    item.PrecoPraticado.Valor,
-                    item.Total.Valor))
-                .ToList());
+            ApresentacaoDaCasa.Resumir(
+                unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Bairro,
+                unidade.Cidade, unidade.Uf),
+
+            [.. itens.Select(item => new ItemPublicoDto(
+                item.NomeProduto, item.Quantidade, item.PrecoPraticado, item.Total))]);
     }
 }

@@ -13,7 +13,7 @@
 # e a pasta nova ficava FORA da exclusão. O sintoma é build de Release vermelho por IDE0161 e
 # CA1861 em arquivo que ninguém escreveu — quem criar um quarto contexto vai passar por isto.
 # devem ser editadas a mão. Analisar código gerado só produz ruído.
-[**/{Migrations,MigrationsLog}/*.cs]
+[**/{Migrations,MigrationsLog,MigrationsArquivo}/*.cs]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
 dotnet_diagnostic.IDE0161.severity = none

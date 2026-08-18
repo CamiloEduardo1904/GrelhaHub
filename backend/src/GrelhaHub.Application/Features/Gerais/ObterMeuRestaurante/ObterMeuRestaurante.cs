@@ -29,26 +29,35 @@ public sealed record MeuRestauranteResponse(
     /// <summary><c>RN-GER-026</c> — a logo. Nula é estado válido: a vitrine exibe o nome.</summary>
     string? UrlLogo);
 
+/// <summary>
+/// ADR-0019 — convertido ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ A contagem de produtos ativos saiu do handler e entrou em <c>vw_unidade</c>: eram duas
+/// viagens ao banco para montar um cartão. A contagem de pedidos do dia continua separada porque
+/// ela depende do <b>dia operacional de hoje</b> — que é pergunta do relógio, não da visão.
+/// </para>
+/// </summary>
 public sealed class ObterMeuRestauranteHandler(
-    IAppDbContext db, IContextoDeExecucao contexto, IRelogio relogio)
+    ILeituraDb leitura, IContextoDeExecucao contexto, IRelogio relogio)
     : IRequestHandler<ObterMeuRestauranteQuery, MeuRestauranteResponse>
 {
     public async Task<MeuRestauranteResponse> Handle(ObterMeuRestauranteQuery request, CancellationToken cancellationToken)
     {
-        var unidade = await db.Unidades
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == contexto.UnidadeId, cancellationToken)
-            ?? throw new NaoEncontradoException("Restaurante não encontrado.");
+        var unidadeId = contexto.UnidadeId;
 
-        var totalProdutos = await db.Produtos.CountAsync(p => p.Ativo, cancellationToken);
+        var unidade = await leitura.Unidades
+            .FirstOrDefaultAsync(u => u.Id == unidadeId, cancellationToken)
+            ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
         // RN-GER-006 ⚠⚠ — a contagem do dia usa data_operacional, NUNCA a data de criação.
         var hoje = relogio.DiaOperacionalDeHoje();
-        var pedidosDoDia = await db.Pedidos.CountAsync(p => p.DataOperacional == hoje, cancellationToken);
+
+        var pedidosDoDia = await leitura.PedidosResumo
+            .CountAsync(p => p.UnidadeId == unidadeId && p.DataOperacional == hoje, cancellationToken);
 
         return new MeuRestauranteResponse(
             unidade.Id, unidade.RazaoSocial, unidade.NomeFantasia, unidade.Cnpj,
             unidade.Telefone, unidade.Slug, $"/c/{unidade.Slug}", unidade.FusoHorario,
-            totalProdutos, pedidosDoDia, unidade.UrlLogo);
+            unidade.TotalDeProdutosAtivos, pedidosDoDia, unidade.UrlLogo);
     }
 }

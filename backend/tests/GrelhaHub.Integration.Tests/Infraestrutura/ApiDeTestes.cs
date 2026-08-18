@@ -15,7 +15,8 @@ namespace GrelhaHub.Integration.Tests.Infraestrutura;
 /// de provar a configuração do teste.
 /// </para>
 /// </summary>
-internal sealed class ApiDeTestes(string stringDeConexao, string stringDeLog, string chaveJwt)
+internal sealed class ApiDeTestes(
+    string stringDeConexao, string stringDeLog, string stringDeArquivo, string chaveJwt)
     : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -33,18 +34,14 @@ internal sealed class ApiDeTestes(string stringDeConexao, string stringDeLog, st
                 // ADR-0017 — o banco de log. Sem isto a API nem sobe, por decisão: sistema sem
                 // onde gravar a trilha não deveria aceitar a primeira requisição.
                 ["ConnectionStrings:GrelhaHubLog"] = stringDeLog,
+
+                // ADR-0018 — o banco de arquivo. Mesma regra: sem ele a API não sobe.
+                ["ConnectionStrings:GrelhaHubArquivo"] = stringDeArquivo,
                 ["Jwt:Chave"] = chaveJwt,
 
                 // O log de requisição do Serilog polui a saída do runner e esconde a
                 // asserção que falhou, que é o que se quer ler.
                 ["Serilog:MinimumLevel:Default"] = "Warning",
-
-                // ADR-0015 / SPEC-VEN-002 — a raiz dos arquivos vai para uma pasta temporária
-                // POR EXECUÇÃO. Sem isto, o upload dos testes escreve dentro de `bin/Release` e o
-                // diretório de build cresce a cada rodada, com a rodada seguinte encontrando o
-                // resíduo da anterior — o mesmo problema que a lista de tabelas do
-                // `AmbienteDeIntegracao` resolve para o banco.
-                ["Arquivos:Raiz"] = RaizDeArquivos,
 
                 // RN-GER-014 — credenciais do usuário de plataforma, pelo mesmo mecanismo de
                 // configuração que o .env da VPS usa em produção.
@@ -55,6 +52,7 @@ internal sealed class ApiDeTestes(string stringDeConexao, string stringDeLog, st
 
         builder.UseSetting("ConnectionStrings:GrelhaHub", stringDeConexao);
         builder.UseSetting("ConnectionStrings:GrelhaHubLog", stringDeLog);
+        builder.UseSetting("ConnectionStrings:GrelhaHubArquivo", stringDeArquivo);
         builder.UseSetting("Jwt:Chave", chaveJwt);
 
         // ADR-0016 — O CORREIO É O ÚNICO DUBLÊ DA SUÍTE, e a exceção é declarada: a alternativa
@@ -67,13 +65,6 @@ internal sealed class ApiDeTestes(string stringDeConexao, string stringDeLog, st
             servicos.AddSingleton<Application.Common.Interfaces.IEnviadorDeEmail>(CaixaDeSaida);
         });
     }
-
-    /// <summary>
-    /// Pasta de arquivos desta execução. Estática para que todos os hosts da suíte compartilhem a
-    /// mesma raiz — o `Existe` conferido em um teste precisa achar o que outro gravou pela API.
-    /// </summary>
-    private static readonly string RaizDeArquivos = Path.Combine(
-        Path.GetTempPath(), "grelhahub-testes", Guid.CreateVersion7().ToString());
 
     /// <summary>
     /// Escopo de serviços da API em execução — para o teste que precisa de um serviço real

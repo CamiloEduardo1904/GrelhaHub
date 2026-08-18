@@ -83,6 +83,13 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
             Database = "grelhahub_testes_log",
         }.ConnectionString;
 
+    /// <summary>ADR-0018 — o banco de ARQUIVO, no mesmo contêiner e com nome próprio.</summary>
+    public string StringDeArquivo =>
+        new Npgsql.NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
+        {
+            Database = "grelhahub_testes_arquivo",
+        }.ConnectionString;
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -99,7 +106,12 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
             await log.Database.MigrateAsync();
         }
 
-        _api = new ApiDeTestes(StringDeConexao, StringDeLog, ChaveJwt);
+        await using (var arquivo = CriarContextoDeArquivo())
+        {
+            await arquivo.Database.MigrateAsync();
+        }
+
+        _api = new ApiDeTestes(StringDeConexao, StringDeLog, StringDeArquivo, ChaveJwt);
 
         // Força a construção do host agora: se a configuração estiver errada, o erro aparece
         // aqui e não disfarçado como falha do primeiro teste da suíte.
@@ -141,6 +153,13 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
     /// ⚠ Sem interceptor nenhum: este banco não audita a si mesmo, e não tem filtro de unidade.
     /// </para>
     /// </summary>
+    /// <summary>ADR-0018 — o contexto do banco de arquivo, para asserção direta nos bytes.</summary>
+    public GrelhaHubArquivoDbContext CriarContextoDeArquivo() =>
+        new(new DbContextOptionsBuilder<GrelhaHubArquivoDbContext>()
+            .UseNpgsql(StringDeArquivo)
+            .UseSnakeCaseNamingConvention()
+            .Options);
+
     public GrelhaHubLogDbContext CriarContextoDeLog() =>
         new(new DbContextOptionsBuilder<GrelhaHubLogDbContext>()
             .UseNpgsql(StringDeLog)
@@ -245,6 +264,14 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
                 TRUNCATE TABLE log_auditoria, log_excecao RESTART IDENTITY CASCADE;
                 ALTER TABLE log_auditoria ENABLE TRIGGER USER;
                 """);
+        }
+
+        // ⚠ O banco de ARQUIVO também é resíduo — ADR-0018. Um binário da rodada anterior faria
+        // uma contagem de órfãos passar quando deveria falhar.
+        await using (var arquivo = CriarContextoDeArquivo())
+        {
+            await arquivo.Database.ExecuteSqlRawAsync(
+                "TRUNCATE TABLE arquivo_binario RESTART IDENTITY CASCADE;");
         }
 
         await SemearPlataformaAsync();

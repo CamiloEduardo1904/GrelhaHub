@@ -73,7 +73,7 @@ Já existia. **Muda uma coisa:** passa a devolver **categorias inativas** també
     "id": "…", "nome": "Lanches", "ordem": 1, "ativa": true,
     "produtos": [
       { "id": "…", "nome": "X-Tudo", "descricao": "…", "preco": 32.90,
-        "ativo": true, "disponivel": true, "categoriaId": "…", "urlImagem": "/arquivos/…" }
+        "ativo": true, "disponivel": true, "categoriaId": "…", "urlImagem": "/api/v1/arquivos/…" }
     ]
   }
 ]

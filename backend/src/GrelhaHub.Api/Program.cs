@@ -4,10 +4,8 @@ using GrelhaHub.Api.Seguranca;
 using GrelhaHub.Application;
 using GrelhaHub.Application.Common.Interfaces;
 using GrelhaHub.Infrastructure;
-using GrelhaHub.Infrastructure.Arquivos;
 using GrelhaHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -136,6 +134,27 @@ if (modoMigrar || modoSemear)
                 await bancoDeLog.Database.MigrateAsync();
                 Log.Information("Banco de log: migrations aplicadas.");
             }
+
+            // ADR-0018 — o BANCO DE ARQUIVO, pelo mesmo motivo do de log: migrations próprias,
+            // que não vêm de carona. Esquecer aqui deixa a API subindo e o primeiro upload
+            // falhando com 500 — para um usuário, no meio do serviço.
+            var bancoDeArquivo = escopoMigracao.ServiceProvider
+                .GetRequiredService<GrelhaHubArquivoDbContext>();
+
+            var pendentesDeArquivo =
+                (await bancoDeArquivo.Database.GetPendingMigrationsAsync()).ToList();
+
+            if (pendentesDeArquivo.Count == 0)
+            {
+                Log.Information("Banco de arquivo: nenhuma migration pendente.");
+            }
+            else
+            {
+                Log.Information("Banco de arquivo: aplicando {Total} migration(s): {Nomes}",
+                    pendentesDeArquivo.Count, string.Join(", ", pendentesDeArquivo));
+                await bancoDeArquivo.Database.MigrateAsync();
+                Log.Information("Banco de arquivo: migrations aplicadas.");
+            }
         }
 
         if (modoSemear)
@@ -178,52 +197,15 @@ if (app.Environment.IsDevelopment())
     app.UseCors(PoliticaDesenvolvimento);
 }
 
-// ADR-0015 / SPEC-VEN-002 — as imagens.
+// ADR-0018 — as imagens NÃO são mais servidas do disco.
 //
-// Em produção quem serve é o NGINX (`location /arquivos/`), que faz isto melhor e sem passar
-// pelo pipeline do ASP.NET. Aqui existe para desenvolvimento e para o teste de integração, que
-// sobe a API sem Nginx na frente.
+// ⚠ Este trecho montava um diretório estático (ADR-0015). Os bytes agora vivem no banco de
+// arquivo e saem pelo `ArquivosController`, que consulta o METADADO antes — e é isso que faz a
+// exclusão lógica valer também para a imagem, coisa que um diretório não sabia fazer.
 //
-// ANTES de UseAuthentication, e de propósito: a imagem do cardápio é pública (RN-VEN-037), e um
-// arquivo estático não deve atravessar autenticação para ser lido. O controle está em quem
-// GRAVA, não em quem lê.
-{
-    var raiz = Path.GetFullPath(
-        builder.Configuration["Arquivos:Raiz"] ?? "arquivos");
-
-    // ⚠ Sonda de ESCRITA, e não `Directory.CreateDirectory` sozinho.
-    //
-    // Criar o diretório passava mesmo com o volume sem permissão — ele já existia, montado, e
-    // `CreateDirectory` em diretório existente não faz nada nem reclama. A API subia inteira e
-    // quebrava só no primeiro upload, com 500 genérico. Recusar a partida aqui transforma um
-    // defeito que espera um usuário em um deploy que não sobe (ADR-0015).
-    GarantirEscritaDeArquivos.Validar(raiz);
-
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(raiz),
-        RequestPath = builder.Configuration["Arquivos:PrefixoPublico"] ?? "/arquivos",
-
-        // Só os tipos que RN-VEN-042 aceita. Um provedor que servisse qualquer extensão
-        // devolveria, como download, qualquer arquivo que acabasse na pasta por outro caminho.
-        ContentTypeProvider = new FileExtensionContentTypeProvider(
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                [".jpg"] = "image/jpeg",
-                [".jpeg"] = "image/jpeg",
-                [".png"] = "image/png",
-            }),
-
-        ServeUnknownFileTypes = false,
-
-        OnPrepareResponse = contexto =>
-        {
-            // Nome gerado por arquivo (SPEC-VEN-002 §4): trocar a imagem gera caminho novo, então
-            // o conteúdo de um caminho nunca muda e pode ser cacheado longe.
-            contexto.Context.Response.Headers.CacheControl = "public,max-age=604800,immutable";
-        },
-    });
-}
+// O `location /arquivos/` do Nginx continua no ar, e é deliberado: as referências gravadas antes
+// de 18/08/2026 apontam para lá. Ele é um atalho de LEITURA para o passado, não um caminho de
+// escrita — nada no código escreve mais naquele volume.
 
 app.UseAuthentication();
 app.UseAuthorization();

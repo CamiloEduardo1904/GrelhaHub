@@ -18,7 +18,7 @@ namespace GrelhaHub.Integration.Tests.Cardapio;
 [Collection(ColecaoDeIntegracao.Nome)]
 public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegracao(ambiente)
 {
-    [Fact(DisplayName = "RN-VEN-042 — JPEG válido é aceito e gravado no disco (CA-1)")]
+    [Fact(DisplayName = "ADR-0018 — JPEG válido vira metadado na aplicação e bytes no banco de arquivo (CA-1)")]
     public async Task CA1_JpegValidoEhAceito()
     {
         var restaurante = await CadastrarRestauranteAsync("Foto Burger", "11111111000191");
@@ -32,7 +32,9 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         var url = await UrlDaRespostaAsync(resposta);
 
-        url.Should().StartWith("/arquivos/").And.EndWith(".jpg");
+        url.Should().StartWith(Prefixo);
+
+        var id = Guid.Parse(url[Prefixo.Length..]);
 
         await using var db = Contexto(restaurante);
 
@@ -40,10 +42,24 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         produto.UrlImagem.Should().Be(url, "a coluna aponta para o arquivo");
 
-        using var escopo = Ambiente.CriarEscopo();
-        var armazenamento = escopo.ServiceProvider.GetRequiredService<IArmazenamentoDeArquivo>();
+        // ⚠ O METADADO fica no banco da APLICAÇÃO — é lá que RN-GER-009 e RN-GER-002 alcançam.
+        var metadado = await db.Arquivos.AsNoTracking().SingleAsync(a => a.Id == id);
 
-        armazenamento.Existe(url).Should().BeTrue("o arquivo está no disco, não só no banco");
+        metadado.UnidadeId.Should().Be(restaurante.UnidadeId);
+        metadado.TipoMime.Should().Be("image/jpeg", "o tipo vem da ASSINATURA, não da extensão");
+        metadado.Pasta.Should().Be("produto");
+        metadado.TamanhoEmBytes.Should().Be(512);
+        metadado.ExcluidoEm.Should().BeNull();
+
+        // ⚠ Os BYTES ficam no OUTRO banco, com o MESMO id — e é a única coisa que liga os dois
+        // lados: chave estrangeira não atravessa banco.
+        await using var arquivo = Ambiente.CriarContextoDeArquivo();
+
+        var binario = await arquivo.Binarios.AsNoTracking().SingleAsync(b => b.Id == id);
+
+        binario.Conteudo.Should().HaveCount(512);
+        binario.Conteudo.Take(4).Should().Equal([(byte)0xFF, 0xD8, 0xFF, 0xE0], "os bytes são os enviados");
+        binario.TipoMime.Should().Be("image/jpeg");
     }
 
     [Fact(DisplayName = "RN-VEN-042 — PNG válido é aceito (CA-1)")]
@@ -58,7 +74,14 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         resposta.EnsureSuccessStatusCode();
 
-        (await UrlDaRespostaAsync(resposta)).Should().EndWith(".png");
+        var url = await UrlDaRespostaAsync(resposta);
+
+        var id = Guid.Parse(url[Prefixo.Length..]);
+
+        await using var db = Contexto(restaurante);
+
+        (await db.Arquivos.AsNoTracking().SingleAsync(a => a.Id == id))
+            .TipoMime.Should().Be("image/png");
     }
 
     [Fact(DisplayName = "RN-VEN-042 — acima de 5 MB é recusado e a coluna não muda (CA-2)")]
@@ -131,7 +154,7 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
             .UrlImagem.Should().BeNull();
     }
 
-    [Fact(DisplayName = "RN-VEN-042 — o nome enviado não vira nome no disco (CA-5)")]
+    [Fact(DisplayName = "RN-VEN-042 — o nome enviado não sobrevive em lugar nenhum (CA-5)")]
     public async Task CA5_NomeDoUsuarioEhDescartado()
     {
         var restaurante = await CadastrarRestauranteAsync("Foto Burger", "11111111000191");
@@ -150,15 +173,25 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         url.Should().NotContain("..", "travessia de diretório é o ataque mais antigo contra upload");
         url.Should().NotContain("passwd");
 
-        // O nome é UUID + extensão canônica, e nada mais.
-        var arquivo = url.Split('/')[^1];
-
-        Guid.TryParse(Path.GetFileNameWithoutExtension(arquivo), out _)
-            .Should().BeTrue("o nome é gerado pelo sistema");
+        // ⚠ Com o ADR-0018 a categoria inteira do problema deixou de existir: não há sistema de
+        // arquivos do outro lado. O teste continua porque o que ele guarda é a INVARIANTE — o nome
+        // recebido não vira identidade —, e ela vale para qualquer armazenamento que venha depois.
+        Guid.TryParse(url[Prefixo.Length..], out _)
+            .Should().BeTrue("a identidade do arquivo é gerada pelo sistema");
     }
 
-    [Fact(DisplayName = "RN-GER-009 — o caminho da imagem carrega a unidade (CA-6)")]
-    public async Task CA6_CaminhoCarregaAUnidade()
+    /// <summary>
+    /// ⚠⚠ <b>Este teste mudou de lugar em 18/08/2026, e a mudança é o ponto.</b> No ADR-0015 a
+    /// unidade estava no CAMINHO do arquivo — <c>/arquivos/{unidade}/produto/{nome}</c> —, e era
+    /// isso que se conferia. Um caminho não é um vínculo: nada impedia que ele apontasse para uma
+    /// pasta e a linha do banco dissesse outra coisa.
+    /// <para>
+    /// Com o ADR-0018 a unidade é <b>coluna do metadado</b>, sob o filtro global. A asserção desceu
+    /// para onde o recorte realmente acontece.
+    /// </para>
+    /// </summary>
+    [Fact(DisplayName = "RN-GER-009 — o metadado do arquivo carrega a unidade (CA-6)")]
+    public async Task CA6_MetadadoCarregaAUnidade()
     {
         var primeiro = await CadastrarRestauranteAsync("Primeira Casa", "11111111000191");
         var segundo = await CadastrarRestauranteAsync("Segunda Casa", "22222222000191");
@@ -166,10 +199,20 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         var urlPrimeiro = await EnviarLogoAsync(primeiro);
         var urlSegundo = await EnviarLogoAsync(segundo);
 
-        urlPrimeiro.Should().Contain(primeiro.UnidadeId.ToString());
-        urlSegundo.Should().Contain(segundo.UnidadeId.ToString());
+        urlPrimeiro.Should().NotBe(urlSegundo);
 
-        urlPrimeiro.Should().NotContain(segundo.UnidadeId.ToString());
+        await using (var db = Contexto(primeiro))
+        {
+            // O filtro global já está ligado: `SingleAsync` sem predicado só acha o DESTA unidade.
+            (await db.Arquivos.AsNoTracking().SingleAsync()).UnidadeId
+                .Should().Be(primeiro.UnidadeId);
+        }
+
+        await using (var db = Contexto(segundo))
+        {
+            (await db.Arquivos.AsNoTracking().SingleAsync()).UnidadeId
+                .Should().Be(segundo.UnidadeId);
+        }
     }
 
     [Fact(DisplayName = "RN-GER-009 — produto de outra unidade não recebe imagem (CA-7)")]
@@ -236,7 +279,7 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         armazenamento.Existe(primeira).Should().BeTrue(
             "RN-GER-002 — apagar arquivo é a exclusão física mais irreversível que existe, e a " +
-            "trilha guarda o caminho antigo");
+            "trilha guarda a referência antiga");
         armazenamento.Existe(segunda).Should().BeTrue();
     }
 
@@ -319,7 +362,118 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         resposta.IsSuccessStatusCode.Should().BeFalse();
     }
 
+    // ── ADR-0018: a leitura ─────────────────────────────────────────────────────────
+
+    [Fact(DisplayName = "ADR-0018 — a rota devolve os BYTES com o tipo da assinatura")]
+    public async Task Leitura_DevolveOsBytes()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Leitura Burger", "11111111000191");
+        var produtoId = await CriarProdutoAsync(restaurante, "Lido", 30.00m);
+
+        using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        var url = await UrlDaRespostaAsync(await EnviarAsync(
+            gestao, $"/api/v1/produtos/{produtoId}/imagem", Png(), "foto.png", "image/png"));
+
+        // ⚠ ANÔNIMO de propósito: é o cliente que abre /c/nome-da-casa sem login (RN-VEN-037).
+        // Se esta chamada precisar de token, a foto some da vitrine.
+        using var anonimo = Ambiente.CriarCliente();
+
+        var resposta = await anonimo.GetAsync(new Uri(url, UriKind.Relative));
+
+        resposta.EnsureSuccessStatusCode();
+        resposta.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+
+        var bytes = await resposta.Content.ReadAsByteArrayAsync();
+
+        bytes.Should().Equal(Png(), "sai exatamente o que entrou");
+    }
+
+    [Fact(DisplayName = "ADR-0018 — a rota /base64 devolve o data URI que o navegador consome")]
+    public async Task Leitura_DevolveBase64()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Base Burger", "11111111000191");
+        var produtoId = await CriarProdutoAsync(restaurante, "Em base64", 30.00m);
+
+        using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        var url = await UrlDaRespostaAsync(await EnviarAsync(
+            gestao, $"/api/v1/produtos/{produtoId}/imagem", Png(), "foto.png", "image/png"));
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        using var documento = await anonimo.GetFromJsonAsync<JsonDocument>(
+            new Uri(url + "/base64", UriKind.Relative));
+
+        var raiz = documento!.RootElement;
+
+        raiz.GetProperty("tipoMime").GetString().Should().Be("image/png");
+        raiz.GetProperty("tamanhoEmBytes").GetInt32().Should().Be(512);
+
+        var conteudo = raiz.GetProperty("conteudoBase64").GetString()!;
+
+        // O prefixo vem pronto: montar "data:" no frontend é onde se erra o MIME de uma das pontas.
+        conteudo.Should().StartWith("data:image/png;base64,");
+
+        Convert.FromBase64String(conteudo["data:image/png;base64,".Length..])
+            .Should().Equal(Png());
+    }
+
+    [Fact(DisplayName = "ADR-0018 — arquivo inexistente devolve 404, não 500")]
+    public async Task Leitura_Inexistente_Da404()
+    {
+        using var anonimo = Ambiente.CriarCliente();
+
+        var resposta = await anonimo.GetAsync(
+            new Uri(Prefixo + Guid.CreateVersion7(), UriKind.Relative));
+
+        resposta.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// ⚠⚠ <b>A garantia que o disco não sabia dar.</b> No ADR-0015 o arquivo continuava servido
+    /// pelo Nginx depois de o registro sumir do sistema — a exclusão parava na borda do sistema de
+    /// arquivos. Aqui o metadado é consultado ANTES dos bytes, então excluir o metadado tira a
+    /// imagem do ar sem apagar byte nenhum (<c>RN-GER-002</c>).
+    /// </summary>
+    [Fact(DisplayName = "RN-GER-002 — metadado excluído tira a imagem do ar, e os bytes ficam")]
+    public async Task Leitura_MetadadoExcluido_Da404()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Sumico Burger", "11111111000191");
+        var produtoId = await CriarProdutoAsync(restaurante, "Sumido", 30.00m);
+
+        using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        var url = await UrlDaRespostaAsync(await EnviarAsync(
+            gestao, $"/api/v1/produtos/{produtoId}/imagem", Jpeg(), "foto.jpg"));
+
+        var id = Guid.Parse(url[Prefixo.Length..]);
+
+        await using (var db = Contexto(restaurante))
+        {
+            var metadado = await db.Arquivos.SingleAsync(a => a.Id == id);
+
+            metadado.Excluir();
+
+            await db.SaveChangesAsync();
+        }
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        (await anonimo.GetAsync(new Uri(url, UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var arquivo = Ambiente.CriarContextoDeArquivo();
+
+        (await arquivo.Binarios.AsNoTracking().AnyAsync(b => b.Id == id))
+            .Should().BeTrue("os bytes ficam: quem apaga byte é varredura deliberada, não um clique");
+    }
+
     // ── auxiliares ──────────────────────────────────────────────────────────────────
+
+    /// <summary>O prefixo da referência gravada na coluna — ADR-0018.</summary>
+    private const string Prefixo = "/api/v1/arquivos/";
+
 
     /// <summary>Assinatura JPEG real (<c>FF D8 FF</c>) seguida de conteúdo qualquer.</summary>
     private static byte[] Jpeg()

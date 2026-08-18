@@ -50,36 +50,26 @@ public sealed class SeparacaoDeCqrsTests
             .Select(p => p.ParameterType);
 
     /// <summary>
-    /// ⚠⚠ <b>A CATRACA.</b> As consultas ainda não convertidas ao modelo de leitura, nomeadas uma a
-    /// uma. A conversão do ADR-0019 é grande — 16 consultas, cada uma com a sua visão — e foi feita
-    /// por partes; esta lista é o que impede "por partes" de virar "pela metade, para sempre".
+    /// ⚠⚠ <b>A CATRACA, agora VAZIA — e é assim que ela deve ficar.</b>
     /// <para>
-    /// Ela só anda para <b>baixo</b>, e os dois testes abaixo garantem isso: um recusa infrator que
-    /// <b>não</b> esteja na lista (a dívida não cresce), o outro recusa nome na lista que <b>já</b>
-    /// foi convertido (a lista não apodrece). Acrescentar um nome aqui para calar o teste exige
-    /// escrever o nome — e alguém vai perguntar na revisão.
+    /// A conversão do ADR-0019 valia 16 consultas e foi feita por partes; esta lista era o que
+    /// impedia "por partes" de virar "pela metade, para sempre". Ela só andava para <b>baixo</b>,
+    /// e os dois testes abaixo garantiam isso: um recusava infrator que <b>não</b> estivesse na
+    /// lista, o outro recusava nome já convertido que continuasse nela.
     /// </para>
     /// <para>
-    /// <b>Inventário aberto em 18/08/2026 com 15 nomes.</b> Dois saíram por conversão e um por
-    /// REMOÇÃO — a sessão de suporte deixou de existir (ADR-0020), e a catraca cobrou a baixa. Quando chegar a zero, os dois testes
-    /// viram um só e esta lista sai.
+    /// <b>Aberta em 18/08/2026 com 15 nomes; fechada no mesmo dia.</b> Uma saiu por REMOÇÃO — a
+    /// sessão de suporte deixou de existir (ADR-0020), e a catraca cobrou a baixa.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>A lista fica, vazia.</b> Apagá-la junto com o inventário devolveria a porta que ela
+    /// fechou: o primeiro handler novo que abrisse o contexto de escrita numa <c>Query</c> não
+    /// teria onde ser anotado, e a discussão viraria "acrescento uma exceção aqui?" em vez de
+    /// "por que esta consulta precisa do agregado?". Um nome novo aqui exige escrever o nome — e
+    /// alguém vai perguntar na revisão.
     /// </para>
     /// </summary>
-    private static readonly HashSet<string> PendentesDeConversao =
-    [
-        "ConsultarPedidoPublicoHandler",
-        "ListarCardapioInternoHandler",
-        "ListarCatalogoDeModulosHandler",
-        "ListarEstabelecimentosHandler",
-        "ListarModulosDaUnidadeHandler",
-        "ListarPerfisHandler",
-        "ListarUsuariosDeSuporteHandler",
-        "ListarUsuariosHandler",
-        "ObterCardapioPublicoHandler",
-        "ObterMeuRestauranteHandler",
-        "ObterOperacaoDaUnidadeHandler",
-        "ObterParametroHandler",
-    ];
+    private static readonly HashSet<string> PendentesDeConversao = [];
 
     [Fact(DisplayName = "ADR-0019 — nenhuma Query NOVA alcança o contexto de escrita")]
     public void Query_NaoAlcancaEscrita()

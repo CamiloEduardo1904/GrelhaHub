@@ -153,13 +153,31 @@ flowchart TB
 3. Os modelos de leitura **não têm chave**, e o framework recusa gravar entidade sem chave.
 
 > ⚠ **A separação é verificada por teste, não combinada em reunião.** `SeparacaoDeCqrsTests` varre
-> os 49 handlers por reflexão e recusa a build se alguma das regras acima for quebrada. Isto existe
+> os handlers por reflexão e recusa a build se alguma das regras acima for quebrada. Isto existe
 > porque o projeto declarou "CQRS" num documento e entregou outra coisa por dois meses **sem
 > ninguém notar** — a divergência não apareceu porque nada a media.
 >
-> A conversão das consultas é grande e foi feita por partes. O que falta está **nomeado** no teste,
-> numa lista que só anda para baixo: um teste recusa infrator fora dela, outro recusa nome nela que
-> já foi convertido. É o que impede "por partes" de virar "pela metade, para sempre".
+> **A conversão terminou: 16 de 16 consultas, 17 visões.** Ela foi feita por partes, e o que faltava
+> ficava **nomeado** no próprio teste, numa lista que só andava para baixo — um teste recusava
+> infrator fora dela, outro recusava nome nela que já tinha sido convertido. É o que impediu "por
+> partes" de virar "pela metade, para sempre".
+>
+> ⚠ **A lista continua lá, vazia**, e isso é deliberado: é onde o próximo handler que precisar do
+> agregado numa consulta terá de ser escrito à mão — e alguém vai perguntar por quê na revisão.
+
+#### ⚠⚠ O que a conversão cobrou: regra que a leitura também precisa
+
+Duas perguntas do cardápio público **não são projeção, são regra**: *"a casa está aberta agora?"*
+(`RN-VEN-048`, com fuso da casa e turno que atravessa a meia-noite) e *"qual é o endereço em uma
+linha?"* (`RN-GER-037`). As duas viviam dentro do agregado, e o handler convertido não carrega
+agregado.
+
+Traduzi-las para SQL, dentro da visão, teria criado **duas implementações da mesma regra** — que é o
+defeito que o projeto persegue com testes de paridade. A saída foi **extrair a função pura**: o
+agregado passa a chamá-la, e a leitura também.
+
+> **Quando a leitura precisa de uma regra, extraia a função — não a traduza.** Tradução cria a
+> segunda verdade que ninguém compara.
 
 ### Um caso de uso, por dentro
 
@@ -236,6 +254,46 @@ falha sem adivinhar horário.
 > ⚠ O registro **nunca lança**. Ele roda dentro do tratador de exceções: uma falha ali substituiria a
 > exceção original por outra, e o usuário receberia um erro sobre o registro do erro — perdendo
 > justamente a causa que se queria guardar.
+
+### A imagem é binário no banco — ADR-0018
+
+A foto do produto e a logo da casa **não são arquivos em disco**. Elas são bytes na tabela
+`arquivo_binario`, no banco `grelhahub_arquivo`, com um metadado do mesmo `id` no banco da
+aplicação.
+
+```mermaid
+sequenceDiagram
+    participant U as upload
+    participant API
+    participant ARQ as banco grelhahub_arquivo
+    participant APP as banco grelhahub
+
+    U->>API: multipart com a imagem
+    Note over API: confere a ASSINATURA<br/>(não a extensão) — RN-VEN-042
+    API->>ARQ: 1. grava os BYTES
+    API->>APP: 2. grava o METADADO + aponta o produto
+```
+
+⚠⚠ **A ordem é a decisão.** Não há transação entre dois bancos, então uma das falhas vai acontecer
+um dia — e escolhe-se qual: metadado sem bytes é **imagem quebrada que o cliente vê**; bytes sem
+metadado é **invisível ao sistema e removível por varredura**. Quando não há transação, falhe do
+lado que não mente para o usuário.
+
+**A leitura tem duas rotas**, e a diferença entre elas importa:
+
+| Rota | Devolve | Quem usa |
+|------|---------|----------|
+| `GET /api/v1/arquivos/{id}` | os **bytes**, com o tipo certo e cache de sete dias | `<img src>` da vitrine |
+| `GET /api/v1/arquivos/{id}/base64` | o **data URI** | a miniatura do painel |
+
+> ⚠ Base64 cresce o conteúdo em um terço e não entra no cache de imagem do navegador. Numa vitrine
+> de vinte produtos aberta no celular do cliente, isso são megabytes antes do primeiro preço
+> aparecer — por isso o padrão é a rota binária, e a base64 fica onde o conteúdo precisa viajar
+> embutido.
+>
+> ⚠ As duas rotas são **anônimas**, como era o diretório que elas substituem: a foto do cardápio é
+> vista por quem não tem login. O que mudou para melhor é que agora o **metadado é consultado antes
+> dos bytes** — então excluir o registro tira a imagem do ar, coisa que apagar do Nginx não fazia.
 
 ### Como um erro vira mensagem
 

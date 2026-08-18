@@ -68,13 +68,15 @@ services:
       # O banco é criado pelo step de migrations do pipeline: o MigrateAsync do EF Core o cria
       # quando ele não existe. Sem passo manual na VPS.
       ConnectionStrings__GrelhaHubLog: "Host=db;Port=5432;Database=${POSTGRES_DB}_log;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      # ADR-0018 — o banco de ARQUIVO: os binarios das imagens. Mesma instancia, banco proprio,
+      # criado pelo MigrateAsync do step de migrations como o de log.
+      ConnectionStrings__GrelhaHubArquivo: "Host=db;Port=5432;Database=${POSTGRES_DB}_arquivo;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Jwt__Chave: ${JWT_CHAVE}
       Jwt__Emissor: ${JWT_EMISSOR:-grelhahub-api}
       Jwt__Audiencia: ${JWT_AUDIENCIA:-grelhahub-web}
       TZ: America/Sao_Paulo
 
       # ADR-0015 / SPEC-VEN-002 — raiz das imagens, em volume.
-      Arquivos__Raiz: /app/arquivos
 
       # RN-GER-014 / ADR-0013 — o usuário de suporte da plataforma.
       #
@@ -101,10 +103,6 @@ services:
       # Ausência da senha é estado válido (RN-GER-032): nada é enviado, cada e-mail que deixou
       # de sair fica no log, e nenhuma operação falha por isso.
       Email__Senha: ${EMAIL_SENHA:-}
-    volumes:
-      # ⚠ A API ESCREVE aqui; o nginx le. É o unico estado da aplicacao fora do banco, e a
-      # consequencia esta declarada no ADR-0015: `pg_dump` sozinho DEIXOU de ser backup completo.
-      - arquivos:/app/arquivos
     networks:
       - interna
     deploy:
@@ -174,10 +172,14 @@ networks:
     driver: bridge
 
 volumes:
-  # ADR-0015 — as imagens de produto e as logos. Precisa entrar na rotina de backup junto com o
-  # banco: a partir daqui, `pg_dump` sozinho nao restaura o sistema inteiro.
+  # ⚠⚠ LEGADO — ADR-0015, substituido pelo ADR-0018 em 18/08/2026.
   #
-  #   docker run --rm -v grelhahub_arquivos:/d -v $PWD:/b alpine   #     tar czf /b/arquivos-$(date +%F).tar.gz -C /d .
+  # A API NAO ESCREVE MAIS AQUI. As imagens novas vao para o banco `grelhahub_arquivo`, e o
+  # `pg_dump` volta a ser backup completo, que era o que este volume tinha tirado do projeto.
+  #
+  # O volume continua montado no nginx, somente leitura, porque as referencias gravadas ANTES
+  # daquela data apontam para `/arquivos/...`. Quando nenhuma linha do banco apontar mais para
+  # este caminho, o volume e o `location /arquivos/` saem juntos.
   arquivos:
 
   pgdata:

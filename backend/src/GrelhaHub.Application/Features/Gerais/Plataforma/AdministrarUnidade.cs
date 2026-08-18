@@ -295,7 +295,16 @@ public sealed class DefinirOperacaoDaUnidadeHandler(IAppDbContext db, IContextoD
 public sealed record ObterOperacaoDaUnidadeQuery(Guid? UnidadeId = null)
     : IRequest<OperacaoDaUnidadeDto>;
 
-public sealed class ObterOperacaoDaUnidadeHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ A ESCRITA continua carregando o agregado (<c>DefinirOperacaoDaUnidadeHandler</c>): é ele que
+/// valida a semana e rederiva a virada operacional. O que mudou é só o caminho da leitura — e o
+/// formato da resposta continua sendo montado por uma função só, agora
+/// <see cref="DefinirOperacaoDaUnidadeHandler.MontarDe"/>, para que as duas rotas não divirjam.
+/// </para>
+/// </summary>
+public sealed class ObterOperacaoDaUnidadeHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ObterOperacaoDaUnidadeQuery, OperacaoDaUnidadeDto>
 {
     public async Task<OperacaoDaUnidadeDto> Handle(
@@ -312,13 +321,24 @@ public sealed class ObterOperacaoDaUnidadeHandler(IAppDbContext db, IContextoDeE
             throw new NaoAutorizadoException("Sessão inválida.");
         }
 
-        var unidade = await db.Unidades
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Include(u => u.Horarios)
+        var unidade = await leitura.Unidades
             .FirstOrDefaultAsync(u => u.Id == alvo, cancellationToken)
             ?? throw new NaoEncontradoException("Estabelecimento não encontrado.");
 
-        return DefinirOperacaoDaUnidadeHandler.Montar(unidade);
+        var semana = await leitura.Horarios
+            .Where(h => h.UnidadeId == alvo)
+            .OrderBy(h => h.DiaDaSemana)
+            .ToListAsync(cancellationToken);
+
+        return new OperacaoDaUnidadeDto(
+            unidade.Id,
+            new EnderecoDto(
+                unidade.Cep, unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Complemento,
+                unidade.Bairro, unidade.Cidade, unidade.Uf),
+            ApresentacaoDaCasa.Resumir(
+                unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Bairro,
+                unidade.Cidade, unidade.Uf),
+            [.. semana.Select(h => new HorarioDoDiaDto(h.DiaDaSemana, h.Abre, h.Fecha))],
+            TimeOnly.FromTimeSpan(unidade.HoraDeViradaOperacional));
     }
 }

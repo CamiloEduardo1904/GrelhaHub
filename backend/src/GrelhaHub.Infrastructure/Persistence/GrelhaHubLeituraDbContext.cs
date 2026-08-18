@@ -38,6 +38,32 @@ public sealed class GrelhaHubLeituraDbContext(
 
     public IQueryable<AutorLeitura> Autores => Set<AutorLeitura>();
 
+    public IQueryable<UnidadeLeitura> Unidades => Set<UnidadeLeitura>();
+
+    public IQueryable<HorarioLeitura> Horarios => Set<HorarioLeitura>();
+
+    public IQueryable<CategoriaLeitura> Categorias => Set<CategoriaLeitura>();
+
+    public IQueryable<ProdutoDoCardapioLeitura> ProdutosDoCardapio =>
+        Set<ProdutoDoCardapioLeitura>();
+
+    public IQueryable<ModuloLeitura> Modulos => Set<ModuloLeitura>();
+
+    public IQueryable<ModuloDependenciaLeitura> DependenciasDeModulo =>
+        Set<ModuloDependenciaLeitura>();
+
+    public IQueryable<ModuloDaUnidadeLeitura> ModulosDaUnidade => Set<ModuloDaUnidadeLeitura>();
+
+    public IQueryable<PerfilLeitura> Perfis => Set<PerfilLeitura>();
+
+    public IQueryable<PerfilPermissaoLeitura> PermissoesDePerfil => Set<PerfilPermissaoLeitura>();
+
+    public IQueryable<UsuarioLeitura> Usuarios => Set<UsuarioLeitura>();
+
+    public IQueryable<ParametroLeitura> Parametros => Set<ParametroLeitura>();
+
+    public IQueryable<ParametroValorLeitura> ValoresDeParametro => Set<ParametroValorLeitura>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         ArgumentNullException.ThrowIfNull(optionsBuilder);
@@ -56,6 +82,20 @@ public sealed class GrelhaHubLeituraDbContext(
         Visao<OperacaoDoDiaLeitura>(modelBuilder, "vw_operacao_dia");
         Visao<ProdutoVendidoLeitura>(modelBuilder, "vw_produto_vendido");
         Visao<AutorLeitura>(modelBuilder, "vw_autor");
+
+        // ADR-0019, segunda leva — o cadastro.
+        Visao<UnidadeLeitura>(modelBuilder, "vw_unidade");
+        Visao<HorarioLeitura>(modelBuilder, "vw_unidade_horario");
+        Visao<CategoriaLeitura>(modelBuilder, "vw_cardapio_categoria");
+        Visao<ProdutoDoCardapioLeitura>(modelBuilder, "vw_cardapio_produto");
+        Visao<ModuloLeitura>(modelBuilder, "vw_modulo");
+        Visao<ModuloDependenciaLeitura>(modelBuilder, "vw_modulo_dependencia");
+        Visao<ModuloDaUnidadeLeitura>(modelBuilder, "vw_unidade_modulo");
+        Visao<PerfilLeitura>(modelBuilder, "vw_perfil");
+        Visao<PerfilPermissaoLeitura>(modelBuilder, "vw_perfil_permissao");
+        Visao<UsuarioLeitura>(modelBuilder, "vw_usuario");
+        Visao<ParametroLeitura>(modelBuilder, "vw_parametro");
+        Visao<ParametroValorLeitura>(modelBuilder, "vw_parametro_valor");
     }
 
     /// <summary>

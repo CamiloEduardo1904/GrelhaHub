@@ -131,6 +131,7 @@ frontend/src/
 │
 └── services/
     ├── api.ts                cliente HTTP, sessão e tradução de erro
+    ├── imagens.ts            as fotos vindas do banco de arquivo (ADR-0018)
     ├── periodo.ts            o recorte de dia operacional
     ├── ciclo.ts              as etapas do pedido
     ├── dinheiro.ts / cpf.ts / datas.ts
@@ -168,6 +169,26 @@ O painel de pedidos e o painel de operação usam o mesmo filtro de **dia operac
 
 E **dia sem pedido aparece com zero**, não some: série com dia faltando faz o olho ler continuidade
 onde houve fechamento.
+
+### As imagens, e as duas formas de exibi-las
+
+Desde a ADR-0018 a foto não é um arquivo no servidor: é um **binário no banco**, e a coluna do
+produto guarda uma **referência** — `/api/v1/arquivos/{id}`.
+
+| Forma | Onde | Por quê |
+|-------|------|---------|
+| `<img src={referencia}>` | vitrine pública | O navegador **cacheia** a imagem, e ela nem passa pelo JavaScript |
+| `carregarBase64(referencia)` | miniatura do painel | Poucas imagens, atrás de login, conteúdo embutido na resposta |
+
+> ⚠⚠ **Base64 cresce o conteúdo em um terço e não entra no cache de imagem do navegador.** Num
+> cardápio de vinte produtos aberto no celular do cliente, isso são megabytes a mais antes do
+> primeiro preço aparecer — e essa é a tela que decide se alguém pede. Por isso a vitrine **não**
+> usa base64, e a decisão está escrita em `services/imagens.ts` em vez de virar folclore.
+>
+> ⚠ **Existem referências antigas em base**, no formato `/arquivos/…` (ADR-0015). Elas continuam
+> sendo servidas pelo Nginx e **não têm** rota de base64. Por isso o componente pergunta o formato
+> antes de escolher o caminho — perguntar é o que impede a miniatura de um cadastro velho de
+> quebrar.
 
 ### A tradução de erro
 

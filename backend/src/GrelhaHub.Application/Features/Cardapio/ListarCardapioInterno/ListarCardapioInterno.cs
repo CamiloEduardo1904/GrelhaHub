@@ -37,73 +37,53 @@ public sealed record ProdutoInternoDto(
     /// <summary><c>RN-VEN-042</c> — para a gestão saber quais produtos já têm foto.</summary>
     string? UrlImagem);
 
-public sealed class ListarCardapioInternoHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertido ao modelo de leitura em 18/08/2026. O preço já chega em <c>decimal</c>
+/// da visão, o que dispensa a montagem em memória que existia só para desembrulhar
+/// <c>Dinheiro</c>.
+/// </summary>
+public sealed class ListarCardapioInternoHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ListarCardapioInternoQuery, IReadOnlyList<CategoriaInternaDto>>
 {
     public async Task<IReadOnlyList<CategoriaInternaDto>> Handle(
         ListarCardapioInternoQuery request, CancellationToken cancellationToken)
     {
-        // O filtro global por unidade (RN-GER-009) já se aplica — não há WHERE de unidade aqui.
-        //
-        // Filtro e ordenação continuam no SQL; só a conversão de Dinheiro para o decimal do
-        // contrato acontece em memória. `Preco` é propriedade com conversor de valor
-        // (SPEC-GER-001 §4), e o EF Core não traduz acesso a membro dela — `p.Preco.Valor`
-        // dentro da árvore de expressão não vira SQL.
+        ArgumentNullException.ThrowIfNull(request);
+
         // Recorte opcional, pelo mesmo desenho de `ListarPedidos`: a plataforma vê todas ou uma,
-        // o restaurante sempre a própria (RN-GER-016).
+        // o restaurante sempre a própria (RN-GER-016). Nunca o `request.UnidadeId` cru.
         var recorte = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
 
-        var categorias = await db.Categorias
-            .AsNoTracking()
+        // ⚠ NÃO há `.Where(c => c.Ativa)` aqui, e a ausência é a correção de um beco
+        // (SPEC-VEN-003 §4): categoria inativada desaparecia desta tela e NÃO HAVIA COMO
+        // REATIVÁ-LA — os produtos ficavam presos num grupo invisível, e a única saída era UPDATE
+        // na mão no banco de produção.
+        //
+        // Vitrine da gestão ≠ vitrine do cliente: o cliente vê o que pode comprar, a gestão vê o
+        // que existe. Aplicar o filtro do público na consulta interna é o erro.
+        var categorias = await leitura.Categorias
             .Where(c => recorte == null || c.UnidadeId == recorte)
-            // ⚠ Havia aqui um `.Where(c => c.Ativa)`, e ele era um beco (SPEC-VEN-003 §4):
-            // categoria inativada desaparecia desta tela e NÃO HAVIA COMO REATIVÁ-LA — os
-            // produtos ficavam presos num grupo invisível, e a única saída era UPDATE na mão no
-            // banco de produção.
-            //
-            // Vitrine da gestão ≠ vitrine do cliente: o cliente vê o que pode comprar, a gestão
-            // vê o que existe. Aplicar o filtro do público na consulta interna é o erro.
             .OrderBy(c => c.Ordem).ThenBy(c => c.Nome)
-            .Select(c => new
-            {
-                c.Id,
-                c.Nome,
-                c.Ordem,
-                c.Ativa,
-                Produtos = c.Produtos
-                    .OrderBy(p => p.Nome)
-                    .Select(p => new
-                    {
-                        p.Id,
-                        p.Nome,
-                        p.Descricao,
-                        p.Preco,
-                        p.Ativo,
-                        p.Disponivel,
-                        p.CategoriaId,
-                        p.UrlImagem,
-                    })
-                    .ToList(),
-            })
             .ToListAsync(cancellationToken);
 
-        return categorias
-            .Select(categoria => new CategoriaInternaDto(
-                categoria.Id,
-                categoria.Nome,
-                categoria.Ordem,
-                categoria.Ativa,
-                categoria.Produtos
-                    .Select(produto => new ProdutoInternoDto(
-                        produto.Id,
-                        produto.Nome,
-                        produto.Descricao,
-                        produto.Preco.Valor,
-                        produto.Ativo,
-                        produto.Disponivel,
-                        produto.CategoriaId,
-                        produto.UrlImagem))
-                    .ToList()))
-            .ToList();
+        var produtos = await leitura.ProdutosDoCardapio
+            .Where(p => recorte == null || p.UnidadeId == recorte)
+            .OrderBy(p => p.Nome)
+            .ToListAsync(cancellationToken);
+
+        var porCategoria = produtos
+            .GroupBy(p => p.CategoriaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return [.. categorias.Select(categoria => new CategoriaInternaDto(
+            categoria.Id,
+            categoria.Nome,
+            categoria.Ordem,
+            categoria.Ativa,
+            porCategoria.TryGetValue(categoria.Id, out var lista)
+                ? [.. lista.Select(p => new ProdutoInternoDto(
+                    p.Id, p.Nome, p.Descricao, p.Preco, p.Ativo, p.Disponivel,
+                    p.CategoriaId, p.UrlImagem))]
+                : []))];
     }
 }

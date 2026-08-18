@@ -64,4 +64,48 @@ public interface ILeituraDb
     /// porquê, que não é conveniência.
     /// </summary>
     IQueryable<AutorLeitura> Autores { get; }
+
+    // ── Cadastro — ADR-0019, segunda leva ────────────────────────────────────────
+
+    /// <summary>
+    /// <c>vw_unidade</c> — a casa, com as contagens que a tela pede já somadas.
+    /// <para>
+    /// ⚠ Sem recorte de unidade, e é deliberado: o cardápio público a encontra pelo <b>slug</b>,
+    /// antes de existir unidade no contexto.
+    /// </para>
+    /// </summary>
+    IQueryable<UnidadeLeitura> Unidades { get; }
+
+    /// <summary><c>vw_unidade_horario</c> — <c>RN-GER-036</c>, a semana da casa.</summary>
+    IQueryable<HorarioLeitura> Horarios { get; }
+
+    /// <summary><c>vw_cardapio_categoria</c> — com a contagem do que está na vitrine.</summary>
+    IQueryable<CategoriaLeitura> Categorias { get; }
+
+    /// <summary><c>vw_cardapio_produto</c> — o produto, com o preço em decimal.</summary>
+    IQueryable<ProdutoDoCardapioLeitura> ProdutosDoCardapio { get; }
+
+    /// <summary><c>vw_modulo</c> — o catálogo, igual para todas as casas.</summary>
+    IQueryable<ModuloLeitura> Modulos { get; }
+
+    /// <summary><c>vw_modulo_dependencia</c> — <c>RN-GER-020</c>, as arestas do grafo.</summary>
+    IQueryable<ModuloDependenciaLeitura> DependenciasDeModulo { get; }
+
+    /// <summary><c>vw_unidade_modulo</c> — <c>RN-GER-021</c>, as habilitações com vigência.</summary>
+    IQueryable<ModuloDaUnidadeLeitura> ModulosDaUnidade { get; }
+
+    /// <summary><c>vw_perfil</c> — os perfis da unidade.</summary>
+    IQueryable<PerfilLeitura> Perfis { get; }
+
+    /// <summary><c>vw_perfil_permissao</c> — <c>RN-GER-010</c>, o que cada perfil concede.</summary>
+    IQueryable<PerfilPermissaoLeitura> PermissoesDePerfil { get; }
+
+    /// <summary><c>vw_usuario</c> — quem opera, já recortado por unidade.</summary>
+    IQueryable<UsuarioLeitura> Usuarios { get; }
+
+    /// <summary><c>vw_parametro</c> — <c>SPEC-GER-003</c>, o catálogo global.</summary>
+    IQueryable<ParametroLeitura> Parametros { get; }
+
+    /// <summary><c>vw_parametro_valor</c> — o valor por unidade, com vigência.</summary>
+    IQueryable<ParametroValorLeitura> ValoresDeParametro { get; }
 }

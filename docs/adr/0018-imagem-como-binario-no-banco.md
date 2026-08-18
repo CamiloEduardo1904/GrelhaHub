@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Situação | **Aceita** |
+| Situação | **Aceita e implementada** |
 | Data | 18/08/2026 |
 | Decide sobre | `RN-VEN-042` (imagem do produto), `RN-GER-026` (logo da unidade) |
 | Relacionada | [ADR-0017](0017-tres-bancos-aplicacao-arquivo-e-log.md) |
@@ -41,8 +41,16 @@ flowchart LR
     V -->|não| X["422"]
     V -->|sim| B["grelhahub_arquivo<br/>arquivo_binario<br/><small>os bytes</small>"]
     B --> M["grelhahub<br/>arquivo<br/><small>metadado + exclusão lógica</small>"]
-    M --> P["produto.arquivo_id"]
+    M --> P["produto.url_imagem<br/><small>/api/v1/arquivos/{id}</small>"]
 ```
+
+⚠ **A coluna do produto continua sendo `url_imagem`, e não virou `arquivo_id`.** O rascunho desta
+ADR previa a chave estrangeira; a implementação manteve o texto por um motivo prático que só
+apareceu ao escrever a migration: as referências gravadas antes de 18/08/2026 apontam para
+`/arquivos/...` (ADR-0015) e continuam válidas, servidas pelo Nginx. Uma coluna `uuid` obrigaria a
+migrar todas elas **antes** de o código novo subir, num ambiente onde a migração ainda nem foi
+decidida (ver *Migração do que já existe*). Guardando a **referência**, os dois formatos convivem e
+a troca é incremental.
 
 ### Por que o metadado fica no banco da aplicação
 
@@ -63,19 +71,34 @@ de arquivo sabe quais ids nenhum metadado referencia.
 ⚠ É a mesma escolha do ADR-0016 para e-mail: quando não há transação, **falhe do lado que não
 mente para o usuário**.
 
-## O custo do base64, declarado
+## A entrega: duas representações, e qual vai em cada lugar
 
-Base64 cresce o payload em **≈33%** e desliga o cache de imagem do navegador — a foto volta a
-trafegar em toda carga da vitrine, dentro do JSON, sem `ETag` e sem `Cache-Control` próprios.
+O binário está no banco. **Como ele chega ao navegador** é uma segunda decisão, e ela foi tomada na
+implementação — a versão original desta ADR dizia "base64" e só depois listava, no parágrafo de
+mitigação, exatamente o problema que base64 tem numa vitrine. Fazer as duas coisas custou vinte
+linhas de controller, então as duas existem:
 
-Aceito porque o volume é o do ADR-0015 e não mudou: **dezenas de produtos por casa**, imagem já
-limitada por `RN-VEN-042`. E o que se compra com isso é a transação, a exclusão lógica e o backup
-em uma peça só.
+| Rota | O que devolve | Onde é usada |
+|------|---------------|--------------|
+| `GET /api/v1/arquivos/{id}` | **os bytes**, com `Content-Type` da assinatura | `<img src>` — cardápio público e cartaz |
+| `GET /api/v1/arquivos/{id}/base64` | **data URI** (`data:image/png;base64,…`) | miniatura do painel, pré-visualização, exportação |
 
-⚠ **Onde isto vai doer primeiro:** o cardápio público de uma casa com muitas fotos. Se acontecer, a
-saída **não** é voltar para o disco — é servir a imagem por uma rota própria, com `ETag` derivado
-do id do arquivo (que é imutável) e `Cache-Control` longo. O binário continua no banco; muda só a
-entrega. Está registrado aqui para que a próxima pessoa não refaça a análise.
+**Base64 cresce o conteúdo em ≈33% e não entra no cache de imagem do navegador.** Numa vitrine de
+vinte produtos aberta no celular do cliente, isso são megabytes a mais antes do primeiro preço
+aparecer na tela — e essa é a tela que decide se alguém pede.
+
+Por isso a **rota padrão é a binária**, com `Cache-Control: public, max-age=604800, immutable`. O
+cabeçalho é seguro porque a **identidade do arquivo é imutável**: trocar a imagem gera um id novo
+(`RN-GER-002` — a anterior não é apagada), então o conteúdo de uma URL nunca muda. É a mitigação
+que o rascunho previa, aplicada de saída em vez de guardada para quando doesse.
+
+A base64 fica onde ela é a ferramenta certa: **poucas imagens, atrás de sessão, conteúdo embutido**
+— a miniatura do painel de cardápio, que já vem junto com a resposta e não precisa de uma segunda
+viagem. O frontend escolhe por `services/imagens.ts`, e a escolha está comentada lá.
+
+⚠ **Nenhuma listagem carrega base64.** Nem o cardápio público, nem o interno: eles devolvem a
+**referência**, e quem quiser os bytes os pede. Uma listagem que embutisse a imagem entregaria o
+cardápio inteiro em cada requisição, e o custo cresceria com o catálogo do cliente.
 
 ## Consequências
 
@@ -89,9 +112,15 @@ entrega. Está registrado aqui para que a próxima pessoa não refaça a anális
 
 ### Negativas
 
-- **+33% de tráfego** e sem cache de imagem — mitigação registrada acima.
 - **O `dump` do banco de arquivo é grande.** É por isso que ele é um banco separado (ADR-0017).
-- O Nginx deixa de servir a imagem: ela passa pela API. Uma requisição a mais no caminho.
+- **O Nginx deixa de servir a imagem nova: ela passa pela API.** Uma requisição a mais no caminho,
+  e um processo a mais para derrubar junto se a API cair. O cabeçalho `immutable` devolve a maior
+  parte disso ao cache do navegador.
+- **A rota do arquivo é anônima**, como o diretório que ela substitui. O id (UUID v7) é a
+  capacidade; quem tem a referência lê a imagem. Não é regressão — no ADR-0015 o diretório era
+  público por desenho —, mas agora está escrito em um lugar só, e a exclusão lógica é conferida
+  antes dos bytes, coisa que o Nginx não fazia.
+- **Base64 continua custando +33%** onde ela é usada. Contida ao painel, e declarada acima.
 
 ## O que **não** muda
 
@@ -101,6 +130,25 @@ entrega. Está registrado aqui para que a próxima pessoa não refaça a anális
 
 ## Migração do que já existe
 
-As imagens gravadas em disco pelo ADR-0015 **não são migradas automaticamente**. O ambiente ainda
-não tem cliente em produção com foto cadastrada; havendo, a migração é uma varredura do volume
-gravando cada arquivo pelo caminho novo. Registrado para não virar descoberta.
+As imagens gravadas em disco pelo ADR-0015 **não são migradas automaticamente**, e **continuam
+funcionando**: o `location /arquivos/` do Nginx segue no ar, somente leitura, e as referências
+antigas apontam para lá. O volume está marcado como legado no `docker-compose.yml`, com a condição
+de saída escrita nele — quando nenhuma linha do banco apontar mais para `/arquivos/...`, o volume e
+o `location` saem juntos.
+
+Havendo necessidade de migrar, é uma varredura do volume gravando cada arquivo pelo caminho novo e
+atualizando a coluna. Registrado para não virar descoberta.
+
+## O que a implementação acrescentou
+
+| Peça | Onde |
+|------|------|
+| `arquivo_binario` | banco `grelhahub_arquivo`, migration `EsquemaDeArquivo` |
+| `arquivo` (metadado) | banco `grelhahub`, migration `ArquivoNoBanco` |
+| `ArmazenamentoEmBanco` | substitui `ArmazenamentoEmDisco`, que **foi removido** |
+| `ArquivosController` | as duas rotas de leitura, anônimas |
+| `services/imagens.ts` | o lado do navegador, com cache de promessa por referência |
+
+⚠ **`ArmazenamentoEmDisco` foi apagado, e não deixado "por segurança".** Implementação morta que
+compila é implementação que alguém religa sem entender o porquê — e o volume que ela escreve não
+entra mais em backup nenhum.

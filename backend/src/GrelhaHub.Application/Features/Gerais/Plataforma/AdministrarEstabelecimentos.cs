@@ -34,7 +34,15 @@ public sealed record EstabelecimentoDto(
 [SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
 public sealed record ListarEstabelecimentosQuery : IRequest<IReadOnlyList<EstabelecimentoDto>>;
 
-public sealed class ListarEstabelecimentosHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ A contagem de usuários virou coluna de <c>vw_unidade</c>, com o <c>NOT eh_plataforma</c>
+/// dentro dela (<c>RN-GER-016</c>): a regra "o suporte não é usuário do restaurante" passou a
+/// morar num lugar só, em vez de ser reescrita em cada consulta que conta gente.
+/// </para>
+/// </summary>
+public sealed class ListarEstabelecimentosHandler(ILeituraDb leitura, IContextoDeExecucao contexto, IRelogio relogio)
     : IRequestHandler<ListarEstabelecimentosQuery, IReadOnlyList<EstabelecimentoDto>>
 {
     public async Task<IReadOnlyList<EstabelecimentoDto>> Handle(
@@ -42,39 +50,40 @@ public sealed class ListarEstabelecimentosHandler(IAppDbContext db, IContextoDeE
     {
         ExigirPlataforma(contexto);
 
-        var agora = DateTimeOffset.UtcNow;
+        var agora = relogio.Agora;
 
-        var unidades = await db.Unidades
-            .AsNoTracking()
+        var unidades = await leitura.Unidades
             .OrderBy(u => u.NomeFantasia)
-            .Select(u => new
-            {
-                u.Id, u.NomeFantasia, u.RazaoSocial, u.Cnpj, u.Slug, u.Ativa, u.CriadoEm, u.UrlLogo,
-
-                // Contagem no banco. RN-GER-016 — o usuário de plataforma não conta como usuário
-                // do restaurante: ele não é dele.
-                Usuarios = db.Usuarios.Count(x => x.UnidadeId == u.Id && !x.EhPlataforma),
-
-                // RN-GER-021 — vigente AGORA. Módulo que já venceu não é módulo habilitado, e
-                // listar o histórico aqui faria a tela mostrar o que o cliente não tem mais.
-                Modulos = db.ModulosDaUnidade
-                    .Where(m => m.UnidadeId == u.Id
-                             && m.VigenciaInicio <= agora
-                             && (m.VigenciaFim == null || m.VigenciaFim > agora))
-                    .Select(m => m.Modulo!.Codigo)
-                    .ToList(),
-            })
             .ToListAsync(cancellationToken);
 
-        // Sigla montada em memória: `Modulo.Sigla` é método do domínio e não tem tradução para
-        // SQL (a mesma restrição que impede `p.Preco.Valor` de virar consulta).
-        return unidades
-            .Select(u => new EstabelecimentoDto(
-                u.Id, u.NomeFantasia, u.RazaoSocial, u.Cnpj, u.Slug, u.Ativa, u.CriadoEm, u.UrlLogo,
-                u.Usuarios,
-                u.Modulos.Select(Modulo.Sigla).OrderBy(s => s, StringComparer.Ordinal).ToList()))
-            .ToList();
+        // RN-GER-021 — vigente AGORA. Módulo que já venceu não é módulo habilitado, e listar o
+        // histórico aqui faria a tela mostrar o que o cliente não tem mais.
+        //
+        // ⚠ Uma consulta para TODAS as unidades, e não uma por linha: a projeção correlacionada
+        // anterior emitia um `SELECT` aninhado por estabelecimento.
+        var habilitados = await leitura.ModulosDaUnidade
+            .Where(m => m.VigenciaInicio <= agora
+                     && (m.VigenciaFim == null || m.VigenciaFim > agora))
+            .ToListAsync(cancellationToken);
+
+        var porUnidade = habilitados
+            .GroupBy(m => m.UnidadeId)
+            .ToDictionary(g => g.Key, g => g.Select(m => m.Codigo).ToList());
+
+        // ⚠ `Codigo` já é a SIGLA. A coluna `modulo.codigo` é `varchar(3)` e o conversor grava
+        // "VEN", não "Vendas" — chamar `Modulo.Sigla` sobre ela seria traduzir o que já está
+        // traduzido. O handler antigo precisava porque carregava a entidade, onde o valor é enum.
+        return [.. unidades.Select(u => new EstabelecimentoDto(
+            u.Id, u.NomeFantasia, u.RazaoSocial, u.Cnpj, u.Slug, u.Ativa, u.CriadoEm, u.UrlLogo,
+            u.TotalDeUsuarios,
+            SiglasDe(porUnidade, u.Id)))];
     }
+
+    private static IReadOnlyList<string> SiglasDe(
+        Dictionary<Guid, List<string>> porUnidade, Guid unidadeId) =>
+        porUnidade.TryGetValue(unidadeId, out var codigos)
+            ? [.. codigos.OrderBy(s => s, StringComparer.Ordinal)]
+            : [];
 
     internal static void ExigirPlataforma(IContextoDeExecucao contexto)
     {
@@ -316,7 +325,12 @@ public sealed record ModuloDoCatalogoDto(
 [SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
 public sealed record ListarCatalogoDeModulosQuery : IRequest<IReadOnlyList<ModuloDoCatalogoDto>>;
 
-public sealed class ListarCatalogoDeModulosHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026. <c>vw_modulo_dependencia</c> já
+/// devolve o código dos dois lados da aresta, o que dispensa o dicionário que existia só para
+/// traduzir <c>depende_de_id</c> em sigla.
+/// </summary>
+public sealed class ListarCatalogoDeModulosHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ListarCatalogoDeModulosQuery, IReadOnlyList<ModuloDoCatalogoDto>>
 {
     public async Task<IReadOnlyList<ModuloDoCatalogoDto>> Handle(
@@ -324,24 +338,18 @@ public sealed class ListarCatalogoDeModulosHandler(IAppDbContext db, IContextoDe
     {
         ListarEstabelecimentosHandler.ExigirPlataforma(contexto);
 
-        var catalogo = await db.Modulos.AsNoTracking().OrderBy(m => m.Ordem).ToListAsync(cancellationToken);
-        var arestas = await db.DependenciasDeModulo.AsNoTracking().ToListAsync(cancellationToken);
+        var catalogo = await leitura.Modulos.OrderBy(m => m.Ordem).ToListAsync(cancellationToken);
+        var arestas = await leitura.DependenciasDeModulo.ToListAsync(cancellationToken);
 
-        var porId = catalogo.ToDictionary(m => m.Id);
-
-        // `Modulo.Sigla` é método do domínio e não tem tradução para SQL — a montagem é em memória,
-        // como em `ListarEstabelecimentos`.
-        return catalogo
-            .Select(modulo => new ModuloDoCatalogoDto(
-                Modulo.Sigla(modulo.Codigo),
-                modulo.Nome,
-                modulo.Nucleo,
-                modulo.Ordem,
-                arestas
-                    .Where(a => a.ModuloId == modulo.Id && porId.ContainsKey(a.DependeDeId))
-                    .Select(a => Modulo.Sigla(porId[a.DependeDeId].Codigo))
-                    .OrderBy(s => s, StringComparer.Ordinal)
-                    .ToList()))
-            .ToList();
+        // ⚠ `Codigo` e `DependeDeCodigo` já são SIGLAS — ver a nota em `ListarEstabelecimentos`.
+        return [.. catalogo.Select(modulo => new ModuloDoCatalogoDto(
+            modulo.Codigo,
+            modulo.Nome,
+            modulo.Nucleo,
+            modulo.Ordem,
+            [.. arestas
+                .Where(a => a.ModuloId == modulo.Id)
+                .Select(a => a.DependeDeCodigo)
+                .OrderBy(s => s, StringComparer.Ordinal)]))];
     }
 }

@@ -22,7 +22,7 @@
           <Format>cobertura</Format>
 
           <!-- Código gerado pelo EF Core: migration e snapshot do modelo. -->
-          <ExcludeByFile>**/Migrations/**.cs</ExcludeByFile>
+          <ExcludeByFile>**/Migrations/**.cs,**/MigrationsLog/**.cs,**/MigrationsArquivo/**.cs</ExcludeByFile>
 
           <!--
             ⚠ O CÓDIGO GERADO DO OPENAPI NÃO É EXCLUÍDO AQUI, e a tentativa está registrada

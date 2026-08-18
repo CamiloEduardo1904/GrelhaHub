@@ -107,6 +107,7 @@ erDiagram
     unidade ||--o{ unidade_modulo : "contrata"
     unidade ||--o{ parametro_valor : "configura"
     unidade ||--o{ outbox_auditoria : "registra"
+    unidade ||--o{ arquivo : "envia"
 
     perfil ||--o{ usuario : "classifica"
     perfil ||--o{ perfil_permissao : "concede"
@@ -161,6 +162,40 @@ erDiagram
 > PostgreSQL a calcula a partir do fuso e da virada da própria linha. Neste banco não existem
 > `unidade` nem `pedido` para consultar — o valor chega pronto. Recalcular aqui seria uma segunda
 > definição da mesma regra, e das piores: divergiria em silêncio.
+
+### O banco de arquivo, separado — ADR-0018
+
+Uma tabela, sem regra nenhuma. Ela é **um monte de bytes com um identificador**.
+
+```mermaid
+erDiagram
+    arquivo_binario {
+        uuid id PK "o MESMO id do metadado"
+        bytea conteudo "os bytes da imagem"
+        string tipo_mime "da assinatura, nunca da extensão"
+    }
+```
+
+> ### ⚠⚠ O que liga os dois lados é o **id**, e nada mais
+>
+> Não existe chave estrangeira entre `arquivo` (banco da aplicação) e `arquivo_binario` (banco de
+> arquivo): **chave estrangeira não atravessa banco.** Os dois lados usam o mesmo `id`, e a
+> integridade é mantida pela **ordem de gravação** — bytes primeiro, metadado depois.
+>
+> Essa ordem é uma escolha entre duas falhas, e não um detalhe:
+>
+> | Se falhar | Resultado |
+> |-----------|-----------|
+> | depois dos bytes, antes do metadado | **binário órfão** — invisível ao sistema, removível por varredura |
+> | depois do metadado, antes dos bytes | **imagem quebrada na vitrine**, que o cliente vê |
+>
+> Quando não há transação, **falhe do lado que não mente para o usuário**. É a mesma escolha que o
+> ADR-0016 fez para o e-mail.
+>
+> **Tudo o que é regra vive no metadado**, no banco da aplicação: a unidade dona (`RN-GER-009`), a
+> exclusão lógica (`RN-GER-002`) e a trilha. Ler a imagem passa pelo metadado **antes** dos bytes —
+> e é isso que faz a exclusão lógica valer também para a foto, coisa que o diretório servido pelo
+> Nginx não sabia fazer.
 
 ### Como ler as cardinalidades
 
@@ -265,7 +300,13 @@ duas vezes ao mesmo perfil.
 | `preco` | `numeric(12,2)` | | ⚠ **Dinheiro nunca é decimal solto** — duas casas, sempre |
 | `ativo` | `boolean` | | Situação **cadastral**: o produto saiu do cardápio |
 | `disponivel` | `boolean` | | Situação **do turno**: acabou o ingrediente hoje |
-| `url_imagem` | `varchar(500)` | ⭘ | |
+| `url_imagem` | `varchar(500)` | ⭘ | A **referência** da foto — ver abaixo |
+
+> ⚠ **`url_imagem` guarda uma referência, não um caminho de disco.** Desde a ADR-0018 ela vale
+> `/api/v1/arquivos/{id}`, e o `{id}` é a linha de `arquivo`. As referências gravadas antes de
+> 18/08/2026 valem `/arquivos/…` e continuam funcionando: o Nginx ainda serve aquele diretório,
+> somente leitura. A coluna guarda **texto** justamente para os dois formatos conviverem sem uma
+> migração obrigatória de dado.
 
 > ⚠ **`ativo` e `disponível` não são o mesmo campo com dois nomes.** O efeito para o cliente é
 > idêntico — o produto não aparece — e é por isso que fundi-los é tentador. Mas "saiu do cardápio"
@@ -416,6 +457,29 @@ apaga. Agora dá para perguntar **"o que mais quebrou esta semana"** com uma con
 | `unidade_id` / `usuario_id` | `uuid` | ⭘ | ⚠ **Opcionais de propósito** — boa parte das falhas acontece antes de existir unidade no contexto (login, rota anônima). Exigi-las deixaria as falhas mais externas sem onde ser gravadas |
 | `correlacao` | `varchar(100)` | ⭘ | O identificador da requisição. **É por ele que o suporte liga esta linha ao erro que o usuário viu** |
 
+#### `arquivo` — o metadado da imagem *(ADR-0018)*
+
+Os **bytes** não estão aqui: estão no banco `grelhahub_arquivo`, na tabela `arquivo_binario`, com o
+mesmo `id`. O que está aqui é tudo o que participa de alguma regra.
+
+| Coluna | Tipo | | O que guarda |
+|--------|------|---|--------------|
+| `id` | `uuid` | 🔑 | **O mesmo id do binário**, no outro banco |
+| `unidade_id` | `uuid` | 🔗 | `RN-GER-009` — de quem é a foto |
+| `pasta` | `varchar(30)` | | `produto` ou `logo`. Escolhida pelo **código**, nunca pelo usuário |
+| `tipo_mime` | `varchar(100)` | | Derivado da **assinatura** do arquivo (`RN-VEN-042`) |
+| `tamanho_em_bytes` | `integer` | | `CHECK > 0` — arquivo vazio não é arquivo |
+| `dh_criacao` | `timestamptz` | | |
+| `dh_exclusao` | `timestamptz` | ⭘ | `RN-GER-002` — exclusão **lógica** |
+
+> ⚠ **Excluir o metadado tira a imagem do ar sem apagar um byte.** A rota de leitura consulta o
+> metadado antes de buscar os bytes, então a foto some do cardápio na hora; os bytes ficam, e quem
+> os apaga é uma varredura deliberada, não um clique. É a garantia que o disco não sabia dar.
+>
+> ⚠ **O `CHECK` valida DOMÍNIO, não política.** O limite de 5 MB é `RN-VEN-042` e vive na validação
+> da aplicação, onde vira mensagem para o usuário. O que o banco recusa aqui é o impossível:
+> tamanho zero ou negativo.
+
 #### `token_acesso` — os links de acesso
 
 Guarda os links de convite e de "esqueci minha senha", e **apenas o hash** do token: quem lê a
@@ -432,6 +496,10 @@ tabela não consegue entrar na conta de ninguém. Emitir um novo invalida o ante
 A **consulta** não lê as tabelas acima: lê visões feitas para a tela que as consome. É onde a
 agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o banco à aplicação.
 
+**São 17 visões, em duas levas.** A primeira cobriu a venda; a segunda, o cadastro.
+
+**Venda**
+
 | Visão | Responde |
 |-------|----------|
 | `vw_pedido_resumo` | Uma linha por pedido, com o total **já somado** e a contagem de itens |
@@ -439,6 +507,39 @@ agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o ba
 | `vw_operacao_dia` | Faturamento, contagem e valor em andamento por (unidade, dia operacional) |
 | `vw_produto_vendido` | Quanto de cada produto saiu — agrupado pelo **nome praticado na venda** |
 | `vw_autor` | Id e nome, só para dizer quem fez algo na trilha |
+
+**Cadastro**
+
+| Visão | Responde |
+|-------|----------|
+| `vw_unidade` | A casa, com a contagem de usuários e de produtos ativos **já somadas** |
+| `vw_unidade_horario` | A semana da casa (`RN-GER-036`) |
+| `vw_cardapio_categoria` | A categoria, com **quantos produtos o cliente veria** nela |
+| `vw_cardapio_produto` | O produto, com o preço já em `decimal` |
+| `vw_modulo` | O catálogo de módulos |
+| `vw_modulo_dependencia` | As arestas do grafo, já com a sigla dos **dois** lados |
+| `vw_unidade_modulo` | As habilitações, com vigência |
+| `vw_perfil` | O perfil, com a contagem de usuários |
+| `vw_perfil_permissao` | O que cada perfil concede |
+| `vw_usuario` | Quem opera, já recortado por unidade |
+| `vw_parametro` | O catálogo de parâmetros |
+| `vw_parametro_valor` | O valor por unidade, com vigência |
+
+> ⚠ **Três visões NÃO são recortadas por unidade, e é decisão, não esquecimento.** `vw_modulo`,
+> `vw_modulo_dependencia` e `vw_parametro` são **catálogo global** — o mesmo para todas as casas.
+> `vw_unidade` também não é, pelo motivo oposto: ela **descreve** a unidade, e o cardápio público a
+> encontra pelo `slug` **antes** de existir unidade no contexto. Recortá-la faria a vitrine
+> responder "restaurante não encontrado" para toda casa que existe.
+>
+> ⚠ **Duas visões guardam a vigência sem filtrá-la** — `vw_unidade_modulo` e `vw_parametro_valor`.
+> Quem decide o que vale é o **instante que o handler recebeu**: uma visão presa a "agora" tornaria
+> impossível perguntar "o que estava habilitado no mês passado?".
+>
+> ⚠⚠ **`vw_usuario` faz `COALESCE(unidade_id, uuid-zero)`**, e é a única que precisa disso:
+> `usuario` é a única tabela onde `unidade_id` admite nulo, porque o usuário de **plataforma** não
+> pertence a restaurante nenhum (`RN-GER-014`). O zero é sentinela — não é igual a nenhuma unidade
+> real, então o usuário de plataforma continua invisível ao restaurante, que é o enunciado de
+> `RN-GER-016`.
 
 > ⚠⚠ **Toda visão recortada por unidade expõe `unidade_id`**, e o contexto de leitura recusa mapear
 > uma que não a tenha. Vazamento entre restaurantes na **leitura** é invisível: o número continua
@@ -466,7 +567,7 @@ O sistema valida em **duas camadas**, deliberadamente:
 | **Chave única** | `unidade.cnpj`, `usuario.email`, `usuario.cpf`, `unidade.slug` | Não existem dois |
 | **Chave única composta** | `pedido (unidade, dia operacional, número)` | O número do pedido não repete no mesmo dia da mesma casa |
 | **Coluna calculada** | `pedido.data_operacional`, `log_auditoria.data_operacional` | A regra do dia operacional não depende de ninguém lembrar |
-| **Restrição de valor** | `ck_modulo_codigo`, `ck_parametro_tipo`, `ck_log_operacao` | O código do módulo tem duas ou três letras maiúsculas; a operação da trilha é uma das três |
+| **Restrição de valor** | `ck_modulo_codigo`, `ck_parametro_tipo`, `ck_log_operacao`, `ck_arquivo_tamanho` | O código do módulo tem duas ou três letras maiúsculas; a operação da trilha é uma das quatro; arquivo vazio não é arquivo |
 | **Restrição contra ciclo** | `ck_modulo_dependencia_ciclo` | Um módulo não depende de si mesmo |
 | **Gatilho** | `trg_log_auditoria_imutavel` **no banco de log** | Ninguém altera nem apaga a trilha |
 | **Restrição na ponte** | `ck_outbox_operacao`, `ck_outbox_valores` | Lixo é recusado na ENTRADA, e não entope a fila |
@@ -483,6 +584,7 @@ consulta de um restaurante não varrer o dado dos outros.
 | `pedido (unidade, dia operacional, status)` | O painel: "os pedidos abertos de hoje" |
 | `log_auditoria (unidade, entidade, registro, ocorrência)` | "O que aconteceu com este pedido" |
 | `token_acesso (hash)` — único | Achar o link em uma leitura |
+| `arquivo (unidade, pasta)` | "As fotos desta casa" — e `unidade_id` vem primeiro, como em todo índice transacional |
 
 ---
 

@@ -40,6 +40,16 @@ public interface IAppDbContext
     /// </para>
     /// </summary>
     DbSet<OutboxDeAuditoria> OutboxDeAuditoria { get; }
+    /// <summary>
+    /// ADR-0018 — o METADADO das imagens. Os bytes vivem no banco de arquivo, com o mesmo
+    /// <c>Id</c>.
+    /// <para>
+    /// ⚠ Está aqui, e não no banco de arquivo, porque é aqui que as regras alcançam: filtro de
+    /// unidade (<c>RN-GER-009</c>), exclusão lógica (<c>RN-GER-002</c>) e trilha. Do outro lado
+    /// não há regra nenhuma — só bytes.
+    /// </para>
+    /// </summary>
+    DbSet<Arquivo> Arquivos { get; }
     DbSet<Permissao> Permissoes { get; }
     DbSet<Modulo> Modulos { get; }
     DbSet<ModuloDependencia> DependenciasDeModulo { get; }

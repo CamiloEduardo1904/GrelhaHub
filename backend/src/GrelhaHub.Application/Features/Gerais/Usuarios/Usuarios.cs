@@ -41,47 +41,47 @@ public sealed record UsuarioDto(
 public sealed record ListarUsuariosQuery(Guid? UnidadeId = null)
     : IRequest<IReadOnlyList<UsuarioDto>>;
 
-public sealed class ListarUsuariosHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠⚠ <b>O recorte deixou de ser responsabilidade deste handler.</b> No lado da escrita
+/// <c>Usuario</c> não implementa <c>IPertenceAUnidade</c> — o usuário de plataforma não tem
+/// unidade —, e a consequência era que TODO handler precisava lembrar de escrever o
+/// <c>WHERE</c>. <c>vw_usuario</c> é recortada pelo filtro global, e o <c>Recorte</c> abaixo passa
+/// a servir só ao caso da plataforma escolhendo uma casa.
+/// </para>
+/// </summary>
+public sealed class ListarUsuariosHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ListarUsuariosQuery, IReadOnlyList<UsuarioDto>>
 {
     public async Task<IReadOnlyList<UsuarioDto>> Handle(
         ListarUsuariosQuery request, CancellationToken cancellationToken)
     {
-        // `usuario` NÃO está sob o filtro global (a entidade não implementa IPertenceAUnidade,
-        // porque o usuário de plataforma não tem unidade). O recorte aqui é explícito — e é
-        // exatamente por isso que este handler carrega duas condições em vez de zero.
-        //
-        // RN-GER-014 / ADR-0013 — a plataforma informa QUAL casa quer ver, ou vê todas. Antes
-        // este handler lançava "unidade não encontrada" para ela: o suporte simplesmente não
-        // conseguia listar os usuários de um cliente, que é metade do trabalho de dar suporte.
+        ArgumentNullException.ThrowIfNull(request);
+
+        // RN-GER-014 / ADR-0013 — a plataforma informa QUAL casa quer ver, ou vê todas. O
+        // restaurante sempre a própria: `Recorte` IGNORA o parâmetro para ele, e usar o valor cru
+        // faria o restaurante que mandasse o id do vizinho ver a própria lista vazia.
         var recorte = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
 
-        var linhas = await db.Usuarios
-            .AsNoTracking()
-            .Include(u => u.Perfil)
+        var linhas = await leitura.Usuarios
             .Where(u => recorte == null || u.UnidadeId == recorte)
 
-            // RN-GER-016 — invisível ao restaurante. Redundante com o recorte de unidade (ele não
-            // tem unidade), e escrito de propósito: a redundância aqui custa nada e a ausência
-            // custaria o vazamento no dia em que o recorte mudasse.
+            // RN-GER-016 — invisível ao restaurante. Redundante com o recorte de unidade, e
+            // escrito de propósito: a redundância aqui custa nada e a ausência custaria o
+            // vazamento no dia em que o recorte mudasse.
             .Where(u => !u.EhPlataforma)
             .OrderBy(u => u.Nome)
-            .Select(u => new
-            {
-                u.Id, u.UnidadeId, u.Nome, u.Sobrenome, u.Cpf, u.Email,
-                Perfil = u.Perfil!.Nome, PerfilId = u.PerfilId!.Value, u.Ativo, u.DeveTrocarSenha,
-            })
             .ToListAsync(cancellationToken);
 
-        // ⚠ Mapeado em MEMÓRIA, e não na projeção do SQL: o EF Core não traduz acesso a membro
-        // de propriedade com conversor de valor, e `u.Cpf.Formatado()` não vira SQL
-        // (SPEC-GER-001, a mesma armadilha de `p.Preco.Valor`). Filtro e ordenação continuam
-        // no banco.
-        return linhas
-            .Select(l => new UsuarioDto(
-                l.Id, l.UnidadeId, l.Nome, l.Sobrenome, l.Cpf?.Formatado(), l.Email,
-                l.Perfil, l.PerfilId, l.Ativo, l.DeveTrocarSenha))
-            .ToList();
+        // ⚠ A formatação do CPF acontece em MEMÓRIA e continua sendo do domínio: `Cpf.Formatado`
+        // é value object, e a visão devolve o dígito cru. Formatar em SQL seria a segunda
+        // implementação da mesma máscara.
+        return [.. linhas.Select(l => new UsuarioDto(
+            // `Sobrenome` só é nulo para usuário de plataforma (RN-GER-030), que o `Where` acima
+            // já excluiu — a coalescência existe para o contrato, não para o dado.
+            l.Id, l.UnidadeId, l.Nome, l.Sobrenome ?? string.Empty, Cpf.Formatar(l.Cpf), l.Email,
+            l.PerfilNome ?? string.Empty, l.PerfilId ?? Guid.Empty, l.Ativo, l.DeveTrocarSenha))];
     }
 }
 
@@ -389,59 +389,61 @@ public sealed record PermissaoDoPerfilDto(string Codigo, string Descricao);
 public sealed record ListarPerfisQuery(Guid? UnidadeId = null)
     : IRequest<IReadOnlyList<PerfilDaUnidadeDto>>;
 
-public sealed class ListarPerfisHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ <c>Delegavel</c> continua vindo de <see cref="MatrizDeDelegacao"/>, que é DOMÍNIO
+/// (<c>RN-GER-024</c>). Traduzi-la para a visão colocaria a matriz de delegação dentro de um
+/// <c>CASE</c> de SQL, longe do teste que a cobre — e a resposta "o sistema me ofereceu e depois
+/// recusou" é exatamente o que a matriz existe para evitar.
+/// </para>
+/// </summary>
+public sealed class ListarPerfisHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ListarPerfisQuery, IReadOnlyList<PerfilDaUnidadeDto>>
 {
     public async Task<IReadOnlyList<PerfilDaUnidadeDto>> Handle(
         ListarPerfisQuery request, CancellationToken cancellationToken)
     {
-        // `perfil` implementa IPertenceAUnidade, mas o filtro global PASSA TUDO para a
-        // plataforma (ADR-0013) — sem o WHERE explícito, o suporte veria os perfis de todos os
-        // clientes num só select. Mesmo motivo de `ListarPedidos`.
+        ArgumentNullException.ThrowIfNull(request);
+
+        // O filtro global PASSA TUDO para a plataforma (ADR-0013) — sem o recorte explícito, o
+        // suporte veria os perfis de todos os clientes num só select.
         var recorte = UnidadeDaConsulta.Recorte(contexto, request.UnidadeId);
 
-        var perfis = await db.Perfis
-            .AsNoTracking()
+        var perfis = await leitura.Perfis
             .Where(p => recorte == null || p.UnidadeId == recorte)
             .OrderBy(p => p.Nome)
-            .Select(p => new
-            {
-                p.Id,
-                p.Nome,
-                p.Descricao,
-
-                // RN-GER-010 — o que o perfil concede. Projetado no banco: trazer o agregado
-                // inteiro carregaria a tabela de junção de todos os perfis da unidade.
-                // ⚠ `OrderBy` na ORIGEM, antes do `Select`.
-                //
-                // Ordenar por propriedade de um record já construído não atravessa a árvore de
-                // expressão: o EF Core não sabe traduzir `x.Codigo` de um DTO que só existe em
-                // memória, e a consulta falha em tempo de execução — 500 sem pista, porque o
-                // erro não é de compilação. Mesma família da armadilha do `Guid?` em
-                // SPEC-VEN-003 §11.7.
-                Permissoes = p.Permissoes
-                    .OrderBy(concedida => concedida.Permissao!.Codigo)
-                    .Select(concedida => new PermissaoDoPerfilDto(
-                        concedida.Permissao!.Codigo, concedida.Permissao!.Descricao))
-                    .ToList(),
-            })
             .ToListAsync(cancellationToken);
 
-        var perfilDeQuemPede = await db.Usuarios
-            .AsNoTracking()
-            .IgnoreQueryFilters()
-            .Where(u => u.Id == contexto.UsuarioId)
-            .Select(u => u.Perfil!.Nome)
+        // RN-GER-010 — o que cada perfil concede. UMA consulta para todos os perfis, e não uma
+        // subconsulta por linha: a projeção correlacionada anterior emitia um `SELECT` aninhado
+        // por perfil da unidade.
+        var permissoes = await leitura.PermissoesDePerfil
+            .Where(p => recorte == null || p.UnidadeId == recorte)
+            .OrderBy(p => p.Codigo)
+            .ToListAsync(cancellationToken);
+
+        var porPerfil = permissoes
+            .GroupBy(p => p.PerfilId)
+            .ToDictionary(g => g.Key, g => g.Select(
+                x => new PermissaoDoPerfilDto(x.Codigo, x.Descricao)).ToList());
+
+        var eu = contexto.UsuarioId;
+
+        var perfilDeQuemPede = await leitura.Usuarios
+            .Where(u => u.Id == eu)
+            .Select(u => u.PerfilNome)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return perfis
-            .Select(p => new PerfilDaUnidadeDto(
-                p.Id,
-                p.Nome,
-                p.Descricao,
-                MatrizDeDelegacao.PodeAtribuir(perfilDeQuemPede, p.Nome),
-                p.Permissoes))
-            .ToList();
+        return [.. perfis.Select(p => new PerfilDaUnidadeDto(
+            p.Id,
+            p.Nome,
+
+            // A coluna admite nulo no banco e o contrato da API não: perfil semeado sempre tem
+            // descrição, e a coalescência cobre o perfil criado a mão sem uma.
+            p.Descricao ?? string.Empty,
+            MatrizDeDelegacao.PodeAtribuir(perfilDeQuemPede, p.Nome),
+            porPerfil.TryGetValue(p.Id, out var lista) ? lista : []))];
     }
 }
 

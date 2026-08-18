@@ -7,7 +7,24 @@
 | Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | 1 — cadastro |
 | Regras implementadas | `RN-VEN-042`, `RN-GER-026`, `RN-VEN-037`, `RN-GER-002` |
-| ADRs aplicáveis | [ADR-0015](../adr/0015-armazenamento-de-imagem.md), [ADR-0006](../adr/0006-deploy-em-vps-unica.md) |
+| ADRs aplicáveis | [ADR-0018](../adr/0018-imagem-como-binario-no-banco.md) ⚠ **substitui a ADR-0015**, [ADR-0017](../adr/0017-tres-bancos-aplicacao-arquivo-e-log.md), [ADR-0006](../adr/0006-deploy-em-vps-unica.md) |
+
+> ## ⚠⚠ O armazenamento MUDOU em 18/08/2026
+>
+> Esta spec foi escrita quando a imagem vivia num **volume de disco** (ADR-0015). A
+> [ADR-0018](../adr/0018-imagem-como-binario-no-banco.md) moveu o binário para o banco
+> `grelhahub_arquivo`. **As regras não mudaram** — formato pela assinatura, 5 MB, nome do usuário
+> descartado, referência antiga preservada —, mas três coisas na letra desta spec ficaram velhas:
+>
+> | Onde | Era | É |
+> |------|-----|---|
+> | A saída do upload | `/arquivos/{unidade}/produto/{uuid}.jpg` | `/api/v1/arquivos/{id}` |
+> | Onde os bytes ficam | volume de disco, servido pelo Nginx | tabela `arquivo_binario` |
+> | O que garante `RN-GER-009` | a unidade **no caminho** | a unidade **no metadado**, sob filtro global |
+>
+> ⚠ A terceira é a que mais importa: **caminho não é vínculo.** Nada impedia o caminho de apontar
+> para uma pasta e a linha do banco dizer outra coisa. O teste CA-6 desceu junto, e o comentário
+> dele explica a mudança.
 | Depende de | `SPEC-VEN-001`, `SPEC-GER-004` |
 | Data | 17/08/2026 |
 | Entregue em | 17/08/2026 |
@@ -41,11 +58,11 @@ recusa do que sobre gravação.
 |-------|------|:-----------:|
 | `arquivo` | binário | ✔ |
 
-**Saída:** `{ "url": "/arquivos/{unidadeId}/produto/{uuid}.jpg" }`
+**Saída:** `{ "url": "/api/v1/arquivos/{id}" }` — ⚠ ADR-0018, ver o aviso no topo
 
 ### `POST /api/v1/unidade/logo` — `multipart/form-data`
 
-Mesma forma. **Saída:** `{ "url": "/arquivos/{unidadeId}/logo/{uuid}.png" }`
+Mesma forma. **Saída:** `{ "url": "/api/v1/arquivos/{id}" }`
 
 > **O campo é `url` nas duas, e não `urlImagem`/`urlLogo` como esta spec dizia.** As duas
 > operações devolvem a mesma coisa — o caminho de um arquivo que acabou de ser gravado —, e dois
@@ -220,7 +237,10 @@ ALTER TABLE unidade ADD COLUMN url_logo varchar(500);
 migration por conjunto de mudanças pendentes do modelo; separar exigiria gerar, aplicar e
 reeditar o modelo, por duas migrations em vez de um nome.
 
-Nenhum `bytea`: o arquivo vive em disco (ADR-0015). O banco guarda caminho, e caminho é texto.
+⚠ **Isto valia até 18/08/2026.** A ADR-0018 pôs o `bytea` no banco `grelhahub_arquivo`, com um
+metadado na tabela `arquivo`. A coluna do produto **continua sendo texto** — ela guarda a
+referência `/api/v1/arquivos/{id}` —, e é o que permite as referências antigas conviverem com as
+novas sem migração obrigatória de dado.
 
 ## 7. Parâmetros consumidos
 

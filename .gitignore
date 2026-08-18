@@ -19,6 +19,11 @@ artifacts/
 *.userprefs
 .vs/
 TestResults/
+
+# Relatorio de cobertura gerado pelo reportgenerator (backend/cobertura).
+# Numero de cobertura se MEDE, nao se versiona: commitado, ele envelhece em silencio
+# e passa a ser citado como se fosse o atual.
+cobertura/
 *.trx
 *.coverage
 coverage*.xml

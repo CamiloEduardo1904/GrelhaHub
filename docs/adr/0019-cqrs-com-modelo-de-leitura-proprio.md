@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Situação | **Aceita** |
+| Situação | **Aceita e concluída** — 16 de 16 consultas convertidas em 18/08/2026 |
 | Data | 18/08/2026 |
 | Decide sobre | Separação leitura/escrita em toda a camada de aplicação |
 | **Emenda** | [ADR-0002](0002-clean-architecture-com-cqrs.md) — que adotou a sigla sem a separação |
@@ -124,7 +124,10 @@ separação verificada, não.**
 - **Duplicação aparente.** O mesmo campo aparece no agregado e na visão. Não é duplicação de
   verdade — é a diferença entre "o que o negócio garante" e "o que a tela mostra" —, mas parece,
   e quem revisar vai perguntar.
-- **A conversão é grande**: 16 consultas mudam de forma.
+- **A conversão é grande**: 16 consultas mudaram de forma, e com elas 17 visões entraram no
+  esquema.
+- **Uma regra de domínio precisou ser EXTRAÍDA** para poder ser respondida dos dois lados — ver
+  abaixo. É o custo real que a conversão cobrou, e vale registrar porque ele vai voltar.
 
 ## Migração
 
@@ -134,3 +137,45 @@ com base rodando exigiria compatibilidade dos dois lados ao mesmo tempo.
 Por consulta, e não em bloco: cada uma ganha a sua visão, o handler passa a lê-la, e o teste de
 integração daquela consulta continua verde — é ele que prova que a leitura nova devolve o mesmo que
 a antiga.
+
+### A catraca, e por que ela ficou
+
+A conversão saiu em duas levas — venda primeiro (5 visões), cadastro depois (12). Entre uma e
+outra, o inventário das consultas ainda não convertidas viveu **dentro do teste**,
+em `SeparacaoDeCqrsTests.PendentesDeConversao`, e dois testes o mantinham honesto:
+
+- um recusa infrator que **não** esteja na lista → a dívida não cresce;
+- outro recusa nome na lista que **já** foi convertido → a lista não apodrece.
+
+Sem o segundo, a lista viraria papel de parede: nomes convertidos ficariam nela para sempre, e a
+próxima pessoa leria "15 pendentes" quando restassem três.
+
+⚠ **A lista continua no código, vazia.** Apagá-la junto com o inventário devolveria a porta que ela
+fechou: o primeiro handler novo que abrisse o contexto de escrita numa `Query` não teria onde ser
+anotado, e a discussão viraria "acrescento uma exceção aqui?" em vez de "por que esta consulta
+precisa do agregado?".
+
+### ⚠⚠ O que a conversão cobrou: regra de domínio que a leitura também precisa
+
+Duas perguntas do cardápio público **não são projeção** — são regra:
+
+| Pergunta | Regra |
+|----------|-------|
+| "a casa está aberta agora?" | `RN-VEN-048`, com conversão para o fuso da casa e turno que atravessa a meia-noite |
+| "qual é o endereço em uma linha?" | `RN-GER-037` |
+
+As duas viviam dentro do agregado `Unidade`, e o handler convertido não carrega agregado. Havia
+três saídas:
+
+1. **reescrever em SQL, dentro da visão** — duas implementações da mesma regra, divergindo em
+   silêncio. É exatamente o defeito que `DiaOperacionalParidadeTests` existe para pegar, e ele só
+   pega porque alguém escreveu o teste de paridade;
+2. **manter estas consultas fora da conversão** — a catraca com dois nomes para sempre;
+3. **extrair a função pura** para `ApresentacaoDaCasa`, que o agregado passa a chamar e a leitura
+   também.
+
+Escolhida a terceira. Não há paridade a manter: **é o mesmo código, com dois chamadores**. O teste
+de `ApresentacaoDaCasa` cobre os dois.
+
+> A generalização vale para o resto do sistema: **quando a leitura precisa de uma regra, extraia a
+> função — não a traduza.** Tradução cria a segunda verdade que ninguém compara.

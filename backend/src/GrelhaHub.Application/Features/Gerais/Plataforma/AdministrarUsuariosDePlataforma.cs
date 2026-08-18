@@ -45,7 +45,16 @@ public sealed record UsuarioDeSuporteDto(
 [SemPermissao("privativa da plataforma — a checagem é EhPlataforma, no handler")]
 public sealed record ListarUsuariosDeSuporteQuery : IRequest<IReadOnlyList<UsuarioDeSuporteDto>>;
 
-public sealed class ListarUsuariosDeSuporteHandler(IAppDbContext db, IContextoDeExecucao contexto)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ <c>vw_usuario</c> É recortada por unidade, e esta consulta ainda funciona: quem chega aqui é
+/// obrigatoriamente usuário de plataforma (a primeira linha o exige), e a plataforma atravessa o
+/// filtro (<c>RN-GER-014</c>, ADR-0013). Não há <c>IgnoreQueryFilters</c> a escrever — o recorte
+/// deixou de depender de o handler lembrar dele.
+/// </para>
+/// </summary>
+public sealed class ListarUsuariosDeSuporteHandler(ILeituraDb leitura, IContextoDeExecucao contexto)
     : IRequestHandler<ListarUsuariosDeSuporteQuery, IReadOnlyList<UsuarioDeSuporteDto>>
 {
     public async Task<IReadOnlyList<UsuarioDeSuporteDto>> Handle(
@@ -55,20 +64,13 @@ public sealed class ListarUsuariosDeSuporteHandler(IAppDbContext db, IContextoDe
 
         var eu = contexto.UsuarioId;
 
-        // IgnoreQueryFilters explícito: `usuario` não tem filtro global por unidade, e a consulta
-        // não deve passar a depender disso se ele existir um dia.
-        var usuarios = await db.Usuarios
-            .IgnoreQueryFilters()
-            .AsNoTracking()
+        var usuarios = await leitura.Usuarios
             .Where(u => u.EhPlataforma)
             .OrderBy(u => u.Nome)
-            .Select(u => new { u.Id, u.Nome, u.Email, u.Ativo, u.DeveTrocarSenha, u.CriadoEm })
             .ToListAsync(cancellationToken);
 
-        return usuarios
-            .Select(u => new UsuarioDeSuporteDto(
-                u.Id, u.Nome, u.Email, u.Ativo, u.DeveTrocarSenha, u.CriadoEm, u.Id == eu))
-            .ToList();
+        return [.. usuarios.Select(u => new UsuarioDeSuporteDto(
+            u.Id, u.Nome, u.Email, u.Ativo, u.DeveTrocarSenha, u.CriadoEm, u.Id == eu))];
     }
 }
 

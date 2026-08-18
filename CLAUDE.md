@@ -214,21 +214,40 @@ vertical. ⚠ **A lista é agrupada por dia operacional, e o agrupamento é obri
 e a #1 de ontem aparecem lado a lado, idênticas. Foi o que o filtro revelou no dia em que entrou.
 
 
-⚠⚠ **18/08/2026 — três mudanças estruturais no mesmo dia**, todas com ADR:
+⚠⚠ **18/08/2026 — quatro mudanças estruturais no mesmo dia**, todas com ADR:
 
 - **ADR-0017 — três bancos.** `grelhahub` (negócio), `grelhahub_log` (trilha + exceções) e
-  `grelhahub_arquivo` (binários, ainda por implementar). A trilha atravessa por **outbox**: ela é
-  gravada na transação da operação e copiada por um worker. ⚠ **A trilha chega com segundos de
-  atraso** — teste que a consulta precisa chamar `Ambiente.DrenarOutboxAsync()` antes, e o helper
-  usa o MESMO código do worker.
-- **ADR-0019 — CQRS de verdade.** A leitura tem `ILeituraDb` (sem `SaveChanges`, modelos sem chave,
-  visões do banco). `SeparacaoDeCqrsTests` recusa a build se um handler cruzar os lados. ⚠ A
-  conversão é **por partes**, e o que falta está nomeado numa lista-catraca dentro do teste.
+  `grelhahub_arquivo` (binários). A trilha atravessa por **outbox**: ela é gravada na transação da
+  operação e copiada por um worker. ⚠ **A trilha chega com segundos de atraso** — teste que a
+  consulta precisa chamar `Ambiente.DrenarOutboxAsync()` antes, e o helper usa o MESMO código do
+  worker.
+- **ADR-0018 — a imagem virou binário no banco**, substituindo a ADR-0015. Não há mais volume de
+  disco: os bytes estão em `arquivo_binario` (banco de arquivo) e o metadado em `arquivo` (banco da
+  aplicação), com o **mesmo id**. ⚠⚠ **A ordem de gravação é a decisão:** bytes primeiro, metadado
+  depois — metadado sem bytes é imagem quebrada que o CLIENTE vê; bytes sem metadado é invisível e
+  varrível. Quando não há transação, falhe do lado que não mente para o usuário.
+- **ADR-0019 — CQRS de verdade, e CONCLUÍDO.** A leitura tem `ILeituraDb` (sem `SaveChanges`,
+  modelos sem chave, 17 visões do banco). `SeparacaoDeCqrsTests` recusa a build se um handler
+  cruzar os lados. **16 de 16 consultas convertidas**; a lista-catraca ficou no teste, vazia, de
+  propósito.
 - **ADR-0020 — a sessão de suporte foi REMOVIDA.** `RN-GER-015` foi revisada: o controle é a
   trilha, não o portão. Não existe mais `sessao_suporte`, nem behavior, nem tela.
 
-⚠ **Cobertura: 90,2% de linha, 69,9% de ramo** — medida com `cobertura.runsettings` E o filtro de
+⚠ **Cobertura: 90,8% de linha, 71,4% de ramo** — medida com `cobertura.runsettings` E o filtro de
 classe do relatório. Sem os dois, o número mente: ver o aviso acima.
+
+⚠⚠ **Quando a LEITURA precisa de uma regra, extraia a função — não a traduza para SQL.** A conversão
+do ADR-0019 esbarrou em `RN-VEN-048` ("a casa está aberta agora?") e `RN-GER-037` (endereço em uma
+linha), que viviam dentro de `Unidade` e que o handler convertido não alcança mais. Reescrevê-las na
+visão criaria a segunda implementação que diverge em silêncio — o defeito que
+`DiaOperacionalParidadeTests` existe para pegar. Estão em `ApresentacaoDaCasa`, chamada pelos dois
+lados: **um código, dois chamadores, nenhuma paridade a manter.**
+
+⚠ **A imagem tem DUAS rotas de leitura, e a escolha não é indiferente.**
+`GET /api/v1/arquivos/{id}` devolve os bytes com `Cache-Control: immutable` — é o que `<img src>`
+usa na vitrine. `/base64` devolve o data URI, para a miniatura do painel. **Base64 infla um terço e
+não entra no cache de imagem**: num cardápio de vinte produtos no celular do cliente isso aparece
+antes do primeiro preço. Nenhuma listagem embute imagem — elas devolvem a referência.
 
 A arquitetura ganhou documento próprio em [`docs/arquitetura/`](docs/arquitetura/) — modelo de
 dados com diagrama e dicionário completo, backend e frontend, **extraídos do modelo real** e
@@ -239,13 +258,13 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **319 testes** — 92 de domínio + 18 de aplicação + 209 de integração |
+| `dotnet test -c Release` | ✔ **348 testes** — 109 de domínio + 18 de aplicação + 221 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 
 > ⚠⚠ **A cobertura que o projeto citava — 95,4% — estava inflada.** As migrations do EF Core são
 > milhares de linhas GERADAS e contavam como cobertas só porque a suíte cria o banco na partida.
-> Sem elas, e sem as 208 linhas do gerador de OpenAPI da Microsoft, o número real é **90,6%**. E há duas exclusões que apagam medição em SILÊNCIO, ambas
+> Sem elas, e sem as 208 linhas do gerador de OpenAPI da Microsoft, o número real é **90,8%**. E há duas exclusões que apagam medição em SILÊNCIO, ambas
 > documentadas em `backend/cobertura.runsettings`: `CompilerGeneratedAttribute` derruba todo código
 > `async` (2.249 linhas contra 4.106), e `Exclude`/`ExcludeByAttribute` fizeram o assembly
 > **Infrastructure sumir do relatório** — não com nota baixa: ausente, com a média subindo porque a
@@ -289,6 +308,12 @@ deixam resíduo silencioso).
 - Use `Contexto(restaurante)` só para **conferir** o que foi gravado
 - Para verificar isolamento entre unidades, use token ou `slug` — nunca `ContextoFixo`, que
   provaria apenas que o teste soube preencher um campo
+
+> ⚠ **`url_imagem` do produto guarda uma REFERÊNCIA, não um caminho de disco.** Vale
+> `/api/v1/arquivos/{id}` desde a ADR-0018. As gravadas antes valem `/arquivos/…` e continuam
+> servidas pelo Nginx, somente leitura — a coluna é texto justamente para os dois formatos
+> conviverem sem migração obrigatória de dado. O frontend pergunta o formato antes de escolher o
+> caminho (`services/imagens.ts`).
 
 **Próximo trabalho de código:** o resto da **onda 1 — cadastro**: **preço com vigência**
 (`RN-VEN-010`), **insumo**, **unidade de medida e conversão**. Já entregues: a onda 0 inteira —

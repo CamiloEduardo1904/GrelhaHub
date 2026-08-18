@@ -58,86 +58,95 @@ public sealed record ProdutoPublicoDto(
     string? Descricao,
     decimal Preco,
 
-    /// <summary><c>RN-VEN-042</c> — caminho público da imagem. Nulo quando não há.</summary>
+    /// <summary><c>RN-VEN-042</c> — referência pública da imagem. Nula quando não há.</summary>
     string? UrlImagem);
 
+/// <summary>
+/// ADR-0019 — convertido ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠⚠ <b>A regra de "está aberta agora" NÃO foi reescrita em SQL.</b> Ela vive em
+/// <see cref="ApresentacaoDaCasa.AbertaEm"/>, que <c>Unidade.AbertaEm</c> também chama — uma
+/// implementação, dois chamadores. Traduzir <c>RN-VEN-048</c> para a visão criaria a segunda
+/// implementação que <c>DiaOperacionalParidadeTests</c> existe para denunciar, e a divergência
+/// apareceria como "a vitrine diz fechado e o painel diz aberto".
+/// </para>
+/// </summary>
 public sealed class ObterCardapioPublicoHandler(
-    IAppDbContext db, IContextoDeExecucao contexto, IModulos modulos, IRelogio relogio)
+    ILeituraDb leitura, IContextoDeExecucao contexto, IModulos modulos, IRelogio relogio)
     : IRequestHandler<ObterCardapioPublicoQuery, CardapioPublicoResponse>
 {
     public async Task<CardapioPublicoResponse> Handle(ObterCardapioPublicoQuery request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var slug = (request.Slug ?? string.Empty).Trim().ToLowerInvariant();
 
-        // `unidade` não é filtrada por unidade_id — ela É a unidade.
-        var unidade = await db.Unidades
-            .AsNoTracking()
-            .Include(u => u.Horarios)
+        // `vw_unidade` não é recortada por unidade — ela É a unidade, e aqui ainda não há uma no
+        // contexto: é o slug que a resolve.
+        var unidade = await leitura.Unidades
             .FirstOrDefaultAsync(u => u.Slug == slug && u.Ativa, cancellationToken)
             ?? throw new NaoEncontradoException("Restaurante não encontrado.");
 
-        // Fixa o escopo: a partir daqui o filtro global do EF Core garante que nada de outra
-        // unidade apareça (RN-VEN-037). Sem isto, cada consulta pública precisaria filtrar a
+        // Fixa o escopo: a partir daqui o filtro global do contexto de leitura garante que nada de
+        // outra unidade apareça (RN-VEN-037). Sem isto, cada consulta pública precisaria filtrar a
         // unidade a mão — e o esquecimento vazaria o cardápio de outro restaurante.
         contexto.DefinirUnidadePublica(unidade.Id);
-        // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline.
-        //
-        // O behavior roda antes do handler, quando a unidade ainda não está no contexto: ela só
-        // é conhecida depois de resolver o slug. E a resposta certa é 404, não 403: para quem
-        // está do lado de fora, o restaurante simplesmente não tem cardápio online — 403
-        // anunciaria que existe algo ali que não foi contratado.
+
+        // RN-GER-017 / SPEC-GER-006 CA-7 — gate de módulo AQUI, e não no pipeline. O behavior roda
+        // antes do handler, quando a unidade ainda não está no contexto. E a resposta certa é 404:
+        // para quem está do lado de fora, o restaurante simplesmente não tem cardápio online.
         if (!await modulos.EstaHabilitadoAsync(unidade.Id, CodigoDeModulo.Vendas, em: null, cancellationToken))
         {
             throw new NaoEncontradoException("Restaurante não encontrado.");
         }
 
-
-        // Filtro e ordenação no SQL; a conversão de Dinheiro para o decimal do contrato
-        // acontece em memória, porque o EF Core não traduz acesso a membro de propriedade com
-        // conversor de valor (SPEC-GER-001 §4).
-        var categorias = await db.Categorias
-            .AsNoTracking()
-            .Where(c => c.Ativa && c.Produtos.Any(p => p.Ativo && p.Disponivel))
-            .OrderBy(c => c.Ordem).ThenBy(c => c.Nome)
-            .Select(c => new
-            {
-                c.Id,
-                c.Nome,
-                Produtos = c.Produtos
-                    // RN-VEN-020 — produto inativo não aparece no cardápio.
-                    .Where(p => p.Ativo && p.Disponivel)
-                    .OrderBy(p => p.Nome)
-                    .Select(p => new { p.Id, p.Nome, p.Descricao, p.Preco, p.UrlImagem })
-                    .ToList(),
-            })
+        var semana = await leitura.Horarios
+            .Where(h => h.UnidadeId == unidade.Id)
+            .OrderBy(h => h.DiaDaSemana)
             .ToListAsync(cancellationToken);
 
-        var publicas = categorias
-            .Select(categoria => new CategoriaPublicaDto(
-                categoria.Id,
-                categoria.Nome,
-                categoria.Produtos
-                    .Select(produto => new ProdutoPublicoDto(
-                        produto.Id, produto.Nome, produto.Descricao, produto.Preco.Valor,
-                        produto.UrlImagem))
-                    .ToList()))
-            .ToList();
+        // RN-VEN-044 — a categoria só entra na vitrine se tiver produto que o cliente possa
+        // comprar. `ProdutosNaVitrine` é contado pela visão, e não por um `Any` correlacionado.
+        var categorias = await leitura.Categorias
+            .Where(c => c.Ativa && c.ProdutosNaVitrine > 0)
+            .OrderBy(c => c.Ordem).ThenBy(c => c.Nome)
+            .ToListAsync(cancellationToken);
+
+        // RN-VEN-020 / RN-VEN-044 — produto inativo OU indisponível não aparece no cardápio. São
+        // dois campos distintos de propósito, e o efeito para o cliente é o mesmo.
+        var produtos = await leitura.ProdutosDoCardapio
+            .Where(p => p.Ativo && p.Disponivel)
+            .OrderBy(p => p.Nome)
+            .ToListAsync(cancellationToken);
+
+        var porCategoria = produtos
+            .GroupBy(p => p.CategoriaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         return new CardapioPublicoResponse(
             unidade.Slug,
             unidade.NomeFantasia,
             unidade.Telefone,
             unidade.UrlLogo,
-            unidade.EnderecoResumido(),
+            ApresentacaoDaCasa.Resumir(
+                unidade.Logradouro, unidade.NumeroDoEndereco, unidade.Bairro,
+                unidade.Cidade, unidade.Uf),
 
             // RN-VEN-048 — no fuso DA CASA, não no do servidor. O contêiner roda em UTC, e
             // perguntar "está aberta?" com a hora de Londres fecharia a loja três horas antes.
-            unidade.AbertaEm(relogio.Agora),
+            ApresentacaoDaCasa.AbertaEm(
+                [.. semana.Select(h => new ApresentacaoDaCasa.DiaDaCasa(h.DiaDaSemana, h.Abre, h.Fecha))],
+                unidade.FusoHorario,
+                relogio.Agora),
 
-            [.. unidade.Horarios
-                .OrderBy(h => h.DiaDaSemana)
-                .Select(h => new HorarioPublicoDto(h.DiaDaSemana, h.Abre, h.Fecha))],
+            [.. semana.Select(h => new HorarioPublicoDto(h.DiaDaSemana, h.Abre, h.Fecha))],
 
-            publicas);
+            [.. categorias.Select(categoria => new CategoriaPublicaDto(
+                categoria.Id,
+                categoria.Nome,
+                porCategoria.TryGetValue(categoria.Id, out var lista)
+                    ? [.. lista.Select(p => new ProdutoPublicoDto(
+                        p.Id, p.Nome, p.Descricao, p.Preco, p.UrlImagem))]
+                    : []))]);
     }
 }

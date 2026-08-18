@@ -109,36 +109,10 @@ public sealed class Unidade : Entidade
     }
 
     /// <summary>O endereço em uma linha, para exibição. Nulo quando não há o suficiente.</summary>
-    public string? EnderecoResumido()
-    {
-        if (string.IsNullOrWhiteSpace(Logradouro))
-        {
-            return null;
-        }
-
-        var partes = new List<string> { Logradouro };
-
-        if (!string.IsNullOrWhiteSpace(NumeroDoEndereco))
-        {
-            partes[0] = $"{Logradouro}, {NumeroDoEndereco}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(Bairro))
-        {
-            partes.Add(Bairro);
-        }
-
-        if (!string.IsNullOrWhiteSpace(Cidade))
-        {
-            partes.Add(string.IsNullOrWhiteSpace(Uf) ? Cidade : $"{Cidade}/{Uf}");
-        }
-        else if (!string.IsNullOrWhiteSpace(Uf))
-        {
-            partes.Add(Uf);
-        }
-
-        return string.Join(" · ", partes);
-    }
+    public string? EnderecoResumido() =>
+        // ⚠ Delega — ADR-0019. A mesma resposta é montada pelo lado da LEITURA, que não carrega
+        // agregado nenhum, e duas implementações da mesma formatação divergiriam em silêncio.
+        ApresentacaoDaCasa.Resumir(Logradouro, NumeroDoEndereco, Bairro, Cidade, Uf);
 
     private static string? Limpo(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
@@ -220,44 +194,13 @@ public sealed class Unidade : Entidade
     /// com a casa cheia.
     /// </para>
     /// </summary>
-    public bool AbertaEm(DateTimeOffset instante)
-    {
-        if (_horarios.Count == 0)
-        {
-            return true;
-        }
-
-        // ⚠ A conversão para o fuso DA CASA acontece AQUI, e não em quem chama.
-        //
-        // O contêiner roda em UTC. Um chamador que esquecesse de converter perguntaria "está
-        // aberta?" com a hora de Londres e fecharia a loja três horas antes — sem erro nenhum,
-        // só uma vitrine fechada no meio da noite de sábado. Método que recebe o instante bruto
-        // e converte sozinho não tem como ser chamado errado.
-        var instanteLocal = TimeZoneInfo.ConvertTime(
-            instante, TimeZoneInfo.FindSystemTimeZoneById(FusoHorario));
-
-        var hora = TimeOnly.FromTimeSpan(instanteLocal.TimeOfDay);
-
-        var hoje = _horarios.FirstOrDefault(h => h.DiaDaSemana == instanteLocal.DayOfWeek);
-
-        if (hoje is { Fechado: false })
-        {
-            var abre = hoje.Abre!.Value;
-            var fecha = hoje.Fecha!.Value;
-
-            var dentro = hoje.AtravessaMeiaNoite ? hora >= abre : hora >= abre && hora < fecha;
-
-            if (dentro)
-            {
-                return true;
-            }
-        }
-
-        var ontem = _horarios.FirstOrDefault(
-            h => h.DiaDaSemana == instanteLocal.AddDays(-1).DayOfWeek);
-
-        return ontem is { Fechado: false, AtravessaMeiaNoite: true } && hora < ontem.Fecha!.Value;
-    }
+    public bool AbertaEm(DateTimeOffset instante) =>
+        // ⚠ Delega pelo mesmo motivo de `EnderecoResumido`: RN-VEN-048 é respondida também pelo
+        // lado da leitura, no cardápio público, e a regra precisa ter UMA implementação.
+        ApresentacaoDaCasa.AbertaEm(
+            [.. _horarios.Select(h => new ApresentacaoDaCasa.DiaDaCasa(h.DiaDaSemana, h.Abre, h.Fecha))],
+            FusoHorario,
+            instante);
 
     /// <summary>
     /// <c>RN-GER-026</c> — o caminho da logomarca, exibida no cardápio público

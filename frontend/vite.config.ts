@@ -15,7 +15,8 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://localhost:5000', changeOrigin: true },
 
-      // ADR-0015 / SPEC-VEN-002 — as imagens de produto e as logos.
+      // ⚠ LEGADO — ADR-0015, substituido pela ADR-0018. As imagens NOVAS saem por /api/v1/arquivos,
+      // que ja cai na regra acima. Esta linha existe para as referencias gravadas ANTES de 18/08/2026.
       //
       // ⚠ Sem esta linha, `/arquivos/...` cai no fallback de SPA do Vite e responde o
       // `index.html`: a API devolve `image/png`, o Vite devolve `text/html`, e o navegador tenta

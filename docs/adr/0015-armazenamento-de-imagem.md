@@ -2,11 +2,23 @@
 
 | Campo | Valor |
 |-------|-------|
-| Situação | **Aceita** |
+| Situação | ⚠ **Substituída** pela [ADR-0018](0018-imagem-como-binario-no-banco.md) em 18/08/2026 |
 | Data | 17/08/2026 |
 | Decide sobre | `RN-VEN-042` (imagem do produto), `RN-GER-026` (logo da unidade) |
 | Relacionada | [ADR-0006](0006-deploy-em-vps-unica.md) (VPS única), [ADR-0009](0009-onde-as-regras-de-negocio-vivem.md) |
 | Especificada em | [`SPEC-VEN-002`](../specs/SPEC-VEN-002-imagem-de-produto-e-logo.md) |
+
+
+> ## ⚠⚠ Esta decisão foi SUBSTITUÍDA
+>
+> A [ADR-0018](0018-imagem-como-binario-no-banco.md) moveu o binário para o banco
+> `grelhahub_arquivo` em 18/08/2026. O que está abaixo continua valendo como **registro do
+> raciocínio** — inclusive das três defesas contra travessia de diretório, que a ADR-0018 herda em
+> espírito ainda que o sistema de arquivos tenha deixado de existir do outro lado.
+>
+> **O que sobrou vivo desta decisão:** o `location /arquivos/` do Nginx, somente leitura, servindo
+> as referências gravadas antes daquela data.
+
 
 ---
 

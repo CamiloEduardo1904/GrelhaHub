@@ -80,20 +80,25 @@ public static class DependencyInjection
         // SPEC-GER-006 — mesmo desenho: cache singleton, serviço scoped.
         services.AddSingleton<CacheDeModulos>();
         services.AddScoped<IModulos, Modulos>();
-        // ADR-0015 / SPEC-VEN-002 — armazenamento de imagem em volume de disco. Singleton:
-        // não guarda estado por requisição, só a raiz resolvida uma vez.
-        // Lido pelo indexador, e não por `Bind`: `Bind` vem do pacote
-        // Microsoft.Extensions.Configuration.Binder, e são duas chaves — a dependência custaria
-        // mais do que resolve.
-        services.Configure<Arquivos.OpcoesDeArquivo>(opcoes =>
-        {
-            var secao = configuration.GetSection(Arquivos.OpcoesDeArquivo.Secao);
+        // ADR-0018 / SPEC-VEN-002 — o BANCO DE ARQUIVO: os binários das imagens.
+        //
+        // ⚠ Connection string própria e obrigatória, pelo mesmo motivo do banco de log: um
+        // sistema que aceita upload sem ter onde gravar o binário só descobre isso no primeiro
+        // envio de um usuário real.
+        var conexaoDeArquivo = configuration.GetConnectionString("GrelhaHubArquivo")
+            ?? throw new InvalidOperationException(
+                "Connection string 'GrelhaHubArquivo' não configurada (ADR-0018). Ver .env.example.");
 
-            opcoes.Raiz = secao["Raiz"] ?? opcoes.Raiz;
-            opcoes.PrefixoPublico = secao["PrefixoPublico"] ?? opcoes.PrefixoPublico;
-        });
+        services.AddDbContext<GrelhaHubArquivoDbContext>(options =>
+            options.UseNpgsql(conexaoDeArquivo).UseSnakeCaseNamingConvention());
 
-        services.AddSingleton<IArmazenamentoDeArquivo, Arquivos.ArmazenamentoEmDisco>();
+        services.AddScoped<IArquivoDb>(sp => sp.GetRequiredService<GrelhaHubArquivoDbContext>());
+
+        // ⚠ SCOPED, e o antecessor era SINGLETON. A diferença não é estilo: esta implementação
+        // depende de dois `DbContext`, que são scoped — registrá-la como singleton capturaria o
+        // contexto da primeira requisição e o reusaria para sempre, que é o defeito mais difícil
+        // de diagnosticar que o contêiner de DI sabe produzir.
+        services.AddScoped<IArmazenamentoDeArquivo, Arquivos.ArmazenamentoEmBanco>();
 
         // ADR-0016 — o correio. Mesma leitura por indexador do bloco acima.
         //

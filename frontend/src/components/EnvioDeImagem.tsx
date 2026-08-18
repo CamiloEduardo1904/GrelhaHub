@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, mensagemDeErro } from '../services/api';
+import { carregarBase64, ehDoBancoDeArquivo } from '../services/imagens';
 
 /**
  * Envio de imagem — `RN-VEN-042`, `RN-GER-026`, `SPEC-VEN-002`.
@@ -37,12 +38,49 @@ export function EnvioDeImagem({
   /**
    * O arquivo não carregou.
    *
-   * ADR-0015 — banco e volume são **duas** cópias de backup, e podem dessincronizar: restaurar o
-   * dump sem o volume deixa colunas apontando para arquivos que não existem. Sem este estado, o
+   * ⚠ Com o ADR-0018 a causa mudou, e o estado continua valendo: metadado sem binário é o único
+   * desencontro que a ordem de gravação admite, e a API responde 404 nele. Sem este estado, o
    * navegador mostra o seu ícone de imagem quebrada, que o usuário lê como "o sistema está com
    * defeito" — e não como "esta foto sumiu". A moldura vazia diz a segunda coisa.
    */
   const [semArquivo, setSemArquivo] = useState(false);
+
+  /**
+   * A miniatura em **base64** — ADR-0018.
+   *
+   * ⚠ Aqui, e não na vitrine pública: são poucas imagens, atrás de sessão, e o conteúdo chega
+   * embutido na mesma resposta. A vitrine continua com `<img src>` apontando para a rota binária,
+   * que o navegador cacheia — base64 num cardápio de vinte produtos custa um terço a mais de
+   * tráfego, no celular do cliente, antes do primeiro preço aparecer. Detalhe em `services/imagens`.
+   */
+  const [miniatura, setMiniatura] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ehDoBancoDeArquivo(urlAtual)) {
+      // Referência antiga (ADR-0015) ou ausente: vai direto em `src`, como sempre foi.
+      setMiniatura(null);
+      return;
+    }
+
+    // `cancelado` porque a resposta pode chegar depois de o usuário ter trocado a foto: sem isto, a
+    // imagem anterior sobrescreveria a nova, e o sintoma seria "trocou e voltou sozinho".
+    let cancelado = false;
+
+    carregarBase64(urlAtual)
+      .then((conteudo) => {
+        if (!cancelado) {
+          setMiniatura(conteudo);
+          setSemArquivo(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelado) setSemArquivo(true);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [urlAtual]);
 
   async function escolher(arquivo: File | undefined) {
     if (!arquivo) return;
@@ -105,7 +143,7 @@ export function EnvioDeImagem({
       {urlAtual && !semArquivo ? (
         <img
           className="miniatura"
-          src={urlAtual}
+          src={miniatura ?? urlAtual}
           alt={rotulo}
           onError={() => setSemArquivo(true)}
         />

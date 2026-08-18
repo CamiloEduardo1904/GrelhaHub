@@ -154,6 +154,52 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("cliente", (string)null);
                 });
 
+            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Arquivo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_criacao");
+
+                    b.Property<DateTimeOffset?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_exclusao");
+
+                    b.Property<string>("Pasta")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("pasta");
+
+                    b.Property<int>("TamanhoEmBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("tamanho_em_bytes");
+
+                    b.Property<string>("TipoMime")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tipo_mime");
+
+                    b.Property<Guid>("UnidadeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unidade_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_arquivo");
+
+                    b.HasIndex("UnidadeId", "Pasta")
+                        .HasDatabaseName("ix_arquivo_unidade_pasta");
+
+                    b.ToTable("arquivo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_arquivo_tamanho", "tamanho_em_bytes > 0");
+                        });
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.HorarioDeFuncionamento", b =>
                 {
                     b.Property<Guid>("Id")

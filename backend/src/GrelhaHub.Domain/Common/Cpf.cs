@@ -73,8 +73,30 @@ public readonly record struct Cpf
     }
 
     /// <summary>Formata para exibição. <b>Só apresentação</b> — nunca volta para o banco.</summary>
-    public string Formatado() =>
-        $"{Valor[..3]}.{Valor[3..6]}.{Valor[6..9]}-{Valor[9..]}";
+    public string Formatado() => Formatar(Valor)!;
+
+    /// <summary>
+    /// A mesma máscara, a partir dos dígitos crus — ADR-0019.
+    /// <para>
+    /// ⚠ Existe porque o modelo de LEITURA devolve <c>string</c>, não <c>Cpf</c>: a visão entrega
+    /// a coluna como ela está no banco, e o value object não é reconstruído para uma listagem. Sem
+    /// este método a máscara seria reescrita no handler de leitura — segunda implementação da
+    /// mesma formatação, divergindo na primeira mudança.
+    /// </para>
+    /// <para>Devolve <c>null</c> para entrada vazia, e a entrada crua quando não tem 11 dígitos:
+    /// mascarar o que não é CPF produziria um texto que parece um documento e não é.</para>
+    /// </summary>
+    public static string? Formatar(string? digitos)
+    {
+        if (string.IsNullOrWhiteSpace(digitos))
+        {
+            return null;
+        }
+
+        return digitos.Length == 11
+            ? $"{digitos[..3]}.{digitos[3..6]}.{digitos[6..9]}-{digitos[9..]}"
+            : digitos;
+    }
 
     public override string ToString() => Valor;
 

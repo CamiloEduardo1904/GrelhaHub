@@ -38,23 +38,30 @@ public sealed class ObterParametroValidator : AbstractValidator<ObterParametroQu
             .WithMessage("O código do parâmetro segue o formato PAR-MOD-nnn.");
 }
 
-public sealed class ObterParametroHandler(IAppDbContext db, IRelogio relogio)
+/// <summary>
+/// ADR-0019 — convertida ao modelo de leitura em 18/08/2026.
+/// <para>
+/// ⚠ <c>TipoValor</c> chega como TEXTO da visão, e é o mesmo texto de antes: a coluna guarda o
+/// enum convertido para string, e o contrato da API sempre foi <c>TipoValor.ToString()</c>.
+/// </para>
+/// </summary>
+public sealed class ObterParametroHandler(ILeituraDb leitura, IRelogio relogio)
     : IRequestHandler<ObterParametroQuery, ParametroResponse>
 {
     public async Task<ParametroResponse> Handle(
         ObterParametroQuery request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var codigo = request.Codigo.Trim().ToUpperInvariant();
         var instante = request.VigenteEm ?? relogio.Agora;
 
-        var parametro = await db.Parametros
-            .AsNoTracking()
+        var parametro = await leitura.Parametros
             .FirstOrDefaultAsync(p => p.Codigo == codigo, cancellationToken)
             ?? throw new NaoEncontradoException("Parâmetro não encontrado.");
 
-        // Filtro global recorta a unidade (RN-GER-009).
-        var vigente = await db.ValoresDeParametro
-            .AsNoTracking()
+        // Filtro global do contexto de leitura recorta a unidade (RN-GER-009).
+        var vigente = await leitura.ValoresDeParametro
             .Where(valor => valor.ParametroId == parametro.Id)
             .Where(valor => valor.VigenciaInicio <= instante)
             .Where(valor => valor.VigenciaFim == null || valor.VigenciaFim > instante)
@@ -66,7 +73,7 @@ public sealed class ObterParametroHandler(IAppDbContext db, IRelogio relogio)
         return new ParametroResponse(
             parametro.Codigo,
             parametro.Descricao,
-            parametro.TipoValor.ToString(),
+            parametro.TipoValor,
             parametro.Dominio,
             vigente.Valor,
             vigente.VigenciaInicio,
