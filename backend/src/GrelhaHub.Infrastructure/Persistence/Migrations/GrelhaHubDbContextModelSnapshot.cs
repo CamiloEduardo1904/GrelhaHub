@@ -938,6 +938,14 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("canal");
 
+                    b.Property<DateTimeOffset?>("CanceladoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dh_cancelamento");
+
+                    b.Property<Guid?>("CanceladoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancelado_por_usuario_id");
+
                     b.Property<Guid?>("ClienteId")
                         .HasColumnType("uuid")
                         .HasColumnName("cliente_id");
@@ -1016,8 +1024,17 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_pedido");
 
+                    b.HasIndex("CanceladoPorUsuarioId")
+                        .HasDatabaseName("ix_pedido_cancelado_por_usuario_id");
+
                     b.HasIndex("ClienteId")
                         .HasDatabaseName("ix_pedido_cliente_id");
+
+                    b.HasIndex("CriadoPorUsuarioId")
+                        .HasDatabaseName("ix_pedido_criado_por");
+
+                    b.HasIndex("ExcluidoPorUsuarioId")
+                        .HasDatabaseName("ix_pedido_excluido_por_usuario_id");
 
                     b.HasIndex("UnidadeId", "DataOperacional", "Numero")
                         .IsUnique()
@@ -1218,11 +1235,29 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GrelhaHub.Domain.Vendas.Pedido", b =>
                 {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("CanceladoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pedido_cancelado_por");
+
                     b.HasOne("GrelhaHub.Domain.Crm.Cliente", null)
                         .WithMany()
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pedido_cliente_cliente_id");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("CriadoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pedido_criado_por");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("ExcluidoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pedido_excluido_por");
 
                     b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
                         .WithMany()

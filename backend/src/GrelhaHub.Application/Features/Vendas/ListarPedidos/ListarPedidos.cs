@@ -58,6 +58,22 @@ public sealed record PedidoResumoDto(
     DateTimeOffset CriadoEm,
     DateOnly DataOperacional,
     string? Observacao,
+
+    /// <summary>
+    /// <c>RN-GER-002</c> / <c>RN-VEN-058</c> ⚠ — os três do cancelamento, e eles andam juntos.
+    /// <para>
+    /// Motivo sem instante não diz se foi agora ou na semana passada; instante sem responsável não
+    /// diz a quem perguntar. A comanda exibe os três ou não exibe o bloco.
+    /// </para>
+    /// <para>
+    /// ⚠ <c>CanceladoPor</c> é <c>null</c> em pedido cancelado antes de 19/08/2026, e a tela
+    /// <b>omite a linha</b> em vez de inventar "sistema".
+    /// </para>
+    /// </summary>
+    string? MotivoCancelamento,
+    DateTimeOffset? CanceladoEm,
+    string? CanceladoPor,
+
     IReadOnlyList<ItemResumoDto> Itens);
 
 public sealed record ItemResumoDto(string Produto, int Quantidade, decimal PrecoPraticado, string? Observacao);
@@ -144,6 +160,9 @@ public sealed class ListarPedidosHandler(
                 p.CriadoEm,
                 p.DataOperacional,
                 p.Observacao,
+                p.MotivoCancelamento,
+                p.CanceladoEm,
+                p.CanceladoPor,
                 porPedido.TryGetValue(p.Id, out var doPedido)
                     ? [.. doPedido.Select(i => new ItemResumoDto(
                         i.NomeProduto, i.Quantidade, i.PrecoPraticado, i.Observacao))]

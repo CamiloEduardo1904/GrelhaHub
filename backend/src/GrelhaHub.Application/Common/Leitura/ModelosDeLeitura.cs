@@ -28,7 +28,27 @@ public sealed record PedidoResumoLeitura(
     int QuantidadeDeItens,
     DateTimeOffset CriadoEm,
     DateOnly DataOperacional,
-    string? Observacao) : IRecortadoPorUnidade;
+    string? Observacao,
+
+    /// <summary><c>RN-GER-002</c> — por que o pedido foi cancelado.</summary>
+    string? MotivoCancelamento,
+
+    /// <summary><c>RN-VEN-058</c> ⚠⚠ — quando. Campo próprio, nunca <c>dh_finalizacao</c>.</summary>
+    DateTimeOffset? CanceladoEm,
+
+    /// <summary>
+    /// <c>RN-VEN-058</c> — quem, com nome e sobrenome, resolvido pela <b>visão</b>.
+    /// <para>
+    /// ⚠ O nome vem do <c>JOIN</c> e não de uma segunda consulta: a lista de pedidos é rota de
+    /// operação e já faz duas idas ao banco (pedidos e itens). Uma terceira, para desenhar uma
+    /// linha que aparece em poucos cartões, seria paga por todos os outros.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Nulo no pedido cancelado antes de 19/08/2026</b> — a tela omite a linha em vez de
+    /// inventar "sistema".
+    /// </para>
+    /// </summary>
+    string? CanceladoPor) : IRecortadoPorUnidade;
 
 /// <param name="Total">Já multiplicado: <c>preco_praticado × quantidade</c>, calculado pela visão.</param>
 public sealed record ItemDePedidoLeitura(

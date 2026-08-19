@@ -91,7 +91,7 @@ public class PedidoTests
         pedido.Invoking(p => p.AvancarStatus())
             .Should().Throw<InvalidOperationException>().WithMessage("*RN-VEN-019*");
 
-        pedido.Invoking(p => p.Cancelar("cliente desistiu"))
+        pedido.Invoking(p => p.Cancelar(Guid.CreateVersion7(), "cliente desistiu"))
             .Should().Throw<InvalidOperationException>().WithMessage("*RN-VEN-019*");
     }
 
@@ -99,7 +99,7 @@ public class PedidoTests
     public void PedidoCancelado_NaoRetorna()
     {
         var pedido = PedidoComUmItem();
-        pedido.Cancelar("cliente desistiu");
+        pedido.Cancelar(Guid.CreateVersion7(), "cliente desistiu");
 
         pedido.Status.Should().Be(StatusPedido.Cancelado);
 
@@ -112,10 +112,35 @@ public class PedidoTests
     {
         var pedido = PedidoComUmItem();
 
-        pedido.Invoking(p => p.Cancelar("  "))
+        pedido.Invoking(p => p.Cancelar(Guid.CreateVersion7(), "  "))
             .Should().Throw<ArgumentException>().WithMessage("*RN-GER-002*");
 
         pedido.Status.Should().Be(StatusPedido.Aberto, "o pedido não pode mudar de estado quando a operação falha");
+    }
+
+    [Fact(DisplayName = "RN-VEN-058 — o cancelamento exige QUEM, e grava instante e responsável")]
+    public void Cancelamento_ExigeResponsavel()
+    {
+        var pedido = PedidoComUmItem();
+
+        pedido.Invoking(p => p.Cancelar(Guid.Empty, "cliente desistiu"))
+            .Should().Throw<ArgumentException>().WithMessage("*RN-VEN-058*");
+
+        pedido.Status.Should().Be(StatusPedido.Aberto, "o pedido não muda de estado quando a operação falha");
+
+        var quem = Guid.CreateVersion7();
+        pedido.Cancelar(quem, "cliente desistiu");
+
+        pedido.CanceladoPorUsuarioId.Should().Be(quem);
+        pedido.CanceladoEm.Should().NotBeNull();
+        pedido.MotivoCancelamento.Should().Be("cliente desistiu");
+
+        // ⚠⚠ O ponto da regra: cancelar NÃO é finalizar. Até 19/08/2026 o instante do cancelamento
+        // ia para `dh_finalizacao`, e cancelado ficava indistinguível de finalizado por data —
+        // qualquer pergunta futura do tipo "quanto tempo até fechar" somaria os dois. Nada lia o
+        // campo, então nada denunciou.
+        pedido.FinalizadoEm.Should().BeNull(
+            "o pedido cancelado não passou pelo fim do ciclo, ele saiu dele");
     }
 
     [Fact(DisplayName = "RN-VEN-008 — o preço praticado é copiado na venda e não muda depois")]

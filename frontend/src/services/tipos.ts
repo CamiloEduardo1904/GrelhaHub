@@ -194,6 +194,20 @@ export interface PedidoResumo {
   criadoEm: string;
   dataOperacional: string;
   observacao?: string;
+
+  /**
+   * `RN-VEN-058` ⚠ — os três do cancelamento, e eles andam juntos.
+   *
+   * Motivo sem instante não diz se foi agora ou na semana passada; instante sem responsável não diz
+   * a quem perguntar.
+   *
+   * ⚠ `canceladoPor` é nulo em pedido cancelado **antes de 19/08/2026** — a tela **omite a linha**
+   * em vez de inventar "sistema". O instante, esse a migration recuperou de `dh_finalizacao`.
+   */
+  motivoCancelamento?: string | null;
+  canceladoEm?: string | null;
+  canceladoPor?: string | null;
+
   itens: ItemResumo[];
 }
 

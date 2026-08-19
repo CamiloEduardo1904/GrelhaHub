@@ -27,7 +27,7 @@
 
 | Documento | O que contém | Quando muda |
 |-----------|--------------|-------------|
-| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **185 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
+| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **188 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
 | [04 — Parâmetros do sistema](04-parametros-do-sistema.md) | Valores configuráveis da operação (`PAR-*`) | Quando surge valor comercial configurável |
 
 > **Regra de ouro:** regra de negócio mora **só** no catálogo. Se você encontrar uma regra
@@ -99,13 +99,13 @@
 
 | Item | Situação |
 |------|----------|
-| Regras catalogadas | **185** — 159 em `HIP`, 26 em `DEC` (decisão de produto) |
+| Regras catalogadas | **188** — 162 em `HIP`, 26 em `DEC` (decisão de produto) |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco. Risco RS5 |
 | ADRs | **20 aceitos** (1 substituída), 4 decisões em aberto. **ADR-0013 revisa o ADR-0005**; **ADR-0018 substitui a ADR-0015** e põe a imagem no banco; ADR-0017 separa os três bancos; ADR-0019 conclui o CQRS; ADR-0020 remove a sessão de suporte |
-| Specs | **13 — todas `ENTREGUE`.** `GER-001` a `009` (onda 0 e horário), `VEN-001` (fatia vertical), `VEN-002` (imagem), `VEN-003` (cadastro do cardápio) e `VEN-004` (fila de monitoramento) |
+| Specs | **14 — todas `ENTREGUE`.** `GER-001` a `009` (onda 0 e horário), `VEN-001` (fatia vertical), `VEN-002` (imagem), `VEN-003` (cadastro do cardápio), `VEN-004` (painel de senha) e `VEN-005` (lista por grupo) |
 | Cobertura de regra por spec | **63 regras com o ID citado no `DisplayName` de um teste** — `RN-EST-021` a `023` têm regra escrita e código pendente (onda 3) |
 | Código entregue | Fatia vertical (`SPEC-VEN-001`) + **onda 0 completa**: unidade e convenções, dia operacional, parâmetros com vigência, usuários e permissões, trilha de auditoria, módulos por unidade. Da onda 1, o **cadastro do cardápio**. Fora de onda: **painel de operação** e **fila de monitoramento** |
-| Testes | **356 verdes** — 109 de domínio + 18 de aplicação + 229 de integração contra PostgreSQL real (Testcontainers, exige Docker) |
+| Testes | **361 verdes** — 110 de domínio + 18 de aplicação + 233 de integração contra PostgreSQL real (Testcontainers, exige Docker) |
 | Gates | `dotnet build -c Release`, `dotnet test`, `npm run lint` e `npm run build` — **todos limpos** |
 | Vitrine pública | ✔ `/` em `grelhahub.com` — design system §8, regra `CHAPA-09` |
 | Sprint | 1 & 2 — documentação entregue; falta entrevista e anexos |

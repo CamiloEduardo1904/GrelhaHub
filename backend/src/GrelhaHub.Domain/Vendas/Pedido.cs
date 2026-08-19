@@ -95,6 +95,34 @@ public sealed class Pedido
     public string? Observacao { get; private set; }
     public string? MotivoCancelamento { get; private set; }
 
+    /// <summary>
+    /// <c>RN-VEN-058</c> ⚠⚠ — instante do cancelamento, em campo <b>próprio</b>.
+    /// <para>
+    /// <b>Até 19/08/2026 o cancelamento gravava em <see cref="FinalizadoEm"/></b>, e o efeito era
+    /// que pedido cancelado e pedido finalizado ficavam <b>indistinguíveis por data</b>: qualquer
+    /// pergunta futura do tipo "quanto tempo até fechar" somaria os dois. Nada lia o campo, então
+    /// nada denunciou — é o mesmo silêncio de toda documentação que afirma o que o código não faz.
+    /// </para>
+    /// </summary>
+    public DateTimeOffset? CanceladoEm { get; private set; }
+
+    /// <summary>
+    /// <c>RN-VEN-058</c> ⚠ — quem cancelou.
+    /// <para>
+    /// <b>Fica no PEDIDO, e não só na trilha.</b> A trilha é o registro de auditoria e atravessa
+    /// por <b>outbox</b> (ADR-0017): chega com segundos de atraso, em outro banco. Quem acabou de
+    /// cancelar veria um traço no lugar do próprio nome, e a comanda precisaria de uma consulta a
+    /// um segundo contexto para desenhar uma linha. Mesma doutrina de <c>RN-VEN-008</c>: o que a
+    /// operação precisa reler depois, o registro carrega.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>Nulo no pedido cancelado antes desta regra</b>, e é irrecuperável: a trilha sabe, mas
+    /// migrar de um banco para outro dentro de uma migration não é caminho. A tela omite a linha em
+    /// vez de inventar "sistema".
+    /// </para>
+    /// </summary>
+    public Guid? CanceladoPorUsuarioId { get; private set; }
+
     public DateTimeOffset CriadoEm { get; private set; }
 
     /// <summary>
@@ -211,12 +239,24 @@ public sealed class Pedido
     /// (<c>RN-EST-018</c>); cancelado <i>antes</i> não gera movimento (<c>RN-EST-019</c>).
     /// </para>
     /// </summary>
-    public void Cancelar(string motivo)
+    /// <param name="usuarioId">
+    /// <c>RN-VEN-058</c> ⚠⚠ — quem cancela. <b>Passou a ser exigido em 19/08/2026</b>, e o resumo
+    /// acima já prometia "com motivo e responsável" desde o primeiro dia: o responsável não era
+    /// gravado em lugar nenhum. Documentação que afirma o que o código não faz é a mesma família de
+    /// defeito que a linha de <c>RN-VEN-047</c> no catálogo carregou por um dia.
+    /// </param>
+    public void Cancelar(Guid usuarioId, string motivo)
     {
         if (string.IsNullOrWhiteSpace(motivo))
         {
             throw new ArgumentException(
                 "RN-GER-002 — o cancelamento exige motivo.", nameof(motivo));
+        }
+
+        if (usuarioId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "RN-VEN-058 — o cancelamento registra quem o fez.", nameof(usuarioId));
         }
 
         if (Status is StatusPedido.Finalizado or StatusPedido.Cancelado)
@@ -227,7 +267,11 @@ public sealed class Pedido
 
         Status = StatusPedido.Cancelado;
         MotivoCancelamento = motivo.Trim();
-        FinalizadoEm = DateTimeOffset.UtcNow;
+        CanceladoPorUsuarioId = usuarioId;
+
+        // ⚠ RN-VEN-058 — em `CanceladoEm`, e NUNCA mais em `FinalizadoEm`. Cancelar não é
+        // finalizar: o pedido cancelado não passou pelo fim do ciclo, ele saiu dele.
+        CanceladoEm = DateTimeOffset.UtcNow;
     }
 
     /// <summary>

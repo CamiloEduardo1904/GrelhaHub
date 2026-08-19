@@ -288,6 +288,45 @@ public sealed class PedidoConfiguration : IEntityTypeConfiguration<Pedido>
         builder.Property(p => p.ConfirmadoEm).HasColumnName("dh_confirmacao");
         builder.Property(p => p.FinalizadoEm).HasColumnName("dh_finalizacao");
 
+        // RN-VEN-058 — o cancelamento tem instante e responsável PRÓPRIOS. Ver o comentário em
+        // `Pedido.CanceladoEm`: até 19/08/2026 o instante ia para `dh_finalizacao`.
+        builder.Property(p => p.CanceladoEm).HasColumnName("dh_cancelamento");
+        builder.Property(p => p.CanceladoPorUsuarioId).HasColumnName("cancelado_por_usuario_id");
+
+        // ⚠⚠ OS TRÊS RESPONSÁVEIS SÃO REFERÊNCIA, e não `Guid` solto — 19/08/2026.
+        //
+        // Até aqui, `criado_por`, `cancelado_por_usuario_id` e `excluido_por_usuario_id` eram
+        // colunas `uuid` sem chave nenhuma: nada impedia gravar um id que não existe, e o modelo
+        // não sabia que aquelas três colunas falavam de gente. O banco é a primeira camada da
+        // ordem de ADR-0009 (`MOD → constraints → ...`), e integridade referencial é literalmente
+        // o que ela existe para dar.
+        //
+        // ⚠ `HasOne<Usuario>()` SEM navegação: `Pedido` não ganha `Usuario CanceladoPor`, porque o
+        // domínio não deve poder navegar de um pedido para o agregado de acesso — quem precisa do
+        // nome é a LEITURA, e ela o resolve na visão (`vw_pedido_resumo`). A chave existe no banco
+        // sem abrir uma porta no domínio.
+        //
+        // ⚠ `Restrict`, nunca cascata: `RN-GER-002` proíbe apagar registro transacional, e apagar
+        // um usuário jamais pode levar pedidos junto. Se um dia alguém tentar remover usuário com
+        // pedido cancelado por ele, o banco recusa — e recusar é a resposta certa.
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(p => p.CriadoPorUsuarioId)
+            .HasConstraintName("fk_pedido_criado_por")
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(p => p.CanceladoPorUsuarioId)
+            .HasConstraintName("fk_pedido_cancelado_por")
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(p => p.ExcluidoPorUsuarioId)
+            .HasConstraintName("fk_pedido_excluido_por")
+            .OnDelete(DeleteBehavior.Restrict);
+
         // RN-VEN-041 — exclusão lógica. O índice inclui a coluna porque TODA consulta de pedido
         // passa pelo filtro global `dh_exclusao IS NULL`.
         builder.Property(p => p.ExcluidoEm).HasColumnName("dh_exclusao");

@@ -81,7 +81,13 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
                 criadoOriginal.AddYears(-1);
             db.Entry(pedido).Property("CriadoPorUsuarioId").CurrentValue = Guid.CreateVersion7();
 
-            pedido.Cancelar("Cancelamento para forcar um UPDATE");
+            // RN-VEN-058 — o cancelamento registra QUEM. Um usuário real, e não um GUID inventado:
+            // a coluna não tem chave estrangeira (mesmo precedente de `excluido_por_usuario_id`),
+            // então um id falso PASSARIA — e o teste seguiria verde afirmando um cenário que não
+            // existe. Onde o banco não recusa, quem recusa é quem escreve o teste.
+            var quemCancela = await db.Usuarios.Select(u => u.Id).FirstAsync();
+
+            pedido.Cancelar(quemCancela, "Cancelamento para forcar um UPDATE");
 
             await db.SaveChangesAsync();
         }
@@ -153,7 +159,12 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         await using var db = Contexto(restaurante);
 
         var pedido = await db.Pedidos.SingleAsync(p => p.Id == pedidoId);
-        pedido.Cancelar("Cancelamento que vai falhar por causa da trilha");
+
+        // RN-VEN-058 — usuário REAL pelo mesmo motivo do caso acima: sem chave estrangeira, um id
+        // inventado passaria e deixaria o teste verde sobre um cenário inexistente.
+        var quemCancela = await db.Usuarios.Select(u => u.Id).FirstAsync();
+
+        pedido.Cancelar(quemCancela, "Cancelamento que vai falhar por causa da trilha");
 
         // ⚠⚠ ADR-0017 — A TRILHA MUDOU DE BANCO, E ESTE TESTE MUDOU DE ALVO SEM MUDAR DE
         // PERGUNTA. Antes ele forçava uma linha inválida em `log_auditoria`; agora força na

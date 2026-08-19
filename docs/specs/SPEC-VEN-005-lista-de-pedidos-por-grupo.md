@@ -6,7 +6,7 @@
 | Módulo | VEN |
 | Situação | `ENTREGUE` — 19/08/2026 |
 | Onda | Fora da ordem — operação da fatia vertical |
-| Regras implementadas | `RN-VEN-057`, `RN-GER-006` ⚠⚠, `RN-VEN-018`, `RN-VEN-052`, `RN-GER-039` |
+| Regras implementadas | `RN-VEN-057`, `RN-VEN-058` ⚠⚠, `RN-GER-002`, `RN-GER-006` ⚠⚠, `RN-VEN-018`, `RN-VEN-052`, `RN-GER-039` |
 | ADRs aplicáveis | [ADR-0012](../adr/0012-direcao-visual-chapa.md) |
 | Depende de | `SPEC-VEN-001`, `SPEC-VEN-004` |
 | Autor / data | 19/08/2026 |
@@ -34,6 +34,8 @@ coisa, no mesmo espaço.
 | `RN-VEN-018` | O ciclo é o que define em qual grupo o pedido cai | Domínio | `StatusPedido`, já existente |
 | `RN-VEN-052` | A observação volta **inteira** ao abrir a comanda | Aplicação | Nada foi truncado — a comanda aberta é a mesma de sempre |
 | `RN-GER-039` | Fechada, a comanda não mostra nome nem telefone | Aplicação (cliente) | O clique abre; dado pessoal não fica à vista sem necessidade |
+| `RN-VEN-058` ⚠⚠ | O cancelamento exibe **motivo, instante e responsável** | Modelo + banco + aplicação | `dh_cancelamento` e `cancelado_por_usuario_id` no pedido; o nome resolvido na visão |
+| `RN-GER-002` | O desfazimento é registrado com motivo e responsável | Domínio | `Pedido.Cancelar(usuarioId, motivo)` — o `usuarioId` **passou a ser exigido** |
 
 > **Nenhuma mudança no servidor, e a ausência é decisão.** `ListarPedidosQuery` já aceita um
 > `status`, e usá-lo faria o filtro ir ao banco. Não foi usado: a lista do período **já está na
@@ -125,7 +127,28 @@ filtro (Todos · Na casa · Concluídos · Cancelados)     ← contagens do PER�
 > **Dado** 62 pedidos de uma noite real
 > **Então** a lista ocupa **4,3 telas** como chega, contra **8,4** com tudo aberto
 
-> ⚠ **Nenhum destes tem teste automatizado, e é a mesma dívida de sempre:** o frontend não tem
+### CA-6 — o cancelamento diz por quê, quando e por quem (`RN-VEN-058`)
+
+> **Dado** um pedido cancelado com motivo
+> **Quando** a comanda é aberta
+> **Então** aparece o motivo, o instante **com hora** e o nome **com sobrenome** de quem cancelou
+> **E** o rótulo vai em `--muted` e o motivo na cor do texto (`CHAPA-10`)
+> **E** pedido cancelado **antes de 19/08/2026** exibe motivo e instante, e **omite** o responsável
+
+> ⚠⚠ **Duas dívidas antigas morreram aqui, e nenhuma tinha quem a denunciasse.** `Pedido.Cancelar`
+> gravava o instante em `dh_finalizacao` — deixando cancelado e finalizado **indistinguíveis por
+> data** — e o resumo XML do método afirmava *"com motivo e responsável"* quando o responsável não
+> era gravado em lugar nenhum. É a mesma família do que a validação em navegador achou em
+> `RN-VEN-047`: documentação afirmando o que o código não faz. `CancelamentoRegistradoTests` são os
+> quatro casos que passam a medir.
+>
+> ⚠ **E as três colunas de responsável do pedido viraram REFERÊNCIA** — `criado_por`,
+> `cancelado_por_usuario_id` e `excluido_por_usuario_id` eram `uuid` soltos, sem chave: nada impedia
+> gravar um id inexistente, e o modelo não sabia que aquelas três colunas falavam de gente. O banco
+> é a **primeira** camada da ordem de ADR-0009, e integridade referencial é o que ela existe para
+> dar. `Restrict` nos três: apagar usuário jamais pode levar pedido junto.
+
+> ⚠ **CA-1 a CA-5 não têm teste automatizado, e é a mesma dívida de sempre:** o frontend não tem
 > runner. Os cinco foram conferidos em Chrome real pela skill `subir-e-validar`
 > (`driver/exemplos/lista.mjs`), que **falha com código 1** quando qualquer um deles quebra — é o
 > mais perto de um teste que este projeto tem no cliente hoje.
@@ -155,7 +178,9 @@ Nenhum. ⚠ Os limiares de colapso são **de apresentação**, não de política
 | Tela | `frontend/src/features/admin/Painel.tsx` — `Pedidos` |
 | Comanda fechada | `frontend/src/components/Comanda.tsx` — `colapsada`, `aoAlternar`, `canalCurto` |
 | Estilo | `frontend/src/app/estilos-globais.css` — "GRUPOS DA LISTA DE PEDIDOS" |
-| Validação em tela | `.claude/skills/subir-e-validar/driver/exemplos/lista.mjs` |
+| Validação em tela | `.claude/skills/subir-e-validar/driver/exemplos/lista.mjs` e `cancelamento.mjs` |
+| Migration | `20260819194338_CancelamentoComResponsavel` — colunas, as três FKs, o backfill e a visão |
+| Teste de integração | `backend/tests/GrelhaHub.Integration.Tests/Vendas/CancelamentoRegistradoTests.cs` |
 | Design system | [`08-design-system.md`](../08-design-system.md) §3 — `<Comanda />` fechada |
 
 ## 10. Definição de pronto

@@ -3270,9 +3270,10 @@ button.link-discreto {
   /* `--mural-base` é o degrau da TELA; `--mural-numero` é o que cada coluna resolve a
      partir dele, conforme a lotação. Duas variáveis porque são duas decisões: quanto a
      tela permite, e quanto a coluna precisa. */
-  --mural-base: clamp(2rem, 4.5vw, 3.5rem);
+  --mural-base: clamp(1.6rem, 3.4vw, 2.6rem);
   --mural-numero: var(--mural-base);
-  --mural-celula: calc(var(--mural-base) * 1.3);
+  /* Com `columns`, isto é a largura MÍNIMA da coluna — o navegador cria quantas couberem. */
+  --mural-celula: calc(var(--mural-base) * 2.2);
 }
 
 /* ---------------------------------------------------------------- o topo */
@@ -3383,14 +3384,28 @@ button.link-discreto {
 
 /* ------------------------------------------------------------ os números */
 
+/* ⚠⚠ FLUXO VERTICAL — `columns`, e não `grid`.
+   A grade enchia da ESQUERDA PARA A DIREITA e quebrava linha: numa fila, isso obriga
+   o olho a varrer horizontalmente para achar um número, que é o oposto de como se lê
+   uma lista de espera. Com `columns` os números descem a primeira coluna e só então
+   abrem a segunda — é o desenho do painel de senha de farmácia que originou a tela.
+
+   ⚠ `columns` e não `grid-auto-flow: column`: o `grid` exigiria dizer QUANTAS linhas
+   cabem, e isso muda com a altura da tela e com o degrau de lotação. O multi-coluna
+   descobre sozinho, e ainda equilibra as colunas. */
 .mural-numeros {
   list-style: none;
   margin: 0;
   padding: var(--esp-2);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--mural-celula), 1fr));
-  gap: var(--esp-2) var(--esp-1);
-  align-content: start;
+  columns: var(--mural-celula);
+  column-gap: var(--esp-3);
+
+  /* ⚠⚠ `column-fill: auto` — sem isto o fluxo vertical NÃO acontece, e a medida denunciou.
+     O padrão do multi-coluna é `balance`: com seis números e uma coluna alta, o navegador
+     os distribui UM POR COLUNA para deixar as colunas da mesma altura — exatamente a leitura
+     horizontal que se estava tirando. `auto` enche a primeira coluna até o fim da altura
+     disponível e só então abre a segunda, que é como se lê uma fila de espera. */
+  column-fill: auto;
   overflow-y: auto;
   min-height: 0;
   flex: 1;
@@ -3401,6 +3416,11 @@ button.link-discreto {
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
+  padding-bottom: var(--esp-1);
+
+  /* Sem isto, o número e a data do dia anterior podem ser separados pela quebra de
+     coluna — o algarismo numa coluna e a data que o desambigua na outra. */
+  break-inside: avoid;
 }
 
 /* CHAPA-03 — o número do pedido é o único lugar do produto que leva `--peso`, e
@@ -3459,7 +3479,7 @@ button.link-discreto {
    metade direita. Aqui ele vem por token multiplicado, e não por um valor novo solto:
    os dois degraus continuam sendo os dois de `.monitor`. */
 .mural-coluna[data-bloco='pronto'] .mural-numeros {
-  --mural-celula: calc(var(--mural-numero) * 1.9);
+  --mural-celula: calc(var(--mural-numero) * 2.6);
 }
 
 .mural-coluna[data-bloco='pronto'] .mural-numero {
@@ -3500,8 +3520,12 @@ button.link-discreto {
   overflow: hidden;
 
   /* O mesmo degrau, um patamar acima: a parede é lida de longe. Só `--mural-base` muda —
-     os degraus de lotação derivam dele e sobem juntos. */
-  --mural-base: clamp(3rem, 7vw, 9rem);
+     os degraus de lotação derivam dele e sobem juntos.
+
+     ⚠ Reduzido em 19/08/2026 a pedido do dono do produto: com o fluxo vertical cabem mais
+     números por coluna, e 9rem deixava a coluna cheia com meia dúzia. Sete continua legível
+     do outro lado do salão e comporta a fila de uma sexta. */
+  --mural-base: clamp(2.5rem, 5.2vw, 7rem);
 }
 
 /* Em tela cheia o painel é a tela inteira: a moldura da placa não tem contra o
@@ -3861,4 +3885,53 @@ button.comanda-cab:focus-visible {
     padding: 0 0.35rem;
     gap: 0;
   }
+}
+
+/* ============================================================================
+   O CANCELAMENTO NA COMANDA — RN-VEN-058 ⚠⚠, 19/08/2026
+
+   Motivo, instante e responsável. `RN-GER-002` já exigia o motivo; o pedido não
+   carregava os outros dois — e o comentário do domínio prometia "com motivo e
+   responsável" desde o primeiro dia, com o responsável em lugar nenhum.
+   ============================================================================ */
+
+.comanda-cancelamento {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: var(--esp-1) 0 var(--esp-1) 0.7rem;
+
+  /* Filete na cor do erro, do mesmo jeito que a observação do cliente tem o âmbar:
+     é citação, não selo. ⚠ Fundo vermelho aqui comemoraria o cancelamento numa tela
+     que alguém está só conferindo — §5 do design system. */
+  border-left: 4px solid var(--erro);
+}
+
+.comanda-cancelamento-motivo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+/* CHAPA-10 — o rótulo é metadado e vai em `--muted`; o motivo é PROSA escrita por
+   uma pessoa, e vai na cor do texto. Foi exatamente esta distinção que a observação
+   do cliente não tinha antes de RN-VEN-052. */
+.comanda-cancelamento .rotulo {
+  color: var(--muted);
+}
+
+/* Quem e quando, na mesma linha: são a assinatura do fato, não o fato. */
+.comanda-cancelamento-quem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+}
+
+.comanda-cancelamento-quem .dado {
+  font-variant-numeric: tabular-nums;
 }

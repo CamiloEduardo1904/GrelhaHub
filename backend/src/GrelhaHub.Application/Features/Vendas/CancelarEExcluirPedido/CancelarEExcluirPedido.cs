@@ -35,7 +35,7 @@ public sealed class CancelarPedidoValidator : AbstractValidator<CancelarPedidoCo
     }
 }
 
-public sealed class CancelarPedidoHandler(IAppDbContext db)
+public sealed class CancelarPedidoHandler(IAppDbContext db, IContextoDeExecucao contexto)
     : IRequestHandler<CancelarPedidoCommand, string>
 {
     public async Task<string> Handle(CancelarPedidoCommand request, CancellationToken cancellationToken)
@@ -45,9 +45,16 @@ public sealed class CancelarPedidoHandler(IAppDbContext db)
             .FirstOrDefaultAsync(p => p.Id == request.PedidoId, cancellationToken)
             ?? throw new NaoEncontradoException("Pedido não encontrado.");
 
+        if (contexto.UsuarioId is not { } usuarioId)
+        {
+            // RN-VEN-058 exige registrar QUEM cancelou — mesma exigência de RN-VEN-041 na exclusão,
+            // e o mesmo motivo de a rota ser autenticada.
+            throw new NaoAutorizadoException("Sessão inválida.");
+        }
+
         try
         {
-            pedido.Cancelar(request.Motivo);
+            pedido.Cancelar(usuarioId, request.Motivo);
         }
         catch (InvalidOperationException excecao)
         {

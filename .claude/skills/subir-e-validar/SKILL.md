@@ -123,6 +123,7 @@ que falhou. Os exemplos são validações **reais**, e cada um sai com **código
 | `lista.mjs` | Os grupos da lista (`RN-VEN-057`) — colapso, filtro, e quanto ele economiza |
 | `operacao.mjs` | A série de 30 dias (`RN-VEN-050`) — nenhuma barra some |
 | `tema.mjs` | Os três estados do tema, `CHAPA-11` nas superfícies e a ausência de piscada |
+| `cancelamento.mjs` | O bloco de cancelamento (`RN-VEN-058`) e o fluxo vertical do painel |
 
 Copie o mais próximo do que você mudou.
 

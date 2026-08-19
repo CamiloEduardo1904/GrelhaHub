@@ -341,6 +341,28 @@ grupo dele, e o clique devolve tudo — inclusive a observação do cliente (`RN
 truncada. Filtro que remove sem dizer quantos removeu é o defeito que `RN-VEN-050` já enuncia do
 lado do gráfico.
 
+#### O cancelamento na comanda — `RN-VEN-058`, 19/08/2026
+
+```
+┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+│▌MOTIVO DO CANCELAMENTO      │  ← rótulo: mono, --muted
+│▌Cliente desistiu na porta   │  ← prosa: sans, --text (CHAPA-10)
+│▌19/08/2026, 16:48  Dona Da… │  ← assinatura do fato: metadado
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
+```
+
+Filete na cor do **erro**, do mesmo jeito que a observação do cliente tem o âmbar: é **citação**,
+não selo. ⚠ Fundo vermelho aqui **comemoraria** o cancelamento numa tela que alguém está só
+conferindo — §5.
+
+⚠ **Instante com HORA, não só data.** "Cancelado em 19/08" não distingue o que aconteceu na abertura
+do que aconteceu no fecho — e cancelamento é o registro que alguém relê justamente para reconstruir
+a sequência de um turno.
+
+⚠ **Cada linha aparece só se existir.** Pedido cancelado antes da regra não tem responsável, e a
+alternativa a omitir a linha seria escrever "sistema" — que é afirmar algo falso sobre quem
+cancelou.
+
 #### O filtro de grupo — `RN-VEN-057`
 
 Quatro chips: `Todos · Na casa · Concluídos · Cancelados`. `CHAPA-02` — exatamente um é âmbar.
@@ -535,6 +557,7 @@ Duas colunas lado a lado, separadas por **traço** e não por vão, e dentro del
 | Decisão | Por quê |
 |---------|---------|
 | **Só o número** | A comanda completa dava ~6 telas de rolagem com 60 pedidos, com a coluna **pronto** embaixo de todas elas. Medido: passou a **1 tela** |
+| **Fluxo VERTICAL** ⚠⚠ | Os números descem a coluna e só então abrem a próxima — `columns` + **`column-fill: auto`**. Numa fila, encher da esquerda para a direita obriga o olho a varrer na horizontal para achar um número |
 | **Divisão vertical, por traço** | Empilhar desperdiça a largura e joga "pronto" para baixo da dobra. O que separa na Chapa é o traço de 2px; vão leria como duas placas soltas |
 | **Pronto invertido, em âmbar** | ⚠ A referência que originou a tela usava **verde**, e o design system recusa: verde é `--ok`, que já significa FINALIZADO no selo. Duas cores para dois sentidos apaga os dois (§5). Âmbar é a cor do que exige ação agora |
 | **Pronto um degrau maior** | Quem está de pé procura **um** número, e é o dele saindo. "Preparando" é contexto, e contexto não precisa ser lido do outro lado do salão |
@@ -559,6 +582,15 @@ parede. O CSS não conta filhos para dimensionar, então quem conta é o compone
 
 ⚠ **Três degraus nomeados, e não uma fórmula contínua.** Degrau é escolha; tamanho calculado por
 item é o valor fracionário que `CHAPA-13` recusa.
+
+> ### ⚠⚠ `column-fill: auto` não é detalhe — sem ele o fluxo vertical não acontece
+>
+> O padrão do multi-coluna é `balance`: com seis números e uma coluna alta, o navegador os
+> distribui **um por coluna** para igualar as alturas — exatamente a leitura horizontal que se
+> estava tirando. A medida denunciou (`segundoAbaixoDoPrimeiro: false`) antes de qualquer olho.
+>
+> ⚠ E `columns`, não `grid-auto-flow: column`: a grade exigiria dizer **quantas linhas** cabem, e
+> isso muda com a altura da tela e com o degrau de lotação. O multi-coluna descobre sozinho.
 
 #### A exceção declarada a `CHAPA-13`
 

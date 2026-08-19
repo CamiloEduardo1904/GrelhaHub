@@ -181,6 +181,31 @@ export function Comanda({
           </p>
         )}
 
+        {/* RN-VEN-058 ⚠⚠ — por que, quando e por quem. `RN-GER-002` já exigia o motivo; o
+            instante e o responsável entraram em 19/08/2026, e até então o próprio comentário do
+            domínio prometia "com motivo e responsável" sem gravar o responsável.
+
+            ⚠ Cada linha aparece só se existir. O pedido cancelado ANTES da regra não tem
+            responsável, e a alternativa a omitir a linha seria escrever "sistema" — que é afirmar
+            algo falso sobre quem cancelou. */}
+        {pedido.motivoCancelamento && (
+          <div className="comanda-cancelamento">
+            <p className="comanda-cancelamento-motivo">
+              <span className="rotulo">Motivo do cancelamento</span>
+              <span className="comanda-obs-texto">{pedido.motivoCancelamento}</span>
+            </p>
+
+            {(pedido.canceladoEm || pedido.canceladoPor) && (
+              <p className="comanda-cancelamento-quem">
+                {pedido.canceladoEm && (
+                  <span className="dado">{dataEHora(pedido.canceladoEm)}</span>
+                )}
+                {pedido.canceladoPor && <span>{pedido.canceladoPor}</span>}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="comanda-soma">
           <span className="rotulo">Total</span>
           <span className="valor">{moeda.format(pedido.total)}</span>
@@ -190,6 +215,32 @@ export function Comanda({
       </div>
     </article>
   );
+}
+
+/**
+ * `RN-VEN-058` — o instante do cancelamento, com hora.
+ *
+ * ⚠ **Com hora, e não só a data.** "Cancelado em 19/08" não distingue o que aconteceu na abertura
+ * do que aconteceu no fecho — e cancelamento é o registro que alguém relê justamente para
+ * reconstruir a sequência de um turno.
+ *
+ * Fuso do navegador, como todo instante exibido: o servidor guarda em UTC (`RN-GER-005`) e quem lê
+ * está na casa.
+ */
+function dataEHora(iso: string): string {
+  const quando = new Date(iso);
+
+  if (Number.isNaN(quando.getTime())) {
+    return '';
+  }
+
+  return quando.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /**
