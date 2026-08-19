@@ -510,7 +510,7 @@ function LinkPublico({
         </p>
       </div>
 
-      <fieldset>
+      <fieldset className="campo-logomarca">
         <legend>Logomarca</legend>
 
         {/* RN-GER-026 — exibida no topo do cardápio público. Sem logo, aparece o nome fantasia:

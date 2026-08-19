@@ -1603,6 +1603,35 @@ tr.apagado td {
   padding: var(--esp-1);
 }
 
+/* ⚠ O bloco da logomarca é o ÚNICO campo centralizado do produto, e a exceção tem
+   razão: aqui não se preenche nada — se OLHA. A moldura de 200×150, o botão e a
+   nota de formato existem para responder "a minha marca ficou boa?", e um objeto
+   de exposição encostado à esquerda de um cartão largo lê como sobra de tela.
+
+   Formulário continua alinhado à esquerda em todo o resto: rótulo e campo têm de
+   partir da mesma coluna, senão o olho reancora a cada linha. Centralizar campo de
+   digitação é o erro que esta regra NÃO autoriza. */
+.campo-logomarca {
+  align-items: center;
+  text-align: center;
+}
+
+/* ⚠ A LEGENDA não vai junto. `align-items: center` a arrastaria para o meio da borda
+   de cima, e ela é rótulo de moldura — em todo o resto do produto fica no canto
+   superior esquerdo. Uma legenda centralizada aqui seria a única do sistema, e a
+   pergunta "por que esta é diferente?" não teria resposta. O que se centraliza é o
+   que se OLHA; o que nomeia a caixa fica onde sempre esteve. */
+.campo-logomarca > legend {
+  align-self: flex-start;
+  text-align: left;
+}
+
+/* `.envio-imagem` é `align-items: flex-start` por padrão — na linha da tabela do
+   cardápio, onde a miniatura divide a célula com os botões. Aqui ela manda. */
+.campo-logomarca .envio-imagem {
+  align-items: center;
+}
+
 /* A logo no topo do cardápio público. Altura limitada: a capa é do NOME da casa, e uma
    logo alta empurraria o cardápio para fora da primeira tela no celular. */
 .logo-casa {

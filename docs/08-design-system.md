@@ -81,6 +81,22 @@ administrativo.
 | `--alerta` | `#9A5B00` | `#FFB020` |
 | `--erro` | `#A3271F` | `#EF6A5E` |
 
+### O bloco da logomarca — a única exceção ao alinhamento à esquerda
+
+A moldura de 200×150, o botão e a nota de formato ficam **centralizados**. É o único campo
+centralizado do produto, e a exceção tem razão: **aqui não se preenche nada — se olha**. O bloco
+existe para responder *"a minha marca ficou boa no cardápio público?"*, e um objeto de exposição
+encostado à esquerda de um cartão largo lê como sobra de tela.
+
+⚠ **Formulário continua alinhado à esquerda em todo o resto.** Rótulo e campo têm de partir da mesma
+coluna, senão o olho reancora a cada linha. Centralizar campo de digitação é o erro que esta exceção
+**não** autoriza.
+
+⚠ **A legenda não vai junto.** `align-items: center` a arrastaria para o meio da borda de cima, e ela
+é rótulo de moldura — em todo o resto do produto fica no canto superior esquerdo. Centralizá-la aqui
+faria dela a única do sistema, e a pergunta *"por que esta é diferente?"* não teria resposta. **O que
+se centraliza é o que se olha; o que nomeia a caixa fica onde sempre esteve.**
+
 ### A escolha do tema — `<AlternadorDeTema />`, 19/08/2026
 
 Os dois temas existiam na folha desde o início; o que faltava era **a escolha**, na barra do
