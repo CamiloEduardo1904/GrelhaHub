@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CpfNaListagem } from '../../components/CpfNaListagem';
+import { ReenviarConvite } from '../../components/ReenviarConvite';
 import { Dialogo } from '../../components/Dialogo';
 import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
@@ -133,8 +135,10 @@ export function Usuarios() {
                   {usuario.sobrenome ? ` ${usuario.sobrenome}` : ''}
                 </td>
 
-                {/* CHAPA-03 — dado em mono. CPF é dado. */}
-                <td className="dado">{usuario.cpf ?? '—'}</td>
+                {/* RN-GER-039 ⚠ — mascarado por padrão, inteiro por ação nesta linha. */}
+                <td>
+                  <CpfNaListagem cpf={usuario.cpf} />
+                </td>
                 <td className="dado">{usuario.email}</td>
                 <td>
                   <span className="chave">{usuario.perfil}</span>
@@ -144,6 +148,12 @@ export function Usuarios() {
                   <span className="selo" data-fase={situacao(usuario)}>
                     {rotuloDaSituacao(usuario)}
                   </span>
+
+                  {/* ⚠ O selo "Senha pendente" existia e não tinha o que fazer com ele: quem
+                      administra via o problema e não tinha botão na mesma tela. RN-GER-032. */}
+                  {podeGerenciar && usuario.ativo && usuario.deveTrocarSenha && (
+                    <ReenviarConvite email={usuario.email} />
+                  )}
                 </td>
                 {podeGerenciar && (
                   <td className="num">

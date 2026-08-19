@@ -388,6 +388,41 @@ Nenhum.
 - Perfil personalizado pela unidade — os seis do catálogo bastam até alguém pedir o sétimo
 - **Colaborador** (`RN-RH-006`): usuário é acesso, colaborador é vínculo. Onda 10
 
+### CPF em listagem — `RN-GER-039`, acrescentado em 19/08/2026
+
+Uma revisão externa de design encontrou o CPF **completo e sem máscara** em duas tabelas: a equipe
+de uma loja e, pior, `/plataforma > Usuários`, que lista os usuários de **todas** as casas. Numa
+base com centenas de lojas, essa segunda tela é um cadastro consolidado de pessoas físicas de
+cliente numa única rolagem.
+
+A tela passa a mostrar `•••.752.818-••`, com revelação por ação explícita numa linha
+(`<CpfNaListagem />`).
+
+#### ⚠⚠ O que isto NÃO é, e a frase precisa existir
+
+**Reduz exposição de tela, não acesso.** O número continua vindo na resposta da API, e quem abre o
+inspetor o lê. Chamar a máscara de proteção sem dizer isso seria exatamente o cadeado que a
+`CHAPA-05` recusa: desenho que sugere que o dado foi retido no cliente quando ele chegou inteiro.
+
+A diferença com `RN-GER-012` é a que importa aqui:
+
+| | `RN-GER-012` (custo, CMV, margem) | `RN-GER-039` (CPF) |
+|---|---|---|
+| A API devolve? | **Não**, para quem não tem permissão | **Sim** — quem olha tem direito ao dado |
+| Na tela | O campo **não existe** (`CHAPA-05`) | Existe, mascarado, e acende sob ação |
+| O que se controla | Acesso | Quando o número aparece |
+
+#### Dívida declarada
+
+A minimização de verdade é a **listagem parar de devolver o CPF**, e ela não foi feita. Exige
+separar duas leituras que hoje são uma: a da tabela (que não precisa do número) e a que alimenta o
+formulário de edição (que precisa, por `RN-GER-028`). Enquanto forem o mesmo DTO, a tabela carrega
+o dado do formulário.
+
+⚠ Também não há registro de **quem revelou o quê**. A revisão sugeriu isso e é o complemento
+natural de `RN-GER-015`, mas trilha de leitura de campo é escopo próprio — e prometê-la sem
+implementar seria pior que a ausência.
+
 ## 9. Rastreabilidade
 
 | Artefato | Caminho |

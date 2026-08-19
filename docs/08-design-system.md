@@ -161,6 +161,56 @@ amanhã — e o defeito reaparece idêntico, num arquivo diferente.
 Sem webfont — decisão do [ADR-0012](adr/0012-direcao-visual-chapa.md): o painel não pode
 depender de fonte baixando no meio do serviço.
 
+#### A escala — `CHAPA-13`, desde 19/08/2026
+
+Oito degraus, razão ~1,25, ancorados em 16 px. Antes **não havia escala**, e a ausência foi
+medida de fora:
+
+| Superfície | Tamanhos distintos |
+|------------|-------------------:|
+| Vitrine | **21** |
+| Painel da loja | 11 |
+| Cardápio público | 9 |
+| Plataforma | 7 |
+
+```css
+--texto-2xs: 0.75rem;   /* 12px — rótulo mono, eyebrow, selo */
+--texto-xs:  0.875rem;  /* 14px — legenda, metadado */
+--texto-sm:  1rem;      /* 16px — corpo */
+--texto-md:  1.25rem;   /* 20px — corpo destacado, lead */
+--texto-lg:  1.5rem;    /* 24px — título de cartão */
+--texto-xl:  2rem;      /* 32px — título de seção */
+--texto-2xl: 3rem;      /* 48px — display secundário */
+--texto-3xl: 3.75rem;   /* 60px — capa */
+```
+
+**Duas regras, e a segunda explica a primeira:**
+
+1. Nenhum `font-size` fora destes tokens
+2. **Nunca `em` para tamanho de fonte** — só `rem`
+
+> ⚠ **O valor fracionário é o sintoma, não a doença.** A vitrine tinha `17.28px` e `15.68px` na
+> tela, e ninguém escreveu esses números: eles são `1.08em` dentro de um elemento que já era
+> `1.2em`. Cada nível multiplica o anterior, e o degrau final não foi escolhido por ninguém — o
+> que o olho registra é que um rótulo de 13,28px e outro de 13,6px deveriam ser o mesmo nível de
+> hierarquia e não são. **`rem` não compõe**, e é por isso que a regra é sobre a unidade e não
+> sobre o valor.
+
+E o **ritmo vertical**, na mesma escala:
+
+```css
+--esp-1: 0.5rem;  --esp-2: 1rem;   --esp-3: 1.5rem;  --esp-4: 2rem;
+--esp-6: 3rem;    --esp-8: 4rem;   --esp-12: 6rem;   --esp-16: 8rem;
+```
+
+> ⚠ **Adoção: a vitrine está convertida; painel e cardápio não.** A conversão foi feita onde o
+> problema é maior — 21 degraus reduzidos aos oito, um a um, com o de/para registrado no topo de
+> `vitrine.css`. Painel (11) e cardápio (9) seguem com valores crus, e a varredura deles é
+> **decisão pendente**: são as telas que o cliente usa todos os dias, mexer nos 82 `font-size` da
+> folha global muda todas de uma vez, e não existe verificação visual automatizada para isso
+> (`RN-VEN-047` já registra que o frontend não tem harness). Convergem por regra, não por sweep:
+> **valor novo em qualquer folha entra por token.**
+
 ### 2.4 Toque
 
 | Contexto | Mínimo |
@@ -172,7 +222,7 @@ depender de fonte baixando no meio do serviço.
 
 ## 3. Componentes
 
-Sete novos. O resto é token.
+Oito novos. O resto é token.
 
 ### `<Grelha etapa={n} de={6} />`
 
@@ -189,6 +239,54 @@ A régua. Barras anteriores em laranja, a atual em âmbar, as seguintes apagadas
 
 O cartão de pedido, desenhado como comanda impressa: furo de tracionador no topo, filete
 tracejado separando os itens, número dominante, mono no dado.
+
+#### A observação do cliente — `RN-VEN-052`, 18/08/2026
+
+Bloco próprio, entre os itens e o total, com **rótulo** e **prosa na cor do texto**:
+
+```
+┌──────────────────────────────┐
+│ 1× X-Burger            28,00 │
+├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤
+│▌OBSERVAÇÃO DO CLIENTE        │  ← rótulo: mono, caixa alta, --muted
+│▌Sem bacon e capricha na maio │  ← prosa: sans, --text, inteira
+├──────────────────────────────┤
+│ TOTAL              R$  28,00 │
+└──────────────────────────────┘
+```
+
+**Três decisões, e as três já eram regra em outro lugar:**
+
+| Decisão | Regra |
+|---------|-------|
+| Prosa em `--text`, rótulo em `--muted` | `CHAPA-10` — a tela do cliente já fazia assim; a da cozinha, não |
+| Nunca truncada, nunca com reticências | `RN-VEN-052` — o limite de 80 caracteres existe para que caiba inteira |
+| Filete âmbar, e ele **não** conta como a barra ativa | `CHAPA-02` — a barra do grupo é a `<Grelha>` no cabeçalho; este é filete de citação, sem estado |
+
+⚠ **`overflow-wrap: anywhere`.** Oitenta caracteres sem espaço são um texto válido, e sem isto
+eles estouram a largura do cartão em vez de quebrar.
+
+A observação **por item** segue o mesmo tratamento em escala menor: rótulo `obs` em `--muted`,
+texto em `--text`, recuado sob o produto a que pertence.
+
+### Campo com limite de caracteres
+
+Onde há teto — observação do pedido (80, `RN-VEN-052`), descrição do produto (200,
+`RN-VEN-053`) — o campo mostra **quantos couberam**, em mono com `tabular-nums`, alinhado à
+direita sob o campo:
+
+```
+ 62/80        ← normal, --muted
+ 213/200      ← excedido, --erro, e o botão de salvar trava
+```
+
+**O número vive nos dois lados de propósito**, como o mínimo do `motivo` no `<Dialogo />`: a tela
+evita a viagem, o servidor decide. O do frontend está em `services/limites.ts`, o do backend em
+constante de domínio, e o do catálogo é o que manda nos dois.
+
+⚠ **O estado excedido não é hipotético** — ele existe para o cadastro feito quando o limite era
+outro. `maxLength` impede digitar, não encurta o que já estava gravado, e truncar o texto de
+alguém ao abrir o formulário é perda silenciosa de dado.
 
 ### `<Dialogo />`
 
@@ -319,7 +417,7 @@ permissão nova, e a tela passaria a prometer o que o servidor recusa.
 
 ---
 
-## 4. As onze regras — checklist de revisão de código
+## 4. As treze regras — checklist de revisão de código
 
 | ID | Regra |
 |----|-------|
@@ -334,6 +432,34 @@ permissão nova, e a tela passaria a prometer o que o servidor recusa.
 | **CHAPA-09** | A vitrine não promete o que a API não faz — §8 |
 | **CHAPA-10** | Prosa não usa cor secundária, e texto nunca usa `opacity` — §2.1 |
 | **CHAPA-11** | Quem declara `background` declara `color` — §2.1 |
+| **CHAPA-12** | O rótulo da aba nomeia o que a aba mostra — §4 |
+| **CHAPA-13** | Tamanho de fonte e espaçamento só por token, e nunca em `em` — §2.3 |
+
+### CHAPA-12 merece explicação
+
+Nasceu de um defeito de 19/08/2026, na área de estabelecimentos da plataforma: a aba
+**"Horário e endereço"** carregava a **lista de pedidos**, a aba **"Painel"** carregava o painel
+de operação, e o horário e o endereço estavam escondidos no fim de **"Dados e situação"**. Três
+rótulos, quatro telas, nenhuma correspondência.
+
+**Não foi descuido de nomenclatura — foi o roteamento espalhado.** O conteúdo saía de três blocos
+aninhados, um deles condicionado por `(aba === 'dados' || aba === 'modulos')`, e nesse arranjo não
+há como ler a lista de abas ao lado do que cada uma renderiza. O comentário que já estava no
+arquivo registrava um incidente anterior *no mesmo lugar*: **"foi assim que o painel entrou num
+bloco que não era dele"**.
+
+A regra, então, é de forma e não só de texto:
+
+| Exigência | Por quê |
+|-----------|---------|
+| O rótulo diz o que a tela mostra | Aba é promessa; quem clica em "Horário e endereço" foi buscar horário |
+| A chave do `type` usa a mesma palavra do rótulo | Chave que diverge do rótulo esconde a troca de quem lê só o `switch` |
+| **Uma linha por aba, na mesma ordem da lista** | É o que torna a divergência visível em revisão — condição enumerada, nunca por negação |
+| Vocabulário igual ao do painel do restaurante | Suporte e cliente conversam por telefone olhando telas diferentes: "vá em Operação" precisa levar os dois ao mesmo lugar |
+
+> ⚠ **Tela trocada não dá erro.** Ela carrega, preenche e parece funcionar — o defeito só aparece
+> para quem sabe o que deveria estar ali. É a mesma família do beco sem mensagem de erro que a
+> `SPEC-VEN-003` §11.3 descreve, e por isso entra no checklist em vez de contar com o olho.
 
 ### CHAPA-05 merece explicação
 

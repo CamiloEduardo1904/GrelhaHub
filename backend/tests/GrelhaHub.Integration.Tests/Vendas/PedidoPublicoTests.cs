@@ -6,6 +6,7 @@ using GrelhaHub.Application.Features.Gerais.CadastrarRestaurante;
 using GrelhaHub.Application.Features.Gerais.Plataforma;
 using GrelhaHub.Application.Features.Vendas.ConsultarPedidoPublico;
 using GrelhaHub.Application.Features.Vendas.CriarPedidoPublico;
+using GrelhaHub.Application.Features.Vendas.ListarPedidos;
 using GrelhaHub.Domain.Common;
 using GrelhaHub.Domain.Vendas;
 using GrelhaHub.Integration.Tests.Infraestrutura;
@@ -14,7 +15,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GrelhaHub.Integration.Tests.Vendas;
 
 /// <summary>
-/// <c>SPEC-VEN-001</c> — CA-3, CA-4, CA-5, CA-6, CA-8 e CA-10: o pedido pelo cardápio público.
+/// <c>SPEC-VEN-001</c> — CA-3, CA-4, CA-5, CA-6, CA-8, CA-10, CA-11 e CA-12: o pedido pelo
+/// cardápio público.
 /// </summary>
 [Collection(ColecaoDeIntegracao.Nome)]
 public sealed class PedidoPublicoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegracao(ambiente)
@@ -337,6 +339,85 @@ public sealed class PedidoPublicoTests(AmbienteDeIntegracao ambiente) : TesteDeI
 
         (await db.Pedidos.AsNoTracking().CountAsync()).Should().Be(3, "os três pedidos foram aceitos");
     }
+
+    [Fact(DisplayName = "RN-VEN-052 — observação com mais de 80 caracteres é recusada, e com 80 é gravada inteira")]
+    public async Task Observacao_RespeitaOTetoDeOitentaCaracteres()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Brasa e Fogo", "11111111000191");
+        var produtoId = await CriarProdutoAsync(restaurante, "X-Salada", 26.00m);
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        var excedida = new string('a', Pedido.MaximoDeCaracteresNaObservacao + 1);
+
+        var recusado = await anonimo.PostAsJsonAsync(
+            new Uri($"/api/publico/{restaurante.Slug}/pedidos", UriKind.Relative),
+            CorpoDoPedido(produtoId, excedida));
+
+        recusado.StatusCode.Should().Be(
+            HttpStatusCode.UnprocessableEntity,
+            "o campo da vitrine tem maxLength, mas quem não passa pela vitrine chega aqui");
+
+        // O limite é fechado, não aberto: 80 exatos passam.
+        var noLimite = new string('b', Pedido.MaximoDeCaracteresNaObservacao);
+
+        var aceito = await anonimo.PostAsJsonAsync(
+            new Uri($"/api/publico/{restaurante.Slug}/pedidos", UriKind.Relative),
+            CorpoDoPedido(produtoId, noLimite));
+
+        aceito.EnsureSuccessStatusCode();
+
+        await using var db = Contexto(restaurante);
+
+        var pedido = await db.Pedidos.AsNoTracking().SingleAsync();
+
+        pedido.Observacao.Should().Be(
+            noLimite, "80 caracteres cabem inteiros — é para isso que o teto existe");
+    }
+
+    [Fact(DisplayName = "RN-VEN-052 — a observação chega inteira à listagem da loja, sem truncar")]
+    public async Task Observacao_ChegaInteiraNaListagemDaLoja()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Brasa e Fogo", "11111111000191");
+        var produtoId = await CriarProdutoAsync(restaurante, "Onion Rings", 22.00m);
+
+        // Oitenta caracteres com espaço e acento — o texto que a cozinha realmente recebe, e não
+        // uma sequência de 'a' que qualquer corte deixaria parecida com o original.
+        const string pedidoDoCliente =
+            "Sem cebola e sem picles, por favor. Capricha na maionese da casa. Obrigado!!!!!!";
+
+        pedidoDoCliente.Length.Should().Be(
+            Pedido.MaximoDeCaracteresNaObservacao, "o caso testa o texto NO limite");
+
+        using var anonimo = Ambiente.CriarCliente();
+        using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        var enviado = await anonimo.PostAsJsonAsync(
+            new Uri($"/api/publico/{restaurante.Slug}/pedidos", UriKind.Relative),
+            CorpoDoPedido(produtoId, pedidoDoCliente));
+
+        enviado.EnsureSuccessStatusCode();
+
+        var lista = await gestao.GetFromJsonAsync<List<PedidoResumoDto>>(
+            new Uri("/api/v1/pedidos", UriKind.Relative));
+
+        lista.Should().NotBeNull();
+        lista!.Should().ContainSingle();
+
+        // ⚠ O corte, se existisse, seria daqui — e é isso que este caso recusa. Truncar na API
+        // pouparia bytes e apagaria a única frase que o cliente escreveu para a cozinha.
+        lista![0].Observacao.Should().Be(pedidoDoCliente);
+        lista[0].Observacao.Should().NotContain("…", "instrução de preparo não leva reticências");
+    }
+
+    private static object CorpoDoPedido(Guid produtoId, string? observacao) =>
+        new
+        {
+            NomeCliente = "Cliente de Teste",
+            Telefone = TelefoneDoCliente,
+            Observacao = observacao,
+            Itens = new[] { new { ProdutoId = produtoId, Quantidade = 1, Observacao = (string?)null } },
+        };
 
     private static async Task<PedidoCriadoResponse> CriarPedidoAsync(
         HttpClient anonimo, string slug, params (Guid ProdutoId, int Quantidade)[] itens)

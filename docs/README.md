@@ -27,7 +27,7 @@
 
 | Documento | O que contém | Quando muda |
 |-----------|--------------|-------------|
-| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **180 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
+| **[03 — Catálogo de Regras](03-catalogo-de-regras-de-negocio.md)** ★ | **182 regras de negócio** com tipo, entidades, mecanismo de implementação, estado de validação e escopo no MVP | A cada entrevista (estado das regras) e a cada implementação que descobre regra nova |
 | [04 — Parâmetros do sistema](04-parametros-do-sistema.md) | Valores configuráveis da operação (`PAR-*`) | Quando surge valor comercial configurável |
 
 > **Regra de ouro:** regra de negócio mora **só** no catálogo. Se você encontrar uma regra

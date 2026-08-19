@@ -6,7 +6,7 @@
 | Módulo | VEN |
 | Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | 1 — cadastro |
-| Regras implementadas | `RN-VEN-043`, `RN-VEN-044`, `RN-VEN-045`, `RN-VEN-046`, `RN-VEN-020`, `RN-VEN-032`, `RN-GER-003`, `RN-GER-009`, `RN-GER-010`, `RN-GER-012` |
+| Regras implementadas | `RN-VEN-043`, `RN-VEN-044`, `RN-VEN-045`, `RN-VEN-046`, `RN-VEN-053`, `RN-VEN-020`, `RN-VEN-032`, `RN-GER-003`, `RN-GER-009`, `RN-GER-010`, `RN-GER-012` |
 | ADRs aplicáveis | [ADR-0009](../adr/0009-onde-as-regras-de-negocio-vivem.md), [ADR-0013](../adr/0013-acesso-de-plataforma.md) |
 | Depende de | `SPEC-VEN-001`, `SPEC-VEN-002`, `SPEC-GER-004` |
 | Data | 17/08/2026 |
@@ -38,6 +38,7 @@ banco existiam desde a migration `Fundacao` sem regra que as enunciasse.
 | `RN-VEN-044` | Produto com nome único na unidade, preço positivo, e `ativo` (cadastral) ≠ `disponível` (do turno) | Banco + aplicação | `uq_produto_nome`, `ck_produto_preco` + dois comandos distintos |
 | `RN-VEN-045` | Categoria e produto **não são excluídos**, apenas inativados | Aplicação | **Ausência de rota de exclusão** + FK de `item_pedido` |
 | `RN-VEN-046` | No máximo `PAR-VEN-004` produtos **ativos** por categoria — 50 por padrão | Aplicação | `TetoDeProdutos`, chamado pelos **dois** caminhos de entrada |
+| `RN-VEN-053` `IMP` | Descrição do produto com 200 caracteres, inteira na vitrine e resumida a duas linhas na gestão | Aplicação | `MaximoDeCaracteresNaDescricao` no validator + `maxLength` no campo + `line-clamp` na tabela |
 | `RN-GER-003` | Dinheiro em duas casas | Aplicação | Máscara acumuladora de centavos no campo de preço |
 | `RN-VEN-020` | Produto inativo não entra em pedido novo nem aparece no cardápio | Aplicação | Filtro em `ObterCardapioPublico` e conferência ao abrir pedido |
 | `RN-VEN-032` | Preço vigente maior que zero | Banco + aplicação | `ck_produto_preco` + validator |
@@ -250,6 +251,37 @@ regra.** Produto excluído levaria consigo o item de pedidos históricos (`RN-VE
 produto vendido); categoria excluída deixaria produto órfão. A FK de `item_pedido` para `produto`
 recusaria de todo jeito — mas com erro de banco, não com decisão de projeto.
 
+### A descrição do produto — `RN-VEN-053`, acrescentada em 18/08/2026
+
+A descrição é o texto que ajuda o cliente a escolher, e por isso tem dois tratamentos, não um:
+
+| Onde | Como | Por quê |
+|------|------|---------|
+| Vitrine (`/c/:slug`) | **Inteira**, em `--text` | É a razão de o campo existir; quem está escolhendo lê |
+| Gestão (tabela do cardápio) | **Duas linhas**, com o texto completo no `title` | Ali se procura nome e preço — descrição longa em linha de tabela empurra o preço para fora do olho |
+
+O limite de **200 caracteres** é o que torna as duas coisas possíveis ao mesmo tempo: um texto
+que caiba na vitrine sem virar parágrafo, e que a gestão resuma sem esconder metade.
+
+> ⚠ **A descrição na gestão estava em `.secundario`, que é `--muted`.** Mesmo defeito da
+> observação do pedido na `SPEC-VEN-001`, na mesma revisão: prosa em cor de metadado, contra a
+> `CHAPA-10`. Passa a ter classe própria, com a cor do texto e o resumo de duas linhas.
+
+#### ⚠ O caminho de volta: cadastro antigo acima do limite
+
+O campo aceitava 500 caracteres até aqui. Baixar o teto para 200 cria um estado que a tela
+precisa saber tratar: **produto cujo texto já gravado excede o novo limite**.
+
+`maxLength` no `<textarea>` impede digitar mais — **não** encurta o que já estava lá, e não
+deveria: truncar cadastro alheio ao abrir o formulário é perda silenciosa de dado. O que a tela
+faz é mostrar o contador **em estado de erro**, dizer quantos caracteres sobram, e **travar o
+botão de salvar** até o corte. O servidor recusaria de qualquer forma; a diferença é que assim o
+usuário sabe o que corrigir antes de apertar.
+
+> É o mesmo item de revisão que pegou o beco da categoria inativa em §11.3: **percorra o caminho
+> de volta de toda operação reversível**. Aqui o caminho de volta não é reativar — é editar um
+> produto que já existia quando a regra era outra.
+
 ## 5. Critérios de aceite
 
 ### CA-1 — Categoria é criada e aparece na gestão (`RN-VEN-043`)
@@ -378,6 +410,13 @@ recusaria de todo jeito — mas com erro de banco, não com decisão de projeto.
 > **Dado** uma categoria com 3 produtos e o teto **reduzido depois** para 1,
 > **Quando** o preço de um deles for corrigido,
 > **Então** a alteração é aceita — senão o teto travaria a correção do próprio dado.
+
+### CA-22 — Descrição acima de 200 caracteres é recusada (`RN-VEN-053`)
+
+> **Dado** a gestão do cardápio,
+> **Quando** um produto for salvo com 201 caracteres na descrição,
+> **Então** a API responde 422 com mensagem legível,
+> **e** com 200 caracteres exatos o produto é salvo e a descrição é gravada inteira.
 
 ## 6. Modelo de dados tocado
 

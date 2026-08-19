@@ -8,11 +8,12 @@ using GrelhaHub.Application.Features.Cardapio.ObterCardapioPublico;
 using GrelhaHub.Application.Features.Gerais.Parametros;
 using GrelhaHub.Integration.Tests.Infraestrutura;
 using Microsoft.EntityFrameworkCore;
+using ProdutoDomain = GrelhaHub.Domain.Cardapio.Produto;
 
 namespace GrelhaHub.Integration.Tests.Cardapio;
 
 /// <summary>
-/// <c>SPEC-VEN-003</c> — cadastro do cardápio. CA-1 a CA-21.
+/// <c>SPEC-VEN-003</c> — cadastro do cardápio. CA-1 a CA-22.
 /// <para>
 /// O cadastro do restaurante semeia três categorias ("Lanches", "Acompanhamentos", "Bebidas") e
 /// sete produtos. Os testes daqui criam os seus próprios nomes para não depender do exemplo — e
@@ -612,6 +613,53 @@ public sealed class CadastroDoCardapioTests(AmbienteDeIntegracao ambiente) : Tes
 
         salvo.Nome.Should().Be("Pudim de leite");
         salvo.Preco.Valor.Should().Be(16.50m);
+    }
+
+    [Fact(DisplayName = "RN-VEN-053 — descrição com mais de 200 caracteres é recusada, e com 200 é gravada inteira (CA-22)")]
+    public async Task CA22_DescricaoRespeitaOTetoDeDuzentosCaracteres()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Cadastro Burger", Cnpj);
+
+        using var gestao = Ambiente.CriarCliente(restaurante.Token);
+
+        var categoriaId = await SalvarCategoriaAsync(gestao, "Sanduíches especiais", ordem: 9);
+
+        var excedida = new string('a', ProdutoDomain.MaximoDeCaracteresNaDescricao + 1);
+
+        var recusado = await gestao.PostAsJsonAsync(
+            new Uri("/api/v1/cardapio/produtos", UriKind.Relative),
+            new
+            {
+                Id = (Guid?)null,
+                CategoriaId = categoriaId,
+                Nome = "Costela defumada",
+                Descricao = excedida,
+                Preco = 48.00m,
+            });
+
+        recusado.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // O limite é fechado: 200 exatos passam.
+        var noLimite = new string('b', ProdutoDomain.MaximoDeCaracteresNaDescricao);
+
+        var aceito = await gestao.PostAsJsonAsync(
+            new Uri("/api/v1/cardapio/produtos", UriKind.Relative),
+            new
+            {
+                Id = (Guid?)null,
+                CategoriaId = categoriaId,
+                Nome = "Costela defumada",
+                Descricao = noLimite,
+                Preco = 48.00m,
+            });
+
+        aceito.EnsureSuccessStatusCode();
+
+        await using var db = Contexto(restaurante);
+
+        var salvo = await db.Produtos.AsNoTracking().SingleAsync(p => p.Nome == "Costela defumada");
+
+        salvo.Descricao.Should().Be(noLimite, "a vitrine mostra a descrição inteira");
     }
 
     /// <summary>

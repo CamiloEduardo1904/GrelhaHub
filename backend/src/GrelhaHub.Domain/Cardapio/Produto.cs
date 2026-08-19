@@ -14,6 +14,20 @@ namespace GrelhaHub.Domain.Cardapio;
 /// </summary>
 public sealed class Produto : Entidade, IPertenceAUnidade
 {
+    /// <summary>
+    /// <c>RN-VEN-053</c> — o teto da descrição, o texto de vitrine que acompanha o nome.
+    /// <para>
+    /// Duzentos caracteres é o que cabe <b>inteiro</b> na vitrine sem virar parágrafo e o que a
+    /// tabela da gestão resume em duas linhas sem esconder metade.
+    /// </para>
+    /// <para>
+    /// ⚠ O campo aceitava 500 até 18/08/2026, e cadastro antigo acima do teto continua no banco.
+    /// A tela mostra quanto excedeu e pede o corte — truncar texto alheio ao abrir o formulário
+    /// seria perda silenciosa de dado.
+    /// </para>
+    /// </summary>
+    public const int MaximoDeCaracteresNaDescricao = 200;
+
     private Produto() { }
 
     public Produto(Guid unidadeId, Guid categoriaId, string nome, string? descricao, Dinheiro preco)
@@ -30,6 +44,9 @@ public sealed class Produto : Entidade, IPertenceAUnidade
     public Guid UnidadeId { get; private set; }
     public Guid CategoriaId { get; private set; }
     public string Nome { get; private set; } = null!;
+
+    /// <summary><c>RN-VEN-053</c> — texto de vitrine, opcional, até
+    /// <see cref="MaximoDeCaracteresNaDescricao"/> caracteres no que entra hoje.</summary>
     public string? Descricao { get; private set; }
 
     /// <summary><c>RN-VEN-032</c> — o preço vigente é sempre maior que zero.</summary>

@@ -36,10 +36,12 @@ export function Plataforma() {
 
   const [aba, setAba] = useState<Aba>('estabelecimentos');
 
-  // RN-GER-016 — quem não é plataforma não tem o que fazer aqui, e a plataforma é invisível ao
-  // restaurante. O servidor recusaria de qualquer forma.
+  // RN-GER-016 — o desvio de quem não é plataforma vive em `ExigeSessao` (`area="plataforma"`),
+  // junto do desvio simétrico. Duas cópias em arquivos diferentes envelheceriam desencontradas, e
+  // foi a ausência do outro lado que deixou `/painel` renderizar a loja para a plataforma.
+  //
+  // A conferência de nulo continua aqui porque o TypeScript precisa dela para o resto do corpo.
   if (!sessao) return <Navigate to="/entrar" replace />;
-  if (!sessao.ehPlataforma) return <Navigate to="/painel" replace />;
 
   return (
     <div className="painel">

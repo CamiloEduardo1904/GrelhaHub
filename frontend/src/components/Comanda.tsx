@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { moeda, valor } from '../services/api';
+import { tempoDecorrido } from '../services/datas';
 import { CICLO, etapaDe } from '../services/ciclo';
 import type { PedidoResumo } from '../services/tipos';
 import { Grelha } from './Grelha';
@@ -15,6 +16,17 @@ import { Selo } from './Selo';
 export function Comanda({ pedido, acoes }: { pedido: PedidoResumo; acoes?: ReactNode }) {
   const cancelado = pedido.status === 'Cancelado';
 
+  /**
+   * Os dois estados em que o tempo de espera deixa de significar algo — `RN-VEN-018`.
+   *
+   * São os mesmos de `RN-VEN-047`, onde o acompanhamento do cliente cessa, e pela mesma razão:
+   * dali o pedido não anda mais. ⚠ `Entregue` **não** está na lista — de lá ainda se vai para
+   * Finalizado, e enquanto isso alguém ainda está esperando o fecho.
+   */
+  const encerrado = cancelado || pedido.status === 'Finalizado';
+
+  const espera = tempoDecorrido(pedido.criadoEm);
+
   return (
     <article className="comanda">
       <div className="comanda-picote" aria-hidden="true" />
@@ -27,7 +39,18 @@ export function Comanda({ pedido, acoes }: { pedido: PedidoResumo; acoes?: React
       <div className="comanda-corpo">
         <div className="comanda-id">
           <span className="numero-pedido">{pedido.numero}</span>
-          <Selo status={pedido.status} />
+
+          <span className="comanda-estado">
+            <Selo status={pedido.status} />
+
+            {/* ⚠ O dado que faltava, e que vale mais que o número: quanto tempo esta pessoa está
+                esperando. O painel não dizia isso em lugar nenhum — nem no cartão, nem na lista —
+                num produto cujo argumento é "a cozinha vê a fila".
+
+                Não aparece em pedido encerrado: "há 3 dias" num pedido finalizado é ruído, e a
+                urgência que o rótulo comunica não existe mais. */}
+            {espera && !encerrado && <span className="comanda-espera dado">{espera}</span>}
+          </span>
         </div>
 
         {pedido.cliente && (
@@ -42,14 +65,36 @@ export function Comanda({ pedido, acoes }: { pedido: PedidoResumo; acoes?: React
             <li key={i}>
               <span>
                 <span className="qtd">{item.quantidade}×</span> {item.produto}
-                {item.observacao && <span className="obs">{item.observacao}</span>}
+
+                {/* RN-VEN-052 — a observação do item, quando existir, também é instrução de
+                    preparo: rótulo em cor de metadado, texto na cor do texto (CHAPA-10). */}
+                {item.observacao && (
+                  <span className="obs">
+                    <span className="obs-rotulo">obs</span> {item.observacao}
+                  </span>
+                )}
               </span>
               <span>{valor.format(item.precoPraticado * item.quantidade)}</span>
             </li>
           ))}
         </ul>
 
-        {pedido.observacao && <p className="nota">{pedido.observacao}</p>}
+        {/* RN-VEN-052 ⚠ — o único campo em que o CLIENTE fala com a cozinha, e ele precisa dizer
+            o que é. Antes vinha como `.nota`: filete âmbar, texto em --muted, nenhum rótulo — e
+            entre os itens e o total isso lê como sobra de tela.
+
+            Duas correções no mesmo bloco. O rótulo, que é metadado e pode ser discreto; e a
+            prosa em --text, que a CHAPA-10 já exigia — a tela do cliente (Acompanhar) fazia
+            certo, a de quem prepara o sanduíche não.
+
+            ⚠ Nunca truncada. O teto de 80 caracteres existe justamente para caber inteira: o
+            corte esconderia a parte que ninguém sabe estar faltando. */}
+        {pedido.observacao && (
+          <p className="comanda-obs">
+            <span className="rotulo">Observação do cliente</span>
+            <span className="comanda-obs-texto">{pedido.observacao}</span>
+          </p>
+        )}
 
         <div className="comanda-soma">
           <span className="rotulo">Total</span>

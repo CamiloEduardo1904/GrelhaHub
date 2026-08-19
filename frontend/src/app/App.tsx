@@ -54,7 +54,7 @@ export function App() {
         <Route
           path="/plataforma"
           element={
-            <ExigeSessao>
+            <ExigeSessao area="plataforma">
               <Plataforma />
             </ExigeSessao>
           }
@@ -63,7 +63,9 @@ export function App() {
         <Route
           path="/painel/*"
           element={
-            <ExigeSessao>
+            // ⚠ `area="loja"` — sem isto, usuário de plataforma recebia o painel da loja
+            // montado em cima de "Restaurante não encontrado.". Ver `ExigeSessao`.
+            <ExigeSessao area="loja">
               <Painel />
             </ExigeSessao>
           }

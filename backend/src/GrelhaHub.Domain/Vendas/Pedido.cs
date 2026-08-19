@@ -10,6 +10,21 @@ public sealed class Pedido
     : Entidade, IPertenceAUnidade, IPossuiDiaOperacional, IExcluivelLogicamente, IAuditavel, IAuditavelDetalhado
 {
     /// <summary>
+    /// <c>RN-VEN-052</c> ⚠ — o teto da observação que o <b>cliente</b> escreve.
+    /// <para>
+    /// O número existe para que a comanda mostre a observação <b>inteira</b>: com teto, o cartão
+    /// comporta o texto e nunca precisa truncar — e reticências numa instrução de preparo escondem
+    /// justamente a parte que ninguém sabe que está faltando.
+    /// </para>
+    /// <para>
+    /// ⚠ <b>A coluna continua em 500.</b> Este é o limite do que se digita <i>agora</i>, imposto
+    /// na tela e no validator; encurtar o <c>varchar</c> reclassificaria pedido já gravado, que é o
+    /// oposto do que <c>RN-GER-036</c> decidiu sobre não mexer no passado.
+    /// </para>
+    /// </summary>
+    public const int MaximoDeCaracteresNaObservacao = 80;
+
+    /// <summary>
     /// <c>RN-VEN-018</c> ⚠ — as únicas transições admitidas.
     /// <para>
     /// A tabela existe para que a regra seja legível de uma vez, em vez de espalhada em
@@ -71,6 +86,12 @@ public sealed class Pedido
     public CanalVenda Canal { get; private set; }
     public StatusPedido Status { get; private set; }
     public Guid? ClienteId { get; private set; }
+
+    /// <summary>
+    /// <c>RN-VEN-052</c> — o que o cliente escreveu para a cozinha. Até
+    /// <see cref="MaximoDeCaracteresNaObservacao"/> caracteres no que entra hoje; o histórico pode
+    /// trazer textos mais longos, e eles continuam válidos.
+    /// </summary>
     public string? Observacao { get; private set; }
     public string? MotivoCancelamento { get; private set; }
 

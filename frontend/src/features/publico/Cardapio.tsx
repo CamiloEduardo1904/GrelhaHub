@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { ContadorDeCaracteres } from '../../components/ContadorDeCaracteres';
 import { Grelha } from '../../components/Grelha';
 import { CapaDaCasa } from './CapaDaCasa';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
+import { MAXIMO_OBSERVACAO_DO_PEDIDO } from '../../services/limites';
 import type { CardapioPublico, ProdutoPublico } from '../../services/tipos';
 
 interface ItemDoCarrinho {
@@ -51,6 +53,15 @@ export function Cardapio() {
     () => carrinho.reduce((soma, item) => soma + item.produto.preco * item.quantidade, 0),
     [carrinho],
   );
+
+  /** Quantos itens, contando quantidade — é o número que a barra do celular mostra. */
+  const itensNoCarrinho = useMemo(
+    () => carrinho.reduce((soma, item) => soma + item.quantidade, 0),
+    [carrinho],
+  );
+
+  const caixaDoPedido = useRef<HTMLElement>(null);
+  const pedidoAVista = useEstaAVista(caixaDoPedido);
 
   function alterar(produto: ProdutoPublico, delta: number) {
     setCarrinho((atual) => {
@@ -147,6 +158,22 @@ export function Cardapio() {
         horarios={cardapio.horarios}
       />
 
+      {/* ⚠ A faixa de categorias, e o motivo dela ser fixa. Com o cardápio de exemplo — quatro
+          grupos, oito produtos — rolar é tolerável. Com quarenta itens reais, quem quer bebida
+          atravessa o cardápio inteiro de lanche para chegar nela, no celular, com uma mão.
+
+          Só aparece com DUAS ou mais categorias: uma faixa de um item só é enfeite que rouba
+          altura da primeira dobra. */}
+      {cardapio.categorias.length > 1 && (
+        <nav className="faixa-categorias" aria-label="Categorias do cardápio">
+          {cardapio.categorias.map((categoria) => (
+            <a key={categoria.id} className="chip" href={`#grupo-${categoria.id}`}>
+              {categoria.nome}
+            </a>
+          ))}
+        </nav>
+      )}
+
       <div className="vitrine">
         <section>
           {cardapio.categorias.length === 0 && (
@@ -154,7 +181,7 @@ export function Cardapio() {
           )}
 
           {cardapio.categorias.map((categoria) => (
-            <div key={categoria.id} className="grupo">
+            <div key={categoria.id} className="grupo" id={`grupo-${categoria.id}`}>
               <h2 className="grupo-titulo">{categoria.nome}</h2>
 
               <ul className="pratos">
@@ -215,11 +242,14 @@ export function Cardapio() {
           ))}
         </section>
 
-        <aside className="carrinho">
+        <aside className="carrinho" id="meu-pedido" ref={caixaDoPedido}>
           <h2>Seu pedido</h2>
 
           {carrinho.length === 0 ? (
-            <p className="secundario">Escolha os itens ao lado.</p>
+            /* ⚠ "ao lado" só é verdade no desktop. No celular o carrinho está DEPOIS de todos os
+               produtos, e a frase mandava o cliente olhar para um lugar que não existe. O texto
+               agora descreve o gesto, que é o mesmo nos dois tamanhos de tela. */
+            <p className="secundario">Toque em + para adicionar itens.</p>
           ) : (
             <>
               <ul className="carrinho-itens">
@@ -258,39 +288,133 @@ export function Cardapio() {
                 />
               </label>
 
+              {/* RN-VEN-052 ⚠ — 80 caracteres, e o número não é arbitrário: é o que cabe
+                  INTEIRO na comanda de quem prepara. Sem teto, ou o cartão da cozinha cresce
+                  sem controle, ou alguém acrescenta reticências numa instrução de preparo.
+
+                  O `maxLength` evita a viagem; quem não passa por aqui é recusado pelo
+                  validator, que é quem decide. */}
               <label>
                 Observação
                 <textarea
                   value={cliente.observacao}
                   onChange={(e) => setCliente({ ...cliente, observacao: e.target.value })}
                   rows={2}
+                  maxLength={MAXIMO_OBSERVACAO_DO_PEDIDO}
                   placeholder="Ponto da carne, sem cebola…"
                 />
+                {cliente.observacao.length > 0 && (
+                  <ContadorDeCaracteres
+                    texto={cliente.observacao}
+                    maximo={MAXIMO_OBSERVACAO_DO_PEDIDO}
+                  />
+                )}
               </label>
 
               {erro && <p className="erro">{erro}</p>}
 
+              {/* ⚠ RN-VEN-048 — "a vitrine informa e NÃO aceita pedido", e a segunda metade estava
+                  só no servidor. A capa dizia "Fechado agora", os itens entravam no carrinho, o
+                  cliente preenchia nome, telefone e observação, apertava enviar — e só então
+                  descobria, por mensagem de erro, que a casa está fechada.
+
+                  Montar o pedido com a loja fechada continua permitido de propósito: olhar
+                  cardápio de casa fechada é uso legítimo, e travar o "+" tiraria isso sem que
+                  nenhuma regra peça. O que a regra pede é não aceitar o envio — e dizer antes. */}
               <button
                 type="button"
                 className="btn bloco"
                 onClick={() => void enviarPedido()}
-                disabled={enviando || !cliente.nome || !cliente.telefone}
+                disabled={
+                  enviando || !cliente.nome || !cliente.telefone || !cardapio.aberta
+                }
               >
                 {enviando ? 'Enviando…' : 'Enviar pedido'}
               </button>
 
-              <p className="nota">
-                O restaurante ainda precisa confirmar — você recebe o número de
-                acompanhamento.
-              </p>
+              {cardapio.aberta ? (
+                <p className="nota">
+                  O restaurante ainda precisa confirmar — você recebe o número de
+                  acompanhamento.
+                </p>
+              ) : (
+                <p className="nota">
+                  A casa está fechada agora e não recebe pedido. Seu carrinho continua aqui
+                  enquanto você não sair da página.
+                </p>
+              )}
             </>
           )}
 
-          <a className="link-discreto" href={`/c/${slug}/acompanhar`}>
+          {/* Era um `link-discreto` de 17 px dentro da caixa. É a segunda ação mais frequente
+              desta tela — depois de pedir, o cliente volta para saber onde está o pedido — e
+              estava com metade do alvo de toque que `RNF-010` pede. */}
+          <a className="btn calada bloco" href={`/c/${slug}/acompanhar`}>
             Já fiz um pedido
           </a>
         </aside>
       </div>
+
+      {/* ⚠⚠ A barra fixa do celular — o achado de maior impacto comercial da revisão de UX.
+          No desktop o carrinho é `sticky` na coluna direita e está sempre à vista. No celular ele
+          ia para o fim da página, depois de todos os produtos: o cliente adicionava um item e
+          NADA mudava no campo de visão dele — sem confirmação, sem contagem, sem total parcial —,
+          e para fechar o pedido tinha de rolar o cardápio inteiro. Quanto maior o cardápio, pior;
+          e cardápio grande é justamente o cliente mais valioso. É atrito que não deixa rastro:
+          ninguém reclama, as pessoas só desistem.
+
+          Ela desaparece quando a caixa do pedido entra em cena — dois totais e dois botões na
+          mesma tela é pior que nenhum, e a barra chegaria a cobrir o "Enviar pedido". */}
+      {carrinho.length > 0 && !pedidoAVista && (
+        <div className="barra-do-pedido">
+          <span className="barra-do-pedido-resumo">
+            <span className="dado">
+              {itensNoCarrinho} {itensNoCarrinho === 1 ? 'item' : 'itens'}
+            </span>
+            <strong className="dado">{moeda.format(total)}</strong>
+          </span>
+
+          <a className="btn" href="#meu-pedido">
+            Ver meu pedido
+          </a>
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * Se o elemento está na tela — para a barra fixa saber quando sair de cena.
+ *
+ * `IntersectionObserver` e não cálculo de `scroll`: o segundo roda a cada pixel e engasga a
+ * rolagem no celular, que é onde esta barra existe. Mesma escolha da revelação da vitrine.
+ *
+ * ⚠ Sem o observador — navegador antigo, ambiente de teste sem DOM — devolve `false`, e a barra
+ * simplesmente fica. Falhar para o lado de ter o atalho é melhor que falhar para o lado de
+ * esconder o caminho de fechar o pedido.
+ */
+function useEstaAVista(referencia: React.RefObject<HTMLElement | null>): boolean {
+  const [aVista, setAVista] = useState(false);
+
+  useEffect(() => {
+    const alvo = referencia.current;
+
+    if (!alvo || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const observador = new IntersectionObserver(
+      ([entrada]) => setAVista(entrada.isIntersecting),
+
+      // A barra tem ~72 px: descontá-los evita o piscar em que a caixa aparece atrás dela e o
+      // observador diz "à vista" enquanto o cliente ainda não a vê.
+      { rootMargin: '0px 0px -80px 0px' },
+    );
+
+    observador.observe(alvo);
+
+    return () => observador.disconnect();
+  }, [referencia]);
+
+  return aVista;
 }

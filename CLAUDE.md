@@ -40,7 +40,7 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 180 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 183 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 20 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
@@ -123,6 +123,15 @@ diferente das demais"*. Na interface isso vira: **em qualquer grupo, exatamente 
   texto **nunca** leva `opacity`: o contraste composto não aparece em ferramenta de verificação
 - **Quem declara `background` declara `color`** (`CHAPA-11`): sem isso a superfície herda a cor
   da seção que a contém — foi assim que a comanda da capa ficou creme sobre creme
+- **O rótulo da aba nomeia o que a aba mostra** (`CHAPA-12`): e a exigência é de forma —
+  **uma linha por aba, na mesma ordem da lista**, condição enumerada e nunca por negação. Na área
+  de estabelecimentos, "Horário e endereço" carregava a lista de pedidos porque o roteamento vivia
+  em três blocos aninhados. ⚠ **Tela trocada não dá erro:** ela carrega e parece funcionar
+- **Tamanho de fonte e espaçamento só por token, e nunca em `em`** (`CHAPA-13`): `--texto-2xs` a
+  `--texto-3xl`, `--esp-1` a `--esp-16`. ⚠ **O valor fracionário é o sintoma:** `17,28px` na
+  vitrine é `1.08em` dentro de `1.2em`, e ninguém escolheu aquele degrau. `rem` não compõe.
+  ⚠ **A vitrine está convertida (21 degraus → 8); painel e cardápio, não** — a varredura da folha
+  global é decisão pendente, e §2.3 do design system diz por quê
 - Alvo de toque **48 px** na operação (acima dos 44 do `RNF-010`)
 - Sem webfont, sem Inter/Geist, sem gradiente decorativo, sem glassmorphism
 - Emoji não é ícone nem estado — status é selo com borda e cor
@@ -191,7 +200,7 @@ npm run lint && npm run build
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **180 regras catalogadas: 154 em `HIP`, 26 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **183 regras catalogadas: 157 em `HIP`, 26 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
@@ -202,7 +211,7 @@ inativo → espera o módulo RH, onda 10).
 **Existe uma fatia vertical funcionando** — `SPEC-VEN-001`, fora da ordem das ondas:
 cadastro de restaurante → cardápio público em `/c/:slug` → pedido → painel do restaurante.
 Backend, frontend, migration `Fundacao` e pipeline de deploy. 26 regras com código, e
-**56 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
+**62 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
 que não baixa estoque hoje não significa que a regra mudou**, significa que o estoque ainda
 não existe.
 
@@ -212,6 +221,39 @@ ganhou tela também na lista de pedidos, onde o backend já suportava `de`/`ate`
 vertical. ⚠ **A lista é agrupada por dia operacional, e o agrupamento é obrigatório:** `numero` é
 único por (unidade, dia operacional) e REINICIA a cada virada — sem o divisor, a comanda #1 de hoje
 e a #1 de ontem aparecem lado a lado, idênticas. Foi o que o filtro revelou no dia em que entrou.
+
+Em 19/08/2026 entraram `RN-VEN-052` e `RN-VEN-053` — **os dois tetos de texto livre**. A observação
+do cliente tem **80 caracteres** e a comanda passa a **rotulá-la** (`Observação do cliente`) em vez
+de exibi-la solta em `--muted`: o campo já era gravado e já era exibido, e mesmo assim o único
+lugar em que o cliente fala com a cozinha lia-se como sobra de tela — `Acompanhar.tsx` já aplicava
+`CHAPA-10` a esse mesmo dado, e a tela de quem prepara o sanduíche não. A descrição do produto tem
+**200**, inteira na vitrine e resumida a duas linhas na gestão. ⚠⚠ **Os dois tetos vivem na tela e
+no validator, NÃO na coluna** — `pedido.observacao` e `produto.descricao` continuam `varchar(500)`,
+com comentário na configuração do EF dizendo por quê: encurtar a coluna reclassificaria dado já
+gravado, o oposto do que `RN-GER-036` decidiu. Quem for "corrigir" a divergência, leia a regra
+antes. O número mora em três lugares — catálogo, constante de domínio e `services/limites.ts` —, e
+mexer num sem os outros produz o pior defeito para o usuário: campo que aceita digitar e recusa ao
+salvar.
+
+⚠⚠ **19/08/2026 — uma revisão externa de design e UX das quatro superfícies**, em dois documentos
+(vitrine/cardápio/painel, e um anexo de plataforma). O que ela achou de mais grave **não estava em
+nenhum teste**, porque nada disso quebra: **`/painel` aberto por usuário de plataforma montava o
+painel de loja inteiro em cima de "Restaurante não encontrado."** — falha em cima, interface
+funcionando embaixo. O desvio agora vive em `ExigeSessao` com `area="loja" | "plataforma"`, as duas
+direções no mesmo lugar. **No celular, o carrinho do cardápio público não era fixo**: adicionar item
+não mudava nada no campo de visão, e fechar o pedido exigia rolar o cardápio inteiro — atrito que
+não deixa rastro, porque ninguém reclama, as pessoas só desistem. Entraram também: **`RN-GER-039`**
+(CPF mascarado em listagem, com a dívida da API declarada), **tempo decorrido na comanda** — que
+vale mais que o número do pedido num produto cujo argumento é "a cozinha vê a fila" —, faixa de
+categorias, atalhos de semana no horário, reenvio de convite para "senha pendente", e as duas
+regras novas do design system (`CHAPA-12`, `CHAPA-13`).
+
+⚠ **Três sugestões da revisão foram RECUSADAS, e o motivo é catálogo, não preguiça.** "CTA final sem
+botão" é a `CHAPA-09` funcionando — `BotaoDeContato` existe e não renderiza porque `CONTATO` está
+`null`, e canal inventado numa vitrine pública é pior que canal nenhum (o beco real foi fechado com
+o destino que **existe**: entrar). "Preço a partir de R$ X" fixaria política em código. E "permitir
+montar pedido com a loja fechada, para enviar na abertura" é **pedido agendado**, que `RN-VEN-048`
+não prevê — o que a regra pedia e faltava era recusar o **envio** na tela, não só no servidor.
 
 
 ⚠⚠ **18/08/2026 — quatro mudanças estruturais no mesmo dia**, todas com ADR:
@@ -258,7 +300,7 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **348 testes** — 109 de domínio + 18 de aplicação + 221 de integração |
+| `dotnet test -c Release` | ✔ **351 testes** — 109 de domínio + 18 de aplicação + 224 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 

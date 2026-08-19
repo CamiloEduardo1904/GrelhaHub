@@ -26,7 +26,13 @@ public sealed class SalvarProdutoValidator : AbstractValidator<SalvarProdutoComm
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(200);
         RuleFor(x => x.CategoriaId).NotEmpty();
-        RuleFor(x => x.Descricao).MaximumLength(500);
+        // RN-VEN-053 — a descrição é texto de vitrine, não catálogo. ⚠ Produto cadastrado antes
+        // desta regra pode trazer mais que isso: a tela mostra quanto excedeu e trava o salvar,
+        // para que o corte seja decisão de quem edita e não 422 sobre um campo que ele nem tocou.
+        RuleFor(x => x.Descricao)
+            .MaximumLength(ProdutoDomain.MaximoDeCaracteresNaDescricao)
+            .WithMessage(
+                $"A descrição deve ter no máximo {ProdutoDomain.MaximoDeCaracteresNaDescricao} caracteres.");
 
         // RN-VEN-032 — o preço vigente é sempre maior que zero.
         // O CHECK no banco valida o DOMÍNIO; a mensagem legível vem daqui (ADR-0009).

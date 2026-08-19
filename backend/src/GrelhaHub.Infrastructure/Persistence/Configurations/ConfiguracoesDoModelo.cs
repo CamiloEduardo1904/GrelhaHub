@@ -218,6 +218,9 @@ public sealed class ProdutoConfiguration : IEntityTypeConfiguration<Produto>
         builder.HasKey(p => p.Id);
 
         builder.Property(p => p.Nome).IsRequired();
+        // RN-VEN-053 — mesma razão de `pedido.observacao`: o teto de 200 é do que se digita agora
+        // e vive no validator. A coluna continua em 500 porque cadastro feito antes da regra está
+        // lá, e a tela é que pede o corte na próxima edição.
         builder.Property(p => p.Descricao).HasMaxLength(500);
         builder.Property(p => p.Preco).HasColumnType("numeric(12,2)").IsRequired();
         builder.Property(p => p.UrlImagem).HasMaxLength(500);
@@ -272,6 +275,10 @@ public sealed class PedidoConfiguration : IEntityTypeConfiguration<Pedido>
         builder.Property(p => p.Numero).IsRequired();
         builder.Property(p => p.Canal).HasConversion<int>().IsRequired();
         builder.Property(p => p.Status).HasConversion<int>().IsRequired();
+        // RN-VEN-052 ⚠ — 500, e NÃO os 80 da regra. O teto de 80 é do que se digita agora, e vive
+        // no validator; a coluna guarda o que já foi gravado. Encurtar o varchar recusaria pedido
+        // antigo na primeira leitura — reclassificar o passado é exatamente o que RN-GER-036
+        // decidiu não fazer. Quem for "corrigir" esta divergência, leia a regra antes.
         builder.Property(p => p.Observacao).HasMaxLength(500);
         builder.Property(p => p.MotivoCancelamento).HasMaxLength(500);
         builder.Property(p => p.CriadoEm).HasColumnName("dh_criacao");

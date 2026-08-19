@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { CpfNaListagem } from '../../components/CpfNaListagem';
+import { ReenviarConvite } from '../../components/ReenviarConvite';
 import { Grelha } from '../../components/Grelha';
 import { IconeChave, IconeDesligar, IconeLapis, IconeMais } from '../../components/Icone';
 import { api, mensagemDeErro } from '../../services/api';
@@ -144,7 +146,13 @@ export function UsuariosDaPlataforma() {
                     {u.sobrenome ? ` ${u.sobrenome}` : ''}
                   </strong>
                 </td>
-                <td className="dado">{u.cpf ?? '—'}</td>
+                {/* ⚠⚠ RN-GER-039 — o caso PIOR da regra, e a razão de ela existir: esta
+                    listagem atravessa todas as casas (RN-GER-014). Com centenas de lojas, uma
+                    coluna de CPF aberta é um cadastro consolidado de pessoas físicas de cliente
+                    numa única tela. */}
+                <td>
+                  <CpfNaListagem cpf={u.cpf} />
+                </td>
                 <td className="dado">{u.email}</td>
                 <td>
                   <span className="chave">{u.perfil}</span>
@@ -153,6 +161,11 @@ export function UsuariosDaPlataforma() {
                   <span className="selo" data-fase={situacao(u)}>
                     {rotuloDaSituacao(u)}
                   </span>
+
+                  {/* ⚠⚠ Aqui pesa mais que na loja: esta tela existe para ATENDER o cliente, e o
+                      atendente enxergava a pendência do outro lado da linha sem poder resolver
+                      dali. RN-GER-032, RN-GER-033. */}
+                  {u.ativo && u.deveTrocarSenha && <ReenviarConvite email={u.email} />}
                 </td>
                 <td className="col-estreita">
                   <button

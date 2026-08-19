@@ -55,7 +55,22 @@ public sealed class CriarPedidoPublicoValidator : AbstractValidator<CriarPedidoP
                 .LessThanOrEqualTo(99).WithMessage("Quantidade acima do limite por item.");
         });
 
-        RuleFor(x => x.Observacao).MaximumLength(500);
+        // RN-VEN-052 ⚠ — a observação do cliente é instrução de preparo, e cabe inteira na
+        // comanda. O campo da vitrine já tem `maxLength`, mas quem não passou pela vitrine chega
+        // aqui: a tela evita a viagem, o validator decide — a mesma divisão do mínimo do motivo
+        // no <Dialogo />.
+        RuleFor(x => x.Observacao)
+            .MaximumLength(Pedido.MaximoDeCaracteresNaObservacao)
+            .WithMessage(
+                $"A observação deve ter no máximo {Pedido.MaximoDeCaracteresNaObservacao} caracteres.");
+
+        // RN-VEN-052 — a observação do item segue o mesmo teto. Hoje nenhuma tela a preenche;
+        // o validator existe para que o dia em que uma preencher não invente outro número.
+        RuleForEach(x => x.Itens).ChildRules(item =>
+            item.RuleFor(i => i.Observacao)
+                .MaximumLength(Pedido.MaximoDeCaracteresNaObservacao)
+                .WithMessage(
+                    $"A observação do item deve ter no máximo {Pedido.MaximoDeCaracteresNaObservacao} caracteres."));
     }
 }
 

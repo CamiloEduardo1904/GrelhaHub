@@ -61,3 +61,25 @@ function verificador(digitos: string, ate: number, pesoInicial: number): string 
 
   return String(resto === 10 ? 0 : resto);
 }
+
+/**
+ * `RN-GER-039` ⚠ — o CPF como ele aparece em **listagem**: `•••.752.818-••`.
+ *
+ * Guarda os dois grupos do meio e esconde o primeiro e o verificador. É o suficiente para quem
+ * está conferindo um documento na mão reconhecer a pessoa, e insuficiente para quem passou pela
+ * mesa levar o número.
+ *
+ * ⚠⚠ **Isto reduz exposição de TELA, não acesso.** O número vem na resposta da API e quem abre o
+ * inspetor o lê. A minimização de verdade é a listagem parar de devolvê-lo — dívida declarada na
+ * regra e na `SPEC-GER-007`. Chamar isto de proteção sem dizer o resto seria o cadeado em campo
+ * que a API devolve, que a `CHAPA-05` recusa por mentir sobre o modelo.
+ */
+export function mascararCpf(cpf: string | null | undefined): string {
+  const d = apenasDigitos(cpf ?? '');
+
+  // Documento incompleto não é mascarado: mascarar o que já está parcial esconde que ele está
+  // parcial. O usuário de plataforma não tem CPF (`RN-GER-023`), e ali o valor é nulo.
+  if (d.length !== DIGITOS) return d;
+
+  return `•••.${d.slice(3, 6)}.${d.slice(6, 9)}-••`;
+}

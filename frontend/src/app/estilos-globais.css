@@ -63,6 +63,42 @@
   --toque: 48px;
   --toque-admin: 44px;
 
+  /* --- Escala tipográfica — CHAPA-13, design system §2.3 ---
+
+         Oito degraus, razão ~1,25, ancorados em 16px. Antes não havia escala nenhuma: uma
+         revisão externa contou **21 tamanhos distintos na vitrine**, com valores como 17,28px
+         e 15,68px — a assinatura de tamanho em `em` dentro de elemento que já tinha `em`, cada
+         nível multiplicando o anterior.
+
+         O usuário não percebe os números. Percebe que nada tem peso relativo claro: um rótulo
+         de 13,28px e outro de 13,6px deveriam ser o mesmo nível de hierarquia, e o olho
+         registra o ruído sem identificar a causa.
+
+         ⚠ Tudo em `rem`. `em` para tamanho de fonte é o que produz o valor fracionário, e o
+         fracionário é o sintoma de que ninguém escolheu aquele degrau. */
+  --texto-2xs: 0.75rem;  /* 12px — rótulo mono, eyebrow, selo */
+  --texto-xs: 0.875rem;  /* 14px — legenda, metadado */
+  --texto-sm: 1rem;      /* 16px — corpo */
+  --texto-md: 1.25rem;   /* 20px — corpo destacado, lead */
+  --texto-lg: 1.5rem;    /* 24px — título de cartão */
+  --texto-xl: 2rem;      /* 32px — título de seção */
+  --texto-2xl: 3rem;     /* 48px — display secundário */
+  --texto-3xl: 3.75rem;  /* 60px — capa */
+
+  /* --- Escala de espaçamento — CHAPA-13 ---
+
+         Os mesmos degraus, para ritmo vertical. O que existia era um `padding` constante numa
+         única regra da vitrine (3,25rem) e nada em nenhum outro lugar: sem token, cada seção
+         nova escolhia um número, e a escolha era sempre plausível e sempre diferente. */
+  --esp-1: 0.5rem;
+  --esp-2: 1rem;
+  --esp-3: 1.5rem;
+  --esp-4: 2rem;
+  --esp-6: 3rem;
+  --esp-8: 4rem;
+  --esp-12: 6rem;
+  --esp-16: 8rem;
+
   /* --- Movimento: CHAPA-08, docs/08-design-system.md §9 ---
 
          12px e não 40: a Chapa é traço de 2px e sombra sólida de 5px, e a sombra que não
@@ -197,6 +233,56 @@ code,
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+/* RN-VEN-052, RN-VEN-053 — quantos caracteres couberam. É DADO (CHAPA-03): mono com
+   tabular-nums, senão o número dança a cada tecla. */
+.contador-de-caracteres {
+  /* Bloco alinhado à direita, e não `align-self`: o <label> deste projeto é `display: block`,
+     onde `align-self` não faz nada. */
+  display: block;
+  text-align: right;
+  margin-top: 0.3rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.contador-de-caracteres[data-excedido] {
+  color: var(--erro);
+  font-weight: 700;
+}
+
+/* ⚠ RN-VEN-053 / CHAPA-10 — a descrição na tabela da gestão é prosa, e estava em `.secundario`,
+   que é cor de metadado. Duas linhas porque ali se procura nome e preço; o texto completo fica
+   no `title`, e é o `maxLength` de 200 que garante que o resumo esconda pouco. */
+.descricao-resumida {
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin: 0.15rem 0 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* Texto só para leitor de tela. Sem `display: none`, que o tira da árvore de acessibilidade —
+   e sem `opacity`, que a CHAPA-10 proíbe em texto. */
+.somente-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .tagline {
@@ -578,12 +664,54 @@ legend {
   color: var(--muted);
 }
 
+/* RN-VEN-052 / CHAPA-10 — a observação do item é PROSA, e prosa não usa cor de metadado.
+   O que fica em --muted é o rótulo, que é metadado de verdade. */
 .comanda-itens .obs {
   display: block;
   font-family: var(--sans);
   font-size: 0.78rem;
   font-style: italic;
+  color: var(--text);
+  padding-left: 1.6rem;
+  overflow-wrap: anywhere;
+}
+
+.comanda-itens .obs-rotulo {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--muted);
+}
+
+/* ⚠ RN-VEN-052 — o bloco que faltava. A observação do cliente vinha como `.nota`: filete âmbar,
+   texto em --muted, nenhum rótulo — e entre os itens e o total isso lê como sobra de tela, não
+   como o único campo em que o cliente falou com a cozinha.
+
+   Filete de citação, e ele NÃO disputa com a CHAPA-02: a barra de estado do cartão é a
+   <Grelha> do cabeçalho; esta não tem estado nenhum. */
+.comanda-obs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border-left: 5px solid var(--ambar-chama);
+  padding-left: 0.9rem;
+}
+
+.comanda-obs .rotulo {
+  font-size: 0.66rem;
+}
+
+/* ⚠ `overflow-wrap: anywhere`: 80 caracteres sem espaço são texto válido, e sem isto eles
+   estouram a largura do cartão. `pre-wrap` porque o cliente digita em <textarea> — a quebra de
+   linha que ele escreveu é parte da instrução. */
+.comanda-obs-texto {
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .comanda-soma {
@@ -1899,6 +2027,10 @@ button.link-discreto {
   font-size: 0.9rem;
   line-height: 1.35;
   color: var(--text);
+
+  /* RN-VEN-053 — inteira na vitrine, porque é o que ajuda a escolher. `anywhere` para que
+     200 caracteres sem espaço quebrem em vez de estourar a linha do prato. */
+  overflow-wrap: anywhere;
 }
 
 .prato-preco {
@@ -2861,4 +2993,205 @@ button.link-discreto {
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* ============================================================================
+   REVISÃO DE DESIGN E UX — 19/08/2026
+
+   Os itens desta seção vêm de uma revisão externa das quatro superfícies. Cada
+   bloco diz qual achado ele fecha, porque a razão de existir não está no seletor.
+   ============================================================================ */
+
+/* ── Faixa de categorias do cardápio público ─────────────────────────────────
+   Achado 4.4: quatro grupos e nenhum atalho entre eles. Com quarenta itens
+   reais, quem quer bebida atravessa o cardápio de lanche inteiro no celular.
+
+   Fixa abaixo do topo, com rolagem horizontal e a barra nativa escondida —
+   mesmo tratamento das abas do painel, e pelo mesmo motivo. */
+.faixa-categorias {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--surface-2);
+  color: var(--text);
+  border-bottom: var(--traco);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.faixa-categorias::-webkit-scrollbar {
+  display: none;
+}
+
+.faixa-categorias .chip {
+  flex: none;
+  text-decoration: none;
+
+  /* Alvo de 48 px: é tela de cliente, e `RNF-010` mede o público em 48, não em 44. */
+  min-height: var(--toque);
+}
+
+/* A âncora precisa parar ABAIXO da faixa, não atrás dela. */
+.grupo[id] {
+  scroll-margin-top: 4.5rem;
+}
+
+/* ── Barra fixa do pedido, no celular ────────────────────────────────────────
+   Achado 4.2 — o de maior impacto comercial da revisão. No desktop o carrinho é
+   `sticky` na coluna direita; no celular ele ficava DEPOIS de todos os produtos,
+   e adicionar item não mudava nada no campo de visão de quem tocou o botão.
+
+   ⚠ Só existe no celular. No desktop a coluna direita já resolve, e uma barra
+   fixa ali seria um segundo total competindo com o primeiro. */
+.barra-do-pedido {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .barra-do-pedido {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+
+    padding: 0.7rem 1.1rem;
+
+    /* ⚠ `env(safe-area-inset-bottom)`: sem isto a barra fica atrás do indicador de
+       home do iPhone, e o botão de fechar o pedido é o que some. */
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+
+    /* CHAPA-11 — quem declara `background` declara `color`. */
+    background: var(--surface);
+    color: var(--text);
+
+    /* Borda em cima e sombra sólida para cima: a barra é um objeto sobre a página,
+       e `0 -4px 0` mantém a sombra deslocada da CHAPA-01 apontando para onde ela
+       precisa apontar. */
+    border-top: var(--traco);
+    box-shadow: 0 -4px 0 var(--shadow);
+  }
+
+  .barra-do-pedido-resumo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .barra-do-pedido-resumo .dado {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .barra-do-pedido-resumo strong {
+    font-size: 1.05rem;
+  }
+
+  .barra-do-pedido .btn {
+    flex: none;
+    min-height: var(--toque);
+  }
+
+  /* O último produto não pode ficar atrás da barra. Reserva a altura dela mais o
+     recorte do aparelho. */
+  .vitrine {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Abas com rolagem, sem a barra nativa ────────────────────────────────────
+   Achados 5.2 (painel) e o mesmo caso na plataforma: as abas não cabem no
+   celular e o navegador desenhava a barra de rolagem nativa, com setas, logo
+   abaixo do menu. Destoa de tudo e não é padrão de aplicativo — e pior, LOJA e
+   OPERAÇÃO ficavam fora de vista sem nenhum sinal de que existiam.
+
+   A máscara à direita é o sinal: o conteúdo desaparece esmaecendo, o que se lê
+   como "tem mais ali". ⚠ `mask-image` e não `opacity` no texto — a CHAPA-10
+   proíbe `opacity` em texto, e aqui o que esmaece é a CAMADA, não a cor. */
+.abas {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.abas::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .abas {
+    mask-image: linear-gradient(to right, #000 88%, transparent);
+  }
+}
+
+/* ── CPF na listagem — RN-GER-039 ────────────────────────────────────────────
+   Achados 5.8 e 3.1: CPF completo em duas listagens, sendo uma delas a da
+   plataforma, que atravessa todas as casas. */
+.cpf-listagem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cpf-listagem .dado {
+  font-variant-numeric: tabular-nums;
+
+  /* Largura fixa: mascarado e revelado têm contagens de caractere diferentes, e sem
+     isto a coluna inteira dança quando alguém aperta "Mostrar". */
+  min-width: 11ch;
+}
+
+/* Botão de apoio dentro de célula: menor que o alvo de 44 px de propósito — é ação
+   de mesa, não de operação, e a linha da tabela tem 40 px. O rótulo textual mantém
+   a área clicável utilizável. */
+.btn.minuscula {
+  min-height: 1.9rem;
+  padding: 0 0.5rem;
+  font-size: 0.62rem;
+  box-shadow: none;
+}
+
+/* ── Tempo de espera na comanda — achado 5.5 ──────────────────────────────────
+   O selo e o tempo empilhados à direita do número. Coluna e não linha: em cartão
+   estreito os dois lado a lado empurravam o selo para baixo do número. */
+.comanda-estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.comanda-espera {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+
+  /* Metadado, e por isso `--muted` é a cor certa aqui — não é prosa (CHAPA-10). */
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Atalhos da semana no cadastro de horário — achado 5.12 ───────────────────
+   Sete linhas preenchidas à mão, uma por dia, quando a maioria das casas repete
+   o mesmo horário. */
+.atalhos-de-semana {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.atalhos-de-semana .rotulo {
+  margin-right: 0.15rem;
 }

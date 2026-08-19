@@ -9,10 +9,15 @@ import type { PedidoResumo, StatusPedido } from '../../services/tipos';
 import type { Estabelecimento } from './tipos';
 
 /**
- * A operação de uma casa — pedidos por **dia operacional** e por fase do ciclo.
+ * Os **pedidos** de uma casa, vistos pela plataforma — por dia operacional e por fase do ciclo.
+ *
+ * ⚠ Chamava-se `OperacaoDaCasa`, e o nome era metade do defeito: com "Operação" já sendo o
+ * painel de faturamento (`RN-GER-038`), dois componentes disputavam a mesma palavra e a aba que
+ * apontava para este vinha rotulada "Horário e endereço". Nome que não diz o que a tela mostra
+ * sobrevive à revisão porque ninguém abre o arquivo para conferir.
  *
  * ⚠⚠ **`RN-GER-006` manda aqui, e é a regra mais fácil de errar numa tela de filtro.** O intervalo
- * é de **dia operacional**, das 04h00 às 03h59 — não de data de calendário. "De 10 a 12" são três
+ * é de **dia operacional** — o que vai de uma virada à seguinte, e não de data de calendário. "De 10 a 12" são três
  * dias operacionais, e não 72 horas corridas: o pedido da 01h30 do dia 13 pertence ao dia 12, que é
  * como o restaurante conta a noite dele.
  *
@@ -52,7 +57,7 @@ const ATALHOS = [
   { chave: '30', nome: '30 dias', calcular: () => [diasAtras(29), hojeIso()] as const },
 ] as const;
 
-export function OperacaoDaCasa({ casa }: { casa: Estabelecimento }) {
+export function PedidosDaCasa({ casa }: { casa: Estabelecimento }) {
   const [de, setDe] = useState(hojeIso);
   const [ate, setAte] = useState(hojeIso);
   const [fase, setFase] = useState<Fase>('todas');
@@ -120,11 +125,17 @@ export function OperacaoDaCasa({ casa }: { casa: Estabelecimento }) {
         </nav>
       </div>
 
-      {/* RN-GER-006 — dito por extenso, porque é o que faz o número desta tela bater com o do
-          painel do restaurante. */}
+      {/* ⚠⚠ RN-GER-036 — a frase dizia "das 04h00 às 03h59", e isso deixou de ser verdade em
+          18/08/2026: a virada passou a sair do horário cadastrado de CADA casa. Numa tela da
+          plataforma, que olha a casa dos outros, afirmar a virada errada é pior que não afirmar
+          nada — o suporte confere um número com o dono e os dois discordam sem saber por quê.
+
+          O texto agora diz a PROPRIEDADE, que vale para toda casa, e manda para onde o número
+          real está: a aba "Horário e endereço", que exibe a virada derivada. */}
       <p className="secundario">
-        O dia operacional vai das <strong>04h00 às 03h59</strong>: o pedido da madrugada pertence
-        ao dia anterior.
+        O dia operacional vai da <strong>virada cadastrada desta casa</strong> até um minuto antes
+        dela no dia seguinte: o pedido da madrugada pertence ao dia anterior. A virada em vigor
+        está em <strong>Horário e endereço</strong>.
       </p>
 
       <nav className="chips" aria-label="Filtrar por fase do pedido">

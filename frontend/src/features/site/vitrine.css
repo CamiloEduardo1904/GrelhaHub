@@ -9,6 +9,20 @@
 
    Nenhum recurso de estilo novo: mesma sombra sólida, mesmo traço de 2 px,
    mono no dado, prosa em sans. A página vende com o que a Chapa já tem.
+
+   ⚠ 19/08/2026 — TAMANHO DE FONTE AQUI SÓ POR TOKEN (`CHAPA-13`).
+   Uma revisão externa contou 21 tamanhos distintos nesta página, com valores
+   fracionários (17,28px, 15,68px) vindos de `em` aninhado. Os 21 foram
+   reduzidos aos oito degraus de `--texto-*`, escolhidos um a um:
+
+     0,70 / 0,72rem  → --texto-2xs   rótulo mono, eyebrow
+     0,78 … 0,90rem  → --texto-xs    legenda, apoio
+     0,95 … 1,02rem  → --texto-sm    corpo
+     1,08 … 1,30rem  → --texto-md    corpo destacado, título de cartão
+     1,45 / 1,60rem  → --texto-lg    título de bloco
+     os três clamp   → extremos ancorados em token
+
+   Acrescentar um valor cru aqui recria o problema em um commit.
    ============================================================================ */
 
 .site {
@@ -118,7 +132,7 @@
 }
 
 .barra-site .wordmark {
-  font-size: 1.15rem;
+  font-size: var(--texto-md);
 }
 
 .menu-site {
@@ -135,7 +149,7 @@
   min-height: var(--toque-admin);
   color: var(--cinza-quente);
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: var(--texto-2xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -205,14 +219,14 @@
 
 .capa-texto h1 {
   font-family: var(--peso);
-  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  font-size: clamp(var(--texto-xl), 5.2vw, var(--texto-3xl));
   line-height: 1.02;
   letter-spacing: -0.04em;
 }
 
 .capa-sub {
   max-width: 46ch;
-  font-size: 1.08rem;
+  font-size: var(--texto-md);
   line-height: 1.6;
 
   /* Sem `opacity`: era 0.82, que levava o contraste de 15,5:1 para ~10:1 e amaciava o texto
@@ -241,7 +255,7 @@
   flex-wrap: wrap;
   gap: 0.5rem 1.4rem;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: var(--texto-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--cinza-quente);
@@ -289,10 +303,19 @@
   color: var(--creme);
 }
 
+/* Ritmo vertical em token — CHAPA-13.
+   O valor era 3,25rem, constante e fora de escala; e não havia degrau no celular, onde 4rem de
+   respiro em cima e embaixo de cada faixa custa meia dobra de tela. */
 .faixa-interna {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 3.25rem 1.25rem;
+  padding: var(--esp-8) var(--esp-3);
+}
+
+@media (max-width: 780px) {
+  .faixa-interna {
+    padding: var(--esp-6) var(--esp-3);
+  }
 }
 
 .faixa-interna.estreita {
@@ -309,7 +332,7 @@
 
 .titulo-secao h2 {
   font-family: var(--peso);
-  font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+  font-size: clamp(var(--texto-lg), 3.4vw, var(--texto-xl));
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
@@ -386,7 +409,7 @@
 .cartao-num h3,
 .bloco-recurso h3 {
   font-family: var(--mono);
-  font-size: 0.86rem;
+  font-size: var(--texto-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -397,7 +420,7 @@
 .cartao-dor p,
 .cartao-num p,
 .bloco-recurso p {
-  font-size: 0.95rem;
+  font-size: var(--texto-sm);
   line-height: 1.55;
   color: var(--text);
 }
@@ -412,7 +435,7 @@
   position: absolute;
   top: 0.7rem;
   left: 1.15rem;
-  font-size: 0.78rem;
+  font-size: var(--texto-xs);
   font-weight: 700;
   letter-spacing: 0.14em;
   color: var(--laranja-brasa);
@@ -445,12 +468,12 @@
 
 .passos h3 {
   font-family: var(--peso);
-  font-size: 1.2rem;
+  font-size: var(--texto-md);
   letter-spacing: -0.02em;
 }
 
 .passos p {
-  font-size: 0.95rem;
+  font-size: var(--texto-sm);
   line-height: 1.55;
   color: var(--text);
 }
@@ -484,12 +507,12 @@
 
 .plano h3 {
   font-family: var(--peso);
-  font-size: 1.45rem;
+  font-size: var(--texto-lg);
   letter-spacing: -0.03em;
 }
 
 .plano-resumo {
-  font-size: 0.95rem;
+  font-size: var(--texto-sm);
   line-height: 1.5;
   color: var(--text);
 }
@@ -505,7 +528,7 @@
 
 .plano-preco strong {
   font-family: var(--peso);
-  font-size: 1.6rem;
+  font-size: var(--texto-lg);
   letter-spacing: -0.02em;
 }
 
@@ -517,7 +540,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  font-size: 0.9rem;
+  font-size: var(--texto-xs);
 }
 
 .plano-itens li {
@@ -559,7 +582,7 @@
   justify-content: space-between;
   gap: 1rem;
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: var(--texto-xs);
   font-weight: 700;
   cursor: pointer;
   list-style: none;
@@ -573,7 +596,7 @@
 .pergunta summary::after {
   content: '+';
   flex: none;
-  font-size: 1.3rem;
+  font-size: var(--texto-md);
   line-height: 1;
   color: var(--laranja-brasa);
 }
@@ -588,7 +611,7 @@
 
 .pergunta p {
   padding: 0.85rem 0.95rem;
-  font-size: 0.98rem;
+  font-size: var(--texto-sm);
   line-height: 1.6;
   color: var(--text);
 }
@@ -614,13 +637,13 @@
 
 .faixa-cta h2 {
   font-family: var(--peso);
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-size: clamp(var(--texto-lg), 4vw, var(--texto-xl));
   letter-spacing: -0.03em;
 }
 
 .faixa-cta p {
   max-width: 52ch;
-  font-size: 1.02rem;
+  font-size: var(--texto-sm);
   line-height: 1.6;
   color: var(--prosa-escura);
 }
@@ -656,7 +679,7 @@
 }
 
 .rodape-colunas a {
-  font-size: 0.9rem;
+  font-size: var(--texto-xs);
 }
 
 /* A descrição da empresa é prosa, não metadado — CHAPA-10. */
@@ -737,5 +760,24 @@
 
   .barra-site-acoes {
     margin-left: auto;
+  }
+}
+
+/* ── Continuidade do menu no celular — achado 3.8 ─────────────────────────────
+   A faixa de âncoras com rolagem horizontal já existia, com a barra nativa
+   escondida; o que faltava era o SINAL de que há mais links à direita. Sem ele,
+   "Perguntas" simplesmente não existe para quem não tentou arrastar.
+
+   A revisão de UX pediu um alternador de menu. Continua fora: a decisão do
+   arquivo é que um botão para revelar quatro links é um clique e um estado a
+   mais — e a alternativa que a própria revisão sugere ("faixa horizontal com
+   rolagem") é o que está aqui. O que faltava era só o esmaecimento.
+
+   ⚠ `mask-image` na CAMADA, e não `opacity` no texto: a CHAPA-10 proíbe
+   `opacity` em texto porque o contraste composto não aparece em ferramenta de
+   verificação. */
+@media (max-width: 780px) {
+  .menu-site {
+    mask-image: linear-gradient(to right, #000 90%, transparent);
   }
 }

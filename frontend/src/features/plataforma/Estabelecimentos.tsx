@@ -5,7 +5,7 @@ import { api, mensagemDeErro } from '../../services/api';
 import { apenasDigitos, cpfValido, formatarCpf } from '../../services/cpf';
 import { CadastroDeOperacao } from './CadastroDeOperacao';
 import { Operacao } from '../admin/Operacao';
-import { OperacaoDaCasa } from './OperacaoDaCasa';
+import { PedidosDaCasa } from './PedidosDaCasa';
 import {
   COM_CODIGO,
   comDependencias,
@@ -22,7 +22,16 @@ import {
  * desta área ficou ilegível.
  */
 
-type Aba = 'operacao' | 'painel' | 'dados' | 'modulos';
+/**
+ * ⚠ **O nome da chave é o nome do que a aba MOSTRA, e isso não é preciosismo de nomenclatura.**
+ *
+ * A versão anterior tinha `operacao` apontando para a lista de pedidos e `painel` apontando para
+ * o painel de operação, com o rótulo "Horário e endereço" no primeiro e "Painel" no segundo — três
+ * nomes para duas telas, e nenhum deles batendo com o conteúdo. Quem abria "Horário e endereço"
+ * recebia a lista de pedidos, e o horário e o endereço viviam escondidos dentro de
+ * "Dados e situação".
+ */
+type Aba = 'pedidos' | 'operacao' | 'dados' | 'loja' | 'modulos';
 
 export function Estabelecimentos() {
   const [lista, setLista] = useState<Estabelecimento[]>([]);
@@ -49,6 +58,13 @@ export function Estabelecimentos() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /**
+   * `RN-GER-019` — quais siglas são de **núcleo**, tiradas do catálogo e não de uma lista escrita
+   * aqui. Cópia local divergiria do servidor no dia em que o núcleo mudasse, e a divergência
+   * apareceria como contagem que não fecha — que é exatamente o defeito que isto corrige.
+   */
+  const nucleo = new Set(catalogo.filter((m) => m.nucleo).map((m) => m.sigla));
 
   const casaAberta = lista.find((c) => c.id === vendo) ?? null;
 
@@ -84,7 +100,10 @@ export function Estabelecimentos() {
 
       <div className="rolagem">
         <table>
-          <caption>Todas as unidades — ADR-0013</caption>
+          {/* ⚠ O código do ADR saiu do título. Jargão de documentação na legenda de uma tabela não
+              comunica nada a quem está atendendo um cliente — a rastreabilidade vive no comentário
+              e no catálogo, que é onde ela é lida. */}
+          <caption>Todas as unidades — a plataforma não pertence a nenhuma casa</caption>
           <thead>
             <tr>
               <th>Estabelecimento</th>
@@ -104,11 +123,26 @@ export function Estabelecimentos() {
                 </td>
                 <td className="dado">{casa.cnpj}</td>
                 <td>
-                  {casa.modulos.map((sigla) => (
-                    <span key={sigla} className="selo" style={{ marginRight: '0.25rem' }}>
-                      {sigla}
-                    </span>
-                  ))}
+                  {/* ⚠ Célula em branco não distingue "não tem módulo" de "não carregou", e as
+                      duas leituras levam a ações opostas: uma é venda, a outra é suporte. */}
+                  {casa.modulos.length === 0 ? (
+                    <span className="secundario">Nenhum módulo</span>
+                  ) : (
+                    casa.modulos.map((sigla) => (
+                      <span
+                        key={sigla}
+                        className="selo"
+                        // RN-GER-019 — o núcleo aparece, mas não como coisa contratada: ele não
+                        // foi vendido, ele vem sempre. Sem a distinção, a contagem da aba (que
+                        // inclui GER) divergia da lista de gestão (que não o mostrava).
+                        data-fase={nucleo.has(sigla) ? 'planejado' : undefined}
+                        title={nucleo.has(sigla) ? 'Núcleo — entra sempre (RN-GER-019)' : undefined}
+                        style={{ marginRight: '0.25rem' }}
+                      >
+                        {sigla}
+                      </span>
+                    ))
+                  )}
                 </td>
                 <td className="num col-estreita">{casa.usuarios}</td>
                 <td className="col-estreita">
@@ -153,7 +187,10 @@ export function Estabelecimentos() {
   );
 }
 
-/** Os detalhes de uma casa, em abas: operação, dados, módulos. */
+/**
+ * Os detalhes de uma casa, em cinco abas: **pedidos, operação, dados e situação, horário e
+ * endereço, módulos**.
+ */
 function DetalheDaCasa({
   casa,
   catalogo,
@@ -163,17 +200,44 @@ function DetalheDaCasa({
   catalogo: ModuloDoCatalogo[];
   aoMudar: () => Promise<void>;
 }) {
-  const [aba, setAba] = useState<Aba>('operacao');
+  const [aba, setAba] = useState<Aba>('pedidos');
 
+  /** `RN-GER-019` — siglas de núcleo, do catálogo. Ver a nota na aba de módulos. */
+  const nucleo = new Set(catalogo.filter((m) => m.nucleo).map((m) => m.sigla));
+
+  /**
+   * ⚠ **O vocabulário é o mesmo do painel do restaurante**, e de propósito: `Pedidos` é a lista
+   * do dia, `Operação` é o faturamento agregado, e o horário e o endereço têm aba própria — lá
+   * ela se chama "Loja", aqui é dita por extenso porque quem olha está numa casa que não é a dele.
+   *
+   * Suporte e restaurante conversam por telefone olhando telas diferentes: quando o operador diz
+   * "vá em Operação", os dois precisam chegar no mesmo lugar.
+   */
   const ABAS: { chave: Aba; nome: string }[] = [
-    { chave: 'operacao', nome: 'Horário e endereço' },
+    { chave: 'pedidos', nome: 'Pedidos' },
 
-    // RN-GER-038 — o painel da casa, visto pela plataforma. Ela alcança pelo bypass de
-    // RN-GER-014, e o recorte vai na consulta: `unidadeId` diz de QUAL casa, e o servidor
+    // RN-GER-038 — o painel de operação da casa, visto pela plataforma. Ela alcança pelo bypass
+    // de RN-GER-014, e o recorte vai na consulta: `unidadeId` diz de QUAL casa, e o servidor
     // ignora o parâmetro para quem não é plataforma (RN-GER-016).
-    { chave: 'painel', nome: 'Painel' },
+    { chave: 'operacao', nome: 'Operação' },
+
     { chave: 'dados', nome: 'Dados e situação' },
-    { chave: 'modulos', nome: `Módulos · ${casa.modulos.length}` },
+
+    // RN-GER-036 / RN-GER-037 — deixou de ser um bloco no fim de "Dados e situação". Aba própria:
+    // é o cadastro que decide a virada do dia operacional da casa, e ninguém procura isso dentro
+    // de uma tela de razão social.
+    { chave: 'loja', nome: 'Horário e endereço' },
+
+    // ⚠ A contagem é de módulos CONTRATADOS, e não de `casa.modulos.length`.
+    //
+    // O total incluía o núcleo (`GER`), mas a lista de gestão o filtra por `!m.nucleo` — então a
+    // aba dizia "Módulos · 10" e abria uma lista de 9. Quem administra o que o cliente paga
+    // encontrava uma divergência de um item e não tinha como saber qual dos dois números estava
+    // errado. Agora a aba conta o que é contratável, e o núcleo é dito dentro da tela.
+    {
+      chave: 'modulos',
+      nome: `Módulos · ${casa.modulos.filter((sigla) => !nucleo.has(sigla)).length}`,
+    },
   ];
 
   return (
@@ -203,30 +267,25 @@ function DetalheDaCasa({
         ))}
       </nav>
 
-      {aba === 'operacao' && <OperacaoDaCasa casa={casa} />}
+      {/* ⚠ Uma linha por aba, na MESMA ordem de `ABAS`, e cada uma renderizando o que o rótulo
+          promete. A versão anterior tinha duas delas trocadas e uma quarta tela escondida dentro
+          de outra aba — e ninguém percebeu porque o roteamento estava espalhado em três blocos
+          aninhados, um deles condicionado por `(aba === 'dados' || aba === 'modulos')`.
 
-      {aba === 'painel' && <Operacao unidadeId={casa.id} />}
+          Enumerado, nunca por negação: condição escrita como "tudo menos X" adota silenciosamente
+          toda aba nova, e já foi assim que o painel entrou num bloco que não era dele. */}
+      {aba === 'pedidos' && <PedidosDaCasa casa={casa} />}
 
-      {/* ⚠ Enumerado, e não por negação: condição escrita como "tudo menos X" adota
-          silenciosamente toda aba nova, e foi assim que o painel entrou num bloco que não era
-          dele. Lista explícita envelhece melhor. */}
-      {(aba === 'dados' || aba === 'modulos') && (
-        <>
+      {aba === 'operacao' && <Operacao unidadeId={casa.id} />}
 
-          {aba === 'dados' && (
-            <>
-              <DadosDaCasa casa={casa} aoMudar={aoMudar} />
+      {aba === 'dados' && <DadosDaCasa casa={casa} aoMudar={aoMudar} />}
 
-              {/* RN-GER-036 / RN-GER-037 — endereço e horário. Fica sob a mesma sessão de
-                  suporte do bloco acima: é dado do cliente sendo alterado em nome dele. */}
-              <CadastroDeOperacao unidadeId={casa.id} />
-            </>
-          )}
+      {/* RN-GER-036 / RN-GER-037 — dado do cliente alterado em nome dele, e por isso a trilha
+          registra quem mexeu (RN-GER-015). */}
+      {aba === 'loja' && <CadastroDeOperacao unidadeId={casa.id} />}
 
-          {aba === 'modulos' && (
-            <ModulosDaCasa casa={casa} catalogo={catalogo} aoMudar={aoMudar} />
-          )}
-        </>
+      {aba === 'modulos' && (
+        <ModulosDaCasa casa={casa} catalogo={catalogo} aoMudar={aoMudar} />
       )}
     </div>
   );
@@ -437,10 +496,42 @@ function ModulosDaCasa({
         (<code>RN-GER-011</code>, <code>RN-GER-021</code>).
       </p>
 
-      <fieldset>
-        <legend>Módulos</legend>
+      {/* ⚠⚠ RN-GER-019 — o NÚCLEO aparece, e antes não aparecia.
+          A lista filtrava `!m.nucleo` com o argumento de que "não existe unidade sem ele", o que é
+          verdade e ainda assim produzia um defeito: a aba contava 10 módulos e a lista mostrava 9.
+          Quem administra o que o cliente paga via uma divergência de um item sem saber qual dos
+          dois números estava errado — e a resposta ("um deles é o núcleo") não estava na tela.
 
-        {/* RN-GER-019 — o núcleo não aparece como escolha: não existe unidade sem ele. */}
+          Ele entra como linha travada, dizendo o que é: incluído, não contratado, não removível. */}
+      <fieldset>
+        <legend>Incluído no produto</legend>
+
+        {catalogo
+          .filter((m) => m.nucleo)
+          .map(({ sigla, nome }) => (
+            <div key={sigla} className="linha-modulo">
+              <label className="alternador">
+                <input
+                  type="checkbox"
+                  checked
+                  disabled
+                  title="O núcleo entra sempre e não é contratável — RN-GER-019"
+                />
+                <span className="chave">{sigla}</span>
+              </label>
+
+              <span className="secundario">{nome}</span>
+
+              <span className="selo" data-fase="fim">
+                Entra sempre
+              </span>
+            </div>
+          ))}
+      </fieldset>
+
+      <fieldset>
+        <legend>Módulos contratáveis</legend>
+
         {catalogo
           .filter((m) => !m.nucleo)
           .map(({ sigla, nome, dependeDe }) => {
@@ -454,13 +545,36 @@ function ModulosDaCasa({
             const travado =
               ocupado || (!habilitado && faltando.length > 0) || presos.length > 0;
 
+            /**
+             * ⚠ O motivo de o controle estar travado, na PRÓPRIA caixa.
+             *
+             * Os selos ao lado já diziam a cadeia, e ainda assim a revisão de UX registrou
+             * "checkbox cinza sem tooltip nem legenda": o selo fica depois do nome do módulo, e o
+             * olho que encontra o controle desabilitado não chega até ele. Quem tenta clicar
+             * precisa da explicação no ponto do clique.
+             */
+            const motivoDoTravamento = ocupado
+              ? 'Aguarde a alteração anterior terminar.'
+              : presos.length > 0
+                ? `Não pode ser desativado: ${presos.join(', ')} ${
+                    presos.length === 1 ? 'depende' : 'dependem'
+                  } deste. Desative-${presos.length === 1 ? 'o' : 'os'} primeiro (RN-GER-020).`
+                : faltando.length > 0
+                  ? `Não pode ser ativado sozinho: exige ${faltando.join(', ')}. Ative-${
+                      faltando.length === 1 ? 'o' : 'os'
+                    } primeiro (RN-GER-020).`
+                  : undefined;
+
             return (
               <div key={sigla} className="linha-modulo">
-                <label className="alternador">
+                <label className="alternador" title={motivoDoTravamento}>
                   <input
                     type="checkbox"
                     checked={habilitado}
                     disabled={travado}
+                    // Um `<input disabled>` não recebe foco nem dispara `title` em leitor de tela;
+                    // o rótulo acessível vai no próprio controle.
+                    aria-label={motivoDoTravamento ? `${sigla} — ${motivoDoTravamento}` : sigla}
                     onChange={(e) => void alternar(sigla, e.target.checked)}
                   />
                   <span className="chave">{sigla}</span>

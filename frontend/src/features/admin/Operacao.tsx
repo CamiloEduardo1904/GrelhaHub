@@ -258,6 +258,21 @@ function MaisVendidos({ produtos }: { produtos: ProdutoVendido[] }) {
         <span className="dado">{produtos.length} produtos</span>
       </header>
 
+      {/* ⚠ O critério, dito. A revisão de UX leu esta lista como "ordenada de forma ambígua",
+          citando "Batata frita (2× · R$ 36,00) acima de X-Burger (2× · R$ 56,00)". A ordem estava
+          certa e era determinística — empate em quantidade, desempate alfabético —, e nada na tela
+          dizia isso. Ranking cujo critério não está escrito é ranking em que ninguém confia.
+
+          ⚠⚠ **Não há alternador "por faturamento" aqui, e a ausência é decisão.** O servidor
+          devolve os oito primeiros POR QUANTIDADE (`Take` depois do `OrderByDescending`).
+          Reordenar essa lista por valor no cliente mostraria "os oito mais vendidos, dispostos por
+          faturamento" — que não é "os oito que mais faturaram", e a diferença é invisível para
+          quem olha. Alternar de verdade exige o critério ir na consulta. */}
+      <p className="secundario">
+        Por <strong>quantidade vendida</strong>; a barra mede a quantidade. Empate desempata pelo
+        nome.
+      </p>
+
       <ul className="ranking">
         {produtos.map((produto, indice) => (
           <li key={produto.produto}>
@@ -268,7 +283,11 @@ function MaisVendidos({ produtos }: { produtos: ProdutoVendido[] }) {
 
             <span className="ranking-nome">{produto.produto}</span>
 
-            <span className="ranking-trilho">
+            <span
+              className="ranking-trilho"
+              role="img"
+              aria-label={`${produto.quantidade} de ${teto} do mais vendido`}
+            >
               <span
                 className={indice === 0 ? 'barra melhor' : 'barra'}
                 style={{ width: `${(produto.quantidade / teto) * 100}%` }}

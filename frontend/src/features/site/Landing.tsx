@@ -183,7 +183,24 @@ export function Landing() {
           <div className="faixa-interna estreita" data-revela>
             <h2>{CHAMADA_FINAL.titulo}</h2>
             <p>{CHAMADA_FINAL.texto}</p>
-            <BotaoDeContato rotulo={CHAMADA_FINAL.acao} classe="btn" />
+
+            {/* ⚠ Uma revisão de UX registrou esta seção como "CTA final sem botão — bug de
+                conversão". O botão está aqui: `BotaoDeContato` **não renderiza** porque `CONTATO`
+                está vazio, e isso é a `CHAPA-09` funcionando — canal inventado numa vitrine
+                pública é pior que canal nenhum.
+
+                Mas o achado acertou no efeito: quem rolou a página inteira chegava a um fim sem
+                nenhum lugar para ir. A saída não é fabricar um contato, é oferecer o destino que
+                **existe** — e ele existe: quem já é cliente entra. */}
+            <div className="capa-acoes">
+              <BotaoDeContato rotulo={CHAMADA_FINAL.acao} classe="btn" />
+
+              {!linkDeContato() && (
+                <Link className="btn" to="/entrar">
+                  Acessar minha loja
+                </Link>
+              )}
+            </div>
           </div>
         </section>
       </main>

@@ -99,6 +99,37 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
   }
 
   /**
+   * Copia o horário de um dia para os outros — achado 5.12 da revisão de UX.
+   *
+   * Sete linhas preenchidas à mão, uma por dia, e a maioria das casas tem o mesmo horário em
+   * quase todos eles. É o atalho padrão deste tipo de formulário, e a sua ausência custava sete
+   * digitações na configuração inicial de cada loja.
+   *
+   * ⚠ **Só replica dia que ABRE.** Copiar um dia fechado sobre a semana apagaria o horário de
+   * todos os outros com um clique — e o clique mais provável de errar é justamente esse, porque
+   * "aplicar em todos" soa inofensivo. Quem quer fechar a semana fecha dia por dia, que é
+   * trabalho proporcional à consequência.
+   *
+   * ⚠ Não grava: mexe no estado da tela, e quem grava continua sendo o botão de salvar. O usuário
+   * vê o resultado antes de confirmar — atalho que envia sozinho é atalho que não dá para desfazer.
+   */
+  function replicar(deIndice: number, paraIndices: number[]) {
+    const molde = doDia(deIndice);
+
+    if (!molde.abre) return;
+
+    setHorarios((atuais) =>
+      DIAS.map(({ indice }) => {
+        const atual = atuais.find((h) => h.diaDaSemana === indice) ?? { diaDaSemana: indice };
+
+        return paraIndices.includes(indice)
+          ? { ...atual, abre: molde.abre, fecha: molde.fecha }
+          : atual;
+      }),
+    );
+  }
+
+  /**
    * ViaCEP — preenche o que der e **nunca bloqueia**.
    *
    * ⚠ Se o serviço estiver fora do ar, o cadastro continua: os campos seguem editáveis e o aviso
@@ -314,6 +345,33 @@ export function CadastroDeOperacao({ unidadeId }: { unidadeId?: string }) {
             );
           })}
         </ul>
+
+        {/* Os atalhos. O molde é sempre SEGUNDA: é o dia que a casa preenche primeiro, e tomar o
+            primeiro dia que abre como molde faria o botão significar coisas diferentes conforme o
+            estado da semana — atalho tem de ser previsível. */}
+        {doDia(1).abre && (
+          <div className="atalhos-de-semana">
+            <span className="rotulo">Copiar segunda para</span>
+
+            <button
+              type="button"
+              className="chip"
+              onClick={() => replicar(1, [2, 3, 4, 5])}
+              disabled={!podeEditar}
+            >
+              Terça a sexta
+            </button>
+
+            <button
+              type="button"
+              className="chip"
+              onClick={() => replicar(1, [0, 2, 3, 4, 5, 6])}
+              disabled={!podeEditar}
+            >
+              Todos os dias
+            </button>
+          </div>
+        )}
 
         {/* RN-GER-006 ⚠⚠ — a consequência que ninguém adivinha olhando para os horários. */}
         <p className="virada">

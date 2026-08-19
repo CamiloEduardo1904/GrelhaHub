@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { ContadorDeCaracteres } from '../../components/ContadorDeCaracteres';
 import { Dialogo } from '../../components/Dialogo';
 import { EnvioDeImagem } from '../../components/EnvioDeImagem';
 import { Grelha } from '../../components/Grelha';
 import { IconeDesligar, IconeLapis, IconeMais } from '../../components/Icone';
 import { api, mensagemDeErro, moeda } from '../../services/api';
 import { formatarDinheiro, paraCampoDeDinheiro, valorDeDinheiro } from '../../services/dinheiro';
+import { MAXIMO_DESCRICAO_DO_PRODUTO } from '../../services/limites';
 import type { CategoriaInterna, ProdutoInterno } from '../../services/tipos';
 
 /**
@@ -173,6 +175,8 @@ export function Cardapio({
                     <th scope="col" className="num">
                       Preço
                     </th>
+                    {/* RN-VEN-044 — o estado DO TURNO. O cabeçalho é curto porque a coluna é
+                        estreita; o rótulo por extenso está no alternador de cada linha. */}
                     <th scope="col">Tem hoje</th>
                     <th scope="col" className="cel-acoes">
                       Ações
@@ -198,7 +202,16 @@ export function Cardapio({
 
                       <td>
                         <strong>{produto.nome}</strong>
-                        {produto.descricao && <p className="secundario">{produto.descricao}</p>}
+                        {/* RN-VEN-053 — resumida a duas linhas: aqui se procura nome e
+                            preço, e descrição longa em linha de tabela empurra o preço para
+                            fora do olho. O texto completo fica no `title`.
+                            CHAPA-10 — prosa na cor do texto; estava em `.secundario`, que é
+                            cor de metadado. */}
+                        {produto.descricao && (
+                          <p className="descricao-resumida" title={produto.descricao}>
+                            {produto.descricao}
+                          </p>
+                        )}
 
                         {/* RN-VEN-044 — "fora do cardápio" é o estado CADASTRAL, e a tela usa
                             palavra diferente da do turno de propósito. */}
@@ -241,13 +254,25 @@ export function Cardapio({
                             <IconeLapis /> Editar
                           </button>
 
+                          {/* ⚠⚠ RN-VEN-044 — "Tirar do cardápio" é o estado CADASTRAL, e o
+                              rótulo tem de dizer isso por extenso.
+
+                              A coluna "Tem hoje" ao lado controla o estado DO TURNO, e a revisão
+                              de UX apontou os dois como redundância — "se ambos controlam
+                              disponibilidade, gera dúvida". Não controlam a mesma coisa, e fundir
+                              é o erro que a regra existe para impedir: o efeito no cliente é
+                              idêntico (o produto não aparece), mas "saiu do cardápio em março" e
+                              "acabou na terça" são histórias diferentes que um campo só perde.
+
+                              A resposta certa é rótulo mais longo, não controle a menos. */}
                           {produto.ativo ? (
                             <button
                               type="button"
-                              className="btn calada perigo"
+                              className="btn calada"
                               onClick={() => setInativandoProduto(produto)}
+                              title="Retira o produto do cardápio até você repor. Não é o mesmo que 'acabou hoje'."
                             >
-                              <IconeDesligar /> Tirar
+                              <IconeDesligar /> Tirar do cardápio
                             </button>
                           ) : (
                             <button
@@ -260,8 +285,9 @@ export function Cardapio({
                                   }),
                                 )
                               }
+                              title="Devolve o produto ao cardápio."
                             >
-                              Repor
+                              Repor no cardápio
                             </button>
                           )}
                         </div>
@@ -432,7 +458,12 @@ function FormularioDeProduto({
   // quem recusa, e é dele que vem a mensagem (ADR-0009).
   const precoValido = valor > 0;
 
-  const impedido = nome.trim().length === 0 || !categoriaId || !precoValido;
+  // RN-VEN-053 — só acontece com cadastro feito quando o limite era 500. O `maxLength` cobre
+  // a digitação; isto cobre o que já estava lá.
+  const descricaoExcedida = descricao.trim().length > MAXIMO_DESCRICAO_DO_PRODUTO;
+
+  const impedido =
+    nome.trim().length === 0 || !categoriaId || !precoValido || descricaoExcedida;
 
   return (
     <Dialogo
@@ -466,16 +497,35 @@ function FormularioDeProduto({
         <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus maxLength={200} />
       </label>
 
+      {/* RN-VEN-053 — 200 caracteres: o que cabe inteiro na vitrine sem virar parágrafo, e o
+          que a tabela da gestão resume em duas linhas sem esconder metade. */}
       <label>
         Descrição
         <textarea
           rows={2}
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
-          maxLength={500}
+          maxLength={MAXIMO_DESCRICAO_DO_PRODUTO}
           placeholder="O que vai no lanche"
+          aria-invalid={descricaoExcedida ? true : undefined}
         />
+        {descricao.length > 0 && (
+          <ContadorDeCaracteres texto={descricao} maximo={MAXIMO_DESCRICAO_DO_PRODUTO} />
+        )}
       </label>
+
+      {/* ⚠ O caminho de volta, e ele não é hipotético: o campo aceitava 500 até 18/08/2026.
+          `maxLength` impede digitar mais — não encurta o que já está gravado, e não deveria:
+          truncar cadastro alheio ao abrir o formulário é perda silenciosa de dado. O servidor
+          recusaria de qualquer forma; a diferença é o usuário saber o que corrigir ANTES de
+          apertar salvar. */}
+      {descricaoExcedida && (
+        <p className="erro">
+          Esta descrição foi cadastrada quando o limite era outro: tem {descricao.length}{' '}
+          caracteres, e o máximo agora é {MAXIMO_DESCRICAO_DO_PRODUTO}. Encurte em{' '}
+          {descricao.length - MAXIMO_DESCRICAO_DO_PRODUTO} para poder salvar.
+        </p>
+      )}
 
       <label>
         Preço

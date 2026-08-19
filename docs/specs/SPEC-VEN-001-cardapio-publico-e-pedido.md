@@ -6,7 +6,7 @@
 | Módulo | VEN |
 | Situação | `ENTREGUE` — 17/08/2026 |
 | Onda | **Fatia vertical antecipada** — ver §0 |
-| Regras implementadas | `RN-VEN-036`, `RN-VEN-037`, `RN-VEN-038`, `RN-VEN-001`, `RN-VEN-002`, `RN-VEN-003`, `RN-VEN-008`, `RN-VEN-009`, `RN-VEN-011`, `RN-VEN-018` *(parcial)*, `RN-VEN-019`, `RN-VEN-020`, `RN-VEN-032`, `RN-VEN-039`, `RN-VEN-040`, `RN-GER-002` *(parcial)*, `RN-GER-003`, `RN-GER-005`, `RN-GER-006` *(parcial)*, `RN-GER-009` *(parcial)*, `RN-GER-010` *(parcial)*, `RN-GER-012`, `RN-GER-013`, `RN-CRM-001`, `RN-CRM-003`, `RN-RH-006` *(parcial)* |
+| Regras implementadas | `RN-VEN-036`, `RN-VEN-037`, `RN-VEN-038`, `RN-VEN-001`, `RN-VEN-002`, `RN-VEN-003`, `RN-VEN-008`, `RN-VEN-009`, `RN-VEN-011`, `RN-VEN-018` *(parcial)*, `RN-VEN-019`, `RN-VEN-020`, `RN-VEN-032`, `RN-VEN-039`, `RN-VEN-040`, `RN-GER-002` *(parcial)*, `RN-GER-003`, `RN-GER-005`, `RN-GER-006` *(parcial)*, `RN-GER-009` *(parcial)*, `RN-GER-010` *(parcial)*, `RN-GER-012`, `RN-GER-013`, `RN-CRM-001`, `RN-CRM-003`, `RN-RH-006` *(parcial)*, `RN-VEN-047`, `RN-VEN-052` |
 | ADRs aplicáveis | [ADR-0002](../adr/0002-clean-architecture-com-cqrs.md), [ADR-0003](../adr/0003-frontend-e-backend-desacoplados.md), [ADR-0005](../adr/0005-multi-estabelecimento-por-coluna-discriminadora.md), [ADR-0011](../adr/0011-dia-operacional.md) |
 | Data | 17/08/2026 |
 
@@ -61,6 +61,7 @@ receba pedidos por ele — e que a equipe do restaurante veja esses pedidos cheg
 | `RN-CRM-001` | Cliente identificado pelo telefone | Modelo | `UNIQUE (unidade_id, telefone)` |
 | `RN-CRM-003` | Delivery exige cliente identificado | Aplicação | Validator |
 | `RN-RH-006` | Usuário inativo não registra operação | Aplicação | Login recusa `ativo = false` |
+| `RN-VEN-052` `IMP` ⚠ | Observação do cliente com 80 caracteres, rotulada na comanda e nunca truncada | Aplicação | `MaximoDeCaracteresNaObservacao` no validator + `maxLength` no campo + bloco próprio na `<Comanda />` |
 
 > **Três destas regras nasceram desta implementação** — `RN-VEN-039`, `RN-VEN-040` e
 > `RN-GER-013`, origem `IMP` no catálogo v1.3. O comportamento já estava no código, citando
@@ -177,6 +178,35 @@ vazar custo seria mais grave, porque qualquer pessoa o acessa.
 > e é ela que dispara baixa de estoque e ordem de produção (`RN-VEN-018`). Confirmar sozinho
 > comprometeria insumo por um pedido que o restaurante ainda não viu.
 
+### A observação do cliente — `RN-VEN-052`, acrescentada em 18/08/2026
+
+O campo já existia, já era gravado e já era exibido. O que faltava era **dizer o que ele é**.
+
+Na comanda, a observação vinha como um parágrafo `.nota` — filete âmbar à esquerda, texto em
+`--muted`, nenhum rótulo. Entre a lista de itens e o total, isso lê como sobra de tela: quem
+opera não distingue "o cliente pediu sem bacon" de um resto de layout, e o único campo em que o
+cliente fala com a cozinha passava despercebido. **Duas coisas estavam erradas ao mesmo tempo**, e
+a segunda é a que o design system já proibia:
+
+| O que estava | O que passa a ser |
+|--------------|-------------------|
+| Sem rótulo | `Observação do cliente`, em `--muted` — rótulo é metadado, e metadado pode ser discreto |
+| Prosa em `--muted` | Prosa em `--text` — `CHAPA-10`, e a tela do cliente (`Acompanhar`) já fazia certo |
+
+> ⚠ **A tela pública já aplicava `CHAPA-10` a este mesmo dado, e a comanda não.** O comentário
+> em `Acompanhar.tsx` diz o motivo em uma linha: *"sem cebola" ilegível é um sanduíche
+> devolvido*. O mesmo texto, na tela de quem prepara o sanduíche, estava em cor de metadado.
+
+**O limite de 80 caracteres é a outra metade da regra**, e existe para que a comanda possa
+mostrar tudo: com teto, o cartão comporta a observação inteira e nunca precisa truncar. Sem
+teto, ou o cartão cresce sem controle na grade, ou alguém acrescenta reticências — e reticências
+numa instrução de preparo escondem exatamente a parte que ninguém sabe que está faltando.
+
+⚠ **O limite não desceu para a coluna.** `pedido.observacao` continua `varchar(500)`: encurtar a
+coluna reclassificaria pedido já gravado, que é o oposto do que `RN-GER-036` estabeleceu no mesmo
+dia sobre não mexer no passado. O teto é do que se digita agora — tela e validator —, e um pedido
+antigo mais longo continua sendo exibido inteiro.
+
 ## 5. Critérios de aceite
 
 ### CA-1 — Cardápio público não vaza custo (`RN-GER-012`, `RN-VEN-037`)
@@ -250,6 +280,30 @@ vazar custo seria mais grave, porque qualquer pessoa o acessa.
 > **Então** o banco guarda `12345678000199` e `11987654321`,
 > **e** um segundo pedido com o telefone digitado como `11 98765 4321` resolve para o
 > **mesmo** cliente, em vez de criar um duplicado.
+
+### CA-11 — Observação acima de 80 caracteres é recusada (`RN-VEN-052`)
+
+> **Dado** um cardápio público no ar,
+> **Quando** o cliente enviar um pedido com 81 caracteres na observação,
+> **Então** a API responde 422 com mensagem legível,
+> **e** com 80 caracteres exatos o pedido é criado e a observação é gravada inteira.
+
+O campo da vitrine tem `maxLength={80}` e um contador, então o 81º caractere normalmente nem
+chega a ser digitado. **O teste é do servidor**, e é ele que decide: a tela evita a viagem, o
+validator recusa quem não passou pela tela — a mesma divisão que o `<Dialogo />` já usava para o
+mínimo do motivo.
+
+### CA-12 — A observação chega inteira à listagem da loja (`RN-VEN-052`)
+
+> **Dado** um pedido com 80 caracteres na observação,
+> **Quando** a loja listar os pedidos do dia,
+> **Então** `observacao` vem no payload **completa**, sem reticências nem corte,
+> **e** a comanda a exibe sob o rótulo `Observação do cliente`.
+
+⚠ **O corte, se existisse, seria do servidor** — e é isso que este critério recusa. Truncar na
+API pouparia bytes e apagaria a única frase que o cliente escreveu para a cozinha; truncar na
+tela seria pior ainda, porque o operador não teria como saber que falta pedaço.
+
 
 ## 6. Modelo de dados tocado
 

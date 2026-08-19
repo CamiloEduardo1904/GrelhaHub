@@ -153,6 +153,14 @@ export function EnvioDeImagem({
         <span className="miniatura vazia" aria-hidden="true" />
       )}
 
+      {/* ⚠ "Trocar" e "Remover" não diziam sobre O QUE agiam, e na linha do produto isso custava:
+          ao lado deles fica "Tirar", que retira o PRODUTO do cardápio. A revisão de UX leu os
+          quatro botões como quatro ações sobre o produto — dois deles em vermelho — e concluiu que
+          havia uma exclusão de produto na tela. Não há: `RN-VEN-045` proíbe exclusão, e não existe
+          rota para ela.
+
+          O rótulo agora nomeia o objeto. É o mesmo princípio da `CHAPA-12` nas abas: o controle
+          diz o que faz, e quem revisa não precisa abrir o arquivo para descobrir. */}
       <div className="envio-imagem-acoes">
         <button
           type="button"
@@ -160,12 +168,12 @@ export function EnvioDeImagem({
           disabled={enviando}
           onClick={() => entrada.current?.click()}
         >
-          {enviando ? 'Enviando…' : urlAtual ? 'Trocar' : 'Enviar foto'}
+          {enviando ? 'Enviando…' : urlAtual ? 'Trocar foto' : 'Enviar foto'}
         </button>
 
         {urlAtual && aoRemover && (
-          <button type="button" className="btn perigo" disabled={enviando} onClick={remover}>
-            Remover
+          <button type="button" className="btn calada" disabled={enviando} onClick={remover}>
+            Remover foto
           </button>
         )}
       </div>
