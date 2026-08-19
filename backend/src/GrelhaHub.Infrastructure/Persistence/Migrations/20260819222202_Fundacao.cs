@@ -6,13 +6,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace GrelhaHub.Infrastructure.Persistence.Migrations
 {
-    /// <summary>
-    /// ADR-0022 §6 — a fundação ÚNICA: substitui as 18 migrations anteriores, com o esquema já
-    /// no formato do Identity. A metade que o EF Core não expressa (extensão, EXCLUDE, seeds,
-    /// dim_tempo e as visões do ADR-0019) vive no arquivo parceiro
-    /// <c>20260819212714_Fundacao.Complemento.cs</c> — este aqui é GERADO pelo
-    /// <c>dotnet ef migrations add</c>, e regenerá-lo não pode custar o SQL escrito à mão.
-    /// </summary>
+    /// <inheritdoc />
     public partial class Fundacao : Migration
     {
         /// <inheritdoc />
@@ -188,38 +182,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "parametro_valor",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    parametro_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    unidade_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    valor = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    vigencia_inicio = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    vigencia_fim = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    justificativa = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    dh_criacao = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    criado_por = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_parametro_valor", x => x.id);
-                    table.CheckConstraint("ck_parametro_valor_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
-                    table.ForeignKey(
-                        name: "fk_parametro_valor_parametro_parametro_id",
-                        column: x => x.parametro_id,
-                        principalTable: "parametro",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_parametro_valor_unidades_unidade_id",
-                        column: x => x.unidade_id,
-                        principalTable: "unidade",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "perfil",
                 columns: table => new
                 {
@@ -262,37 +224,6 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         principalTable: "unidade",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "unidade_modulo",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    unidade_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    modulo_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    vigencia_inicio = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    vigencia_fim = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    justificativa = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    dh_criacao = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    criado_por = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_unidade_modulo", x => x.id);
-                    table.CheckConstraint("ck_unidade_modulo_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
-                    table.ForeignKey(
-                        name: "fk_unidade_modulo_modulo_modulo_id",
-                        column: x => x.modulo_id,
-                        principalTable: "modulo",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_unidade_modulo_unidade_unidade_id",
-                        column: x => x.unidade_id,
-                        principalTable: "unidade",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -383,6 +314,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("pk_usuario", x => x.id);
                     table.CheckConstraint("ck_usuario_cpf", "cpf IS NULL OR cpf ~ '^[0-9]{11}$'");
                     table.ForeignKey(
+                        name: "fk_usuario_criado_por",
+                        column: x => x.criado_por,
+                        principalTable: "usuario",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "fk_usuario_perfil_perfil_id",
                         column: x => x.perfil_id,
                         principalTable: "perfil",
@@ -390,6 +327,44 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_usuario_unidade_unidade_id",
+                        column: x => x.unidade_id,
+                        principalTable: "unidade",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "parametro_valor",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    parametro_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    unidade_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    valor = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    vigencia_inicio = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    vigencia_fim = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    justificativa = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    dh_criacao = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    criado_por = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_parametro_valor", x => x.id);
+                    table.CheckConstraint("ck_parametro_valor_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
+                    table.ForeignKey(
+                        name: "fk_parametro_valor_criado_por",
+                        column: x => x.criado_por,
+                        principalTable: "usuario",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_parametro_valor_parametro_parametro_id",
+                        column: x => x.parametro_id,
+                        principalTable: "parametro",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_parametro_valor_unidades_unidade_id",
                         column: x => x.unidade_id,
                         principalTable: "unidade",
                         principalColumn: "id",
@@ -478,6 +453,43 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         principalTable: "usuario",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "unidade_modulo",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    unidade_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    modulo_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    vigencia_inicio = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    vigencia_fim = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    justificativa = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    dh_criacao = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    criado_por = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_unidade_modulo", x => x.id);
+                    table.CheckConstraint("ck_unidade_modulo_vigencia", "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio");
+                    table.ForeignKey(
+                        name: "fk_unidade_modulo_criado_por",
+                        column: x => x.criado_por,
+                        principalTable: "usuario",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_unidade_modulo_modulo_modulo_id",
+                        column: x => x.modulo_id,
+                        principalTable: "modulo",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_unidade_modulo_unidade_unidade_id",
+                        column: x => x.unidade_id,
+                        principalTable: "unidade",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -658,6 +670,11 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                 descending: new[] { false, false, true });
 
             migrationBuilder.CreateIndex(
+                name: "ix_parametro_valor_criado_por",
+                table: "parametro_valor",
+                column: "criado_por");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_parametro_valor_parametro_id",
                 table: "parametro_valor",
                 column: "parametro_id");
@@ -703,6 +720,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                 name: "ix_perfil_permissao_perfil",
                 table: "perfil_permissao",
                 column: "perfil_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_perfil_permissao",
+                table: "perfil_permissao",
+                columns: new[] { "perfil_id", "tipo", "valor" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_produto_categoria",
@@ -756,9 +779,19 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                 descending: new[] { false, false, true });
 
             migrationBuilder.CreateIndex(
+                name: "ix_unidade_modulo_criado_por",
+                table: "unidade_modulo",
+                column: "criado_por");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_unidade_modulo_modulo_id",
                 table: "unidade_modulo",
                 column: "modulo_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_usuario_criado_por",
+                table: "usuario",
+                column: "criado_por");
 
             migrationBuilder.CreateIndex(
                 name: "ix_usuario_email_normalizado",
@@ -808,7 +841,13 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                 table: "usuario_perfil",
                 column: "perfil_id");
 
-            // A metade escrita à mão — ver o arquivo Complemento.
+            // ⚠⚠ A METADE ESCRITA À MÃO — ver o arquivo `Complemento`.
+            //
+            // Esta linha é a coisa mais fácil de perder ao REGERAR a migration, e perdê-la não
+            // quebra a build: o esquema sobe sem as seeds, sem as visões, sem a `dim_tempo` e sem
+            // os `EXCLUDE` de vigência. O sintoma aparece longe daqui — "PAR-GER-001 está em
+            // CatalogoDeParametros e não existe na tabela parametro", num 500 no cadastro de
+            // restaurante. Foi exatamente o que aconteceu ao regerar em 19/08/2026.
             AplicarObjetosDeBanco(migrationBuilder);
         }
 

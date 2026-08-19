@@ -149,6 +149,11 @@ Componentes necessários:
 
 ## 5. Estrutura de Pastas Sugerida
 
+> ⚠ **SUGERIDA em agosto/2026, e a real divergiu.** A estrutura que existe está no
+> [README](README.md#onde-cada-coisa-mora) e em [`docs/arquitetura/`](docs/arquitetura/). O texto
+> abaixo fica como registro do que se imaginava **antes** de construir — que é o valor deste
+> documento inteiro. Não use como referência de onde as coisas estão.
+
 ```
 A estrutura prevista aqui foi **implementada**. A versão vigente está em
 [`README.md`](README.md#estrutura); o esqueleto abaixo fica como registro do que foi
@@ -188,6 +193,13 @@ GrelhaHub/
 ---
 
 ## 7. Próximos Passos Imediatos (Sprint 1 & 2)
+
+> ⚠ **Estes passos já aconteceram.** As Sprints 1 & 2 foram entregues: 190 regras catalogadas, 22
+> ADRs, 14 specs e a fatia vertical funcionando. O próximo passo real é a **entrevista com o
+> cliente** — nenhuma das 190 regras foi validada —, com o roteiro em
+> [`docs/05-fila-de-validacao-com-cliente.md`](docs/05-fila-de-validacao-com-cliente.md).
+>
+> A lista abaixo fica como registro do plano original.
 
 1. ~~**Documento de Levantamento**~~ → **feito**: [`docs/01-documento-de-levantamento.md`](docs/01-documento-de-levantamento.md)
    — 60 requisitos funcionais (MoSCoW), 40 regras de negócio, 20 requisitos

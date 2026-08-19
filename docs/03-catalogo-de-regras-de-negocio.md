@@ -181,8 +181,8 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 
 | Módulo | Regras | Prioridade de validação | Escopo predominante |
 |--------|-------:|-------------------------|---------------------|
-| **GER** — Gerais e transversais | 40 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
-| **VEN** — Vendas e Comercial | 55 | **MÁXIMA** | Núcleo |
+| **GER** — Gerais e transversais | 41 | **ALTA** — RN-GER-006 é estrutural | Núcleo |
+| **VEN** — Vendas e Comercial | 58 | **MÁXIMA** | Núcleo |
 | **PRO** — Produção | 13 | **MÁXIMA** | Núcleo |
 | **EST** — Estoque | 23 | **MÁXIMA** | Núcleo |
 | **COM** — Compras | 9 | ALTA | Modelo |
@@ -191,7 +191,18 @@ nasce errado e a correção posterior custa retrabalho de projeto, não de códi
 | **LOG** — Logística e Frota | 9 | MÉDIA | Núcleo |
 | **RH** — Recursos Humanos | 6 | BAIXA | Modelo |
 | **FIS** — Fiscal | 6 | BAIXA | **Fase 2 — por último** |
-| **Total** | **186** | | |
+| **Total** | **190** | | |
+
+> ⚠ **Estes números são medidos, não mantidos à mão** — e já divergiram do cabeçalho duas
+> vezes. Para reconferir, contando ID distinto antes da §16:
+>
+> ```bash
+> LINHA=$(grep -n '^## 16. Rastreabilidade' docs/03-catalogo-de-regras-de-negocio.md | cut -d: -f1)
+> head -$LINHA docs/03-catalogo-de-regras-de-negocio.md \n>   | grep -oE '^\| \**`?RN-[A-Z]{2,3}-[0-9]{3}' | grep -oE 'RN-[A-Z]{2,3}-[0-9]{3}' | sort -u | wc -l
+> ```
+>
+> ⚠ `RN-RH-` tem **duas** letras. Um `[A-Z]{3}` engole o módulo inteiro e devolve 184 com ar
+> de número certo — foi o que aconteceu na primeira conferência.
 
 > **Ordem de ataque decidida (17/08/2026).** O módulo **FIS** fica **por último**: é o único
 > cujo valor depende de homologação externa (SEFAZ, certificado digital), e nada nos outros

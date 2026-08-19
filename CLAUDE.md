@@ -45,9 +45,9 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 188 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 190 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | 21 decisões (a 0021 é **proposta**) e 4 em aberto |
+| `docs/adr/README.md` | 22 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
@@ -216,7 +216,7 @@ falha em toda operação e o primeiro upload dá 500. O startup de Development m
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **188 regras catalogadas: 162 em `HIP`, 26 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **190 regras catalogadas: 164 em `HIP`, 26 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
@@ -272,22 +272,40 @@ montar pedido com a loja fechada, para enviar na abertura" é **pedido agendado*
 não prevê — o que a regra pedia e faltava era recusar o **envio** na tela, não só no servidor.
 
 
-⚠⚠ **19/08/2026 — DUAS LACUNAS DE SEGURANÇA ABERTAS, achadas ao avaliar o ASP.NET Identity**
+⚠⚠ **19/08/2026 — O ACESSO PASSOU A SER O DO ASP.NET IDENTITY** (ADR-0022), e as duas lacunas
+abaixo — achadas ao avaliar a adoção — **estão FECHADAS**. O texto fica porque o que elas ensinam
+não expira:
 ([ADR-0021](docs/adr/0021-identity-do-aspnet-core.md), **proposta, aguarda decisão**):
 
-1. **Não há bloqueio por tentativa no login.** `RN-GER-027` protege contra **enumeração de contas**
-   (a resposta é igual para senha errada e conta inexistente) e **não** contra força bruta. Senha de
-   8 caracteres sem limite de tentativas é atacável.
-2. **O JWT sobrevive à troca de senha** — não há *security stamp* nem revogação, e o token vale
-   até 8 h (`Jwt:ExpiracaoEmMinutos`). ⚠ Isto já estava documentado abaixo, em `RF-SEG-005`, como
+1. **Não havia bloqueio por tentativa no login.** `RN-GER-027` protege contra **enumeração de
+   contas** (a resposta é igual para senha errada e conta inexistente) e **não** contra força bruta.
+   Senha de 8 caracteres sem limite de tentativas é atacável. → **`RN-GER-040`**: 5 tentativas
+   (`PAR-GER-004`), 15 min de bloqueio (`PAR-GER-005`), mensagem dizendo o prazo. ⚠ E com uma
+   **fresta assumida em `RN-GER-027`**: dizer que a conta está bloqueada revela que ela existe. A
+   troca está na regra — a fresta encarece a enumeração na mesma medida que a força bruta, e o
+   silêncio cobraria o preço do operador legítimo.
+2. **O JWT sobrevivia à troca de senha** — não havia *security stamp* nem revogação, e o token valia
+   até 8 h (`Jwt:ExpiracaoEmMinutos`). → **`RN-GER-041`**: o `SecurityStamp` vai no JWT e é
+   conferido a cada requisição. ⚠ O token deixou de ser puramente *stateless* — emenda à ADR-0003,
+   e o custo é uma leitura por requisição. ⚠ Isto já estava documentado abaixo, em `RF-SEG-005`, como
    detalhe de usabilidade: *"trocar a senha NÃO derruba a pendência do token que já está na mão"*. O
    contorno da tela é de usabilidade; **quem teve a senha vazada troca a senha e o atacante segue
    dentro por oito horas.**
 
-⚠ **O `PasswordHasher` do Identity JÁ é usado** (`RNF-005`, PBKDF2 com salt) — a pasta se chama
-`Infrastructure/Identity/`. O que a ADR-0021 recusa é `AspNetUsers`/`AspNetRoles`/`UserManager`, com
-sete motivos; o principal é que **papel do Identity é global e o perfil do GrelhaHub é por unidade**
-(`RN-GER-009` exige `unidade_id` como primeira coluna de toda chave única).
+⚠ **A ADR-0021 recomendou NÃO migrar, e o dono do produto decidiu o contrário** — com o argumento
+que a análise não tinha pesado: *"essa mudança agora custa menos do que na versão com dados reais de
+produção"*. A ADR-0021 mediu o custo de hoje; não mediu o de depois. **A janela em que isso é barato
+é agora, e ela não reabre.**
+
+O conflito nº 1 daquela análise — papel do Identity é **global**, perfil do GrelhaHub é **por
+unidade** — foi resolvido movendo o índice único para `(unidade_id, nome_normalizado)`, que é o que
+`RN-GER-009` já exigia de toda chave única.
+
+⚠⚠ **O que você precisa saber ao mexer:** `[ExigePermissao]` fica **no request**, nunca no
+controller — é o que impede caso de uso novo de subir sem declarar o que exige. Permissão é **claim
+de papel**. Nenhum `AspNet*` chega ao banco. `UserManager.DeleteAsync` **existe e nunca pode ser
+chamado** (`RN-GER-002`), e um teste de arquitetura recusa a build se ele aparecer. O Domínio ganhou
+**uma** dependência — `Microsoft.Extensions.Identity.Stores` — e a exceção é declarada na ADR-0022.
 
 ⚠⚠ **19/08/2026 — a FILA DE MONITORAMENTO** (`RN-VEN-054`, `RN-VEN-055`, `SPEC-VEN-004`). Aba
 **Monitor**, ao lado de Operação: o que ainda está na casa, em dois blocos — **em aberto** (Aberto,
@@ -382,7 +400,7 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **361 testes** — 110 de domínio + 18 de aplicação + 233 de integração |
+| `dotnet test -c Release` | ✔ **366 testes** — 110 de domínio + 19 de aplicação + 237 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 | **Validação em tela** | ✔ 19/08/2026 — fila, cadência, celular e `CHAPA-02`/`04` conferidos em Chrome real. ⚠⚠ **Não é gate automático:** roda à mão, pela skill `subir-e-validar` |
@@ -404,11 +422,20 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 
 `/trocar-senha` existe, e `ExigeSessao` manda para lá quando a pendência está aberta.
 
-⚠ **Trocar a senha NÃO derruba a pendência do token que já está na mão:** o claim
-`trocar_senha` viaja nele. Depois do `POST /v1/usuarios/minha-senha`, a tela **reautentica** com a
-senha nova para receber um token limpo — e é por isso que o e-mail vem na resposta do login. Quem
-mexer nesse fluxo e só navegar para o painel vai ver "Troque a sua senha" de novo, com a senha já
-trocada.
+⚠⚠ **Esta nota MUDOU em 19/08/2026 com `RN-GER-041`, e a versão antiga era um buraco de
+segurança descrito como detalhe de usabilidade.** Ela dizia: *"trocar a senha NÃO derruba a
+pendência do token que já está na mão"* — o que era verdade, e a consequência que ninguém tinha
+escrito é que **quem tivesse a senha vazada trocava a senha e o atacante seguia dentro por até oito
+horas.** Foi a investigação da ADR-0021 que a encontrou.
+
+**Hoje o token antigo morre.** O `SecurityStamp` viaja no JWT e é conferido a cada requisição: no
+instante da troca, todo token anterior passa a responder **401**.
+
+⚠ **A tela continua reautenticando, e por um motivo que sobrevive à mudança:** depois do
+`POST /v1/usuarios/minha-senha` ela precisa de um token novo — antes porque o antigo carregava o
+claim `trocar_senha`, agora porque o antigo simplesmente não vale mais. É por isso que o e-mail vem
+na resposta do login. Quem mexer nesse fluxo e só navegar para o painel vai tomar 401 na primeira
+requisição.
 
 > **Este foi o terceiro gate que subiu sem porta na interface** — os outros dois: sessão de suporte
 > e dependência de módulo. A pergunta de revisão está na definição de pronto do guia de specs:

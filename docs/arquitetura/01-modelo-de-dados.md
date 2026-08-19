@@ -1,10 +1,18 @@
 # 01 — Modelo de dados
 
-> **Extraído do modelo real do sistema em 18/08/2026 (segunda extração do dia).**
-> **Três bancos** — 18 tabelas na aplicação com 13 relacionamentos, 2 no banco de log, 5 visões de
-> leitura.
-> Nada aqui foi escrito de memória: os tipos, as chaves e os índices vieram do snapshot do
-> mapeamento objeto-relacional.
+> **Extraído do modelo real do sistema em 19/08/2026 — a extração que acompanha a ADR-0022.**
+> **Três bancos** — 22 tabelas e 1 visão materializada na aplicação, 2 tabelas no banco de log,
+> 1 no banco de arquivo, e 17 visões de leitura.
+> Nada aqui foi escrito de memória: os tipos, as chaves e os índices vieram da migration
+> `Fundacao` e do snapshot do mapeamento objeto-relacional.
+
+> ⚠⚠ **Em 19/08/2026 o modelo de acesso migrou para o ASP.NET Core Identity (ADR-0022), e o banco
+> foi reconstruído do zero: 18 migrations viraram uma** — a `Fundacao`, autorizada pelo dono do
+> produto porque o projeto não está em produção. O que mudou de forma visível: `usuario` e `perfil`
+> ganharam as colunas do Identity (com nome em português — **nenhum `AspNet*` chega ao banco**),
+> a tabela `permissao` **deixou de existir** (a concessão virou claim de papel em
+> `perfil_permissao`), e entraram as quatro tabelas acessórias do framework — `usuario_claim`,
+> `usuario_login`, `usuario_perfil`, `usuario_token`.
 
 ---
 
@@ -110,8 +118,15 @@ erDiagram
     unidade ||--o{ arquivo : "envia"
 
     perfil ||--o{ usuario : "classifica"
-    perfil ||--o{ perfil_permissao : "concede"
-    permissao ||--o{ perfil_permissao : "é concedida em"
+    perfil ||--o{ perfil_permissao : "concede (claim)"
+
+    usuario ||--o{ usuario_claim : "pode ter"
+    usuario ||--o{ usuario_login : "pode ter"
+    usuario ||--o{ usuario_token : "pode ter"
+    usuario ||--o{ usuario_perfil : "vazia, de propósito"
+    perfil ||--o{ usuario_perfil : "vazia, de propósito"
+
+    usuario ||--o{ pedido : "cria, cancela, exclui"
 
     categoria ||--o{ produto : "agrupa"
     produto ||--o{ item_pedido : "é vendido em"
@@ -127,6 +142,13 @@ erDiagram
     usuario ||--o{ token_acesso : "recebe link de"
     usuario ||--o{ outbox_auditoria : "é autor de"
 ```
+
+> ⚠ Três setas do diagrama são vínculo por **valor**, sem chave estrangeira no banco: `arquivo`
+> e `outbox_auditoria` guardam `unidade_id` (e a outbox, `usuario_id`) como cópia, de propósito —
+> a fila e o metadado não podem travar a exclusão de ninguém, e a trilha vive para ser transportada
+> a outro banco. Todas as demais setas são FK de verdade — inclusive as três de responsável no
+> pedido (`criado_por`, `cancelado_por_usuario_id`, `excluido_por_usuario_id`), que ganharam
+> constraint em 19/08/2026: apontar um usuário que não existe passou a ser recusado pelo banco.
 
 ### O banco de log, separado — ADR-0017
 
@@ -204,11 +226,17 @@ erDiagram
 | `\|\|--o{` | **Um para muitos, opcional** — uma unidade pode ter zero ou muitos usuários |
 | `\|\|--\|{` | **Um para muitos, obrigatório** — todo pedido tem **pelo menos um** item |
 
-### As duas tabelas que ligam duas coisas
+### As tabelas que ligam duas coisas
 
-`perfil_permissao` e `modulo_dependencia` não guardam informação própria: existem só para ligar. A
-chave primária delas é **o par**, e não um `id` — é o que impede a mesma permissão de ser concedida
-duas vezes ao mesmo perfil.
+`modulo_dependencia` e `usuario_perfil` não guardam informação própria: existem só para ligar. A
+chave primária delas é **o par**, e não um `id` — a mesma aresta não entra duas vezes.
+
+⚠ `perfil_permissao` **deixou de ser assim** com a ADR-0022: ela agora é a tabela de claims de
+papel do Identity, e a chave é um `int` gerado pelo banco — o formato do framework. Com isso ela
+**perdeu a garantia estrutural** de que a mesma permissão não é concedida duas vezes ao mesmo
+perfil: não há índice único em (`perfil_id`, `valor`). Hoje o único ponto que escreve nela é a
+semeadura do cadastro de restaurante, que não repete — mas a garantia mudou de camada, do banco
+para o código que grava.
 
 ---
 
@@ -235,46 +263,76 @@ duas vezes ao mesmo perfil.
 | `url_logo` | `varchar(500)` | ⭘ | A logo mostrada na vitrine |
 | `dh_criacao` | `timestamptz` | | Quando foi cadastrada |
 
-#### `usuario` — quem trabalha
+#### `usuario` — quem trabalha *(ADR-0022: uma pessoa, uma linha — agora no formato do Identity)*
 
 | Coluna | Tipo | | O que guarda |
 |--------|------|---|--------------|
-| `id` | `uuid` | 🔑 | |
+| `id` | `uuid` | 🔑 | Gerado pela **aplicação** (uuid v7), não pelo framework |
 | `unidade_id` | `uuid` | 🔗 ⭘ | **Vazio para usuário de plataforma** — quem opera o produto não pertence a restaurante nenhum |
-| `perfil_id` | `uuid` | 🔗 ⭘ | Vazio para usuário de plataforma, pelo mesmo motivo |
-| `nome` / `sobrenome` | `varchar(200)` | | |
+| `perfil_id` | `uuid` | 🔗 ⭘ | Vazio para usuário de plataforma, pelo mesmo motivo. ⚠ **É esta coluna — não `usuario_perfil` — a fonte do vínculo** |
+| `nome` / `sobrenome` | `varchar(200)` | ⭘ | Sobrenome vazio no usuário de plataforma |
 | `cpf` | `char(11)` | ⭘ | Só dígitos. **Único no sistema** |
-| `email` | `varchar(200)` | | **Único no sistema.** É por ele que se entra |
-| `senha_hash` | `varchar(500)` | | ⚠ **Nunca a senha** — só o resultado irreversível dela |
+| `email` | `varchar(256)` | | **Único no sistema.** É por ele que se entra |
+| `email_normalizado` | `varchar(256)` | | Maiúsculo — é por ele que o `UserManager` procura |
+| `nome_de_usuario` / `nome_de_usuario_normalizado` | `varchar(256)` | | O Identity exige um "nome de usuário"; aqui ele **espelha o e-mail** — o login é por e-mail, e os dois andam juntos |
+| `senha_hash` | `varchar(500)` | | ⚠ **Nunca a senha** — só o resultado irreversível dela. A propriedade mudou de nome (`PasswordHash`); a coluna, não |
+| `carimbo_de_seguranca` | `varchar(64)` | | `RN-GER-041` ⚠⚠ — viaja no JWT e é conferido a **cada requisição**. Trocar a senha o regenera, e é isso que derruba as sessões anteriores |
+| `carimbo_de_concorrencia` | `varchar(200)` | ⭘ | Controle de concorrência do Identity — nunca negócio |
+| `bloqueado_ate` | `timestamptz` | ⭘ | `RN-GER-040` — até quando a conta está travada. **Expira sozinho**, nunca vira fila de desbloqueio |
+| `falhas_de_acesso` | `integer` | | O contador de senha errada. Zera no primeiro acerto — quem conta é o `SignInManager` |
+| `bloqueio_habilitado` | `boolean` | | Ligado para **todo** usuário, inclusive o de plataforma — sem esta marca o framework nem conta as falhas |
 | `deve_trocar_senha` | `boolean` | | Senha escolhida por outra pessoa não é senha |
 | `eh_plataforma` | `boolean` | | Se é da equipe GrelhaHub |
 | `ativo` | `boolean` | | Desligado, não excluído |
+| `criado_por` | `uuid` | ⭘ | Quem criou. Nulo no administrador fundador, criado junto com a unidade |
+| `email_confirmado` / `telefone` / `telefone_confirmado` / `dois_fatores_habilitado` | vários | ⭘ | Colunas do Identity **sem uso hoje** — 2FA e confirmação de e-mail passam a ser configuração no dia em que forem requisito |
 
-#### `perfil` — o cargo
+#### `perfil` — o cargo *(agora papel do Identity)*
 
 | Coluna | Tipo | | O que guarda |
 |--------|------|---|--------------|
 | `id` | `uuid` | 🔑 | |
-| `unidade_id` | `uuid` | 🔗 | Cada casa tem os seus |
-| `nome` | `varchar(60)` | | Administrador, Gerente, Atendente, Cozinha, Operador, Entregador. **Único por unidade** |
+| `unidade_id` | `uuid` | 🔗 ⭘ | Cada casa tem os seus. ⚠ Anulável desde a ADR-0022 — a porta para um eventual perfil **da própria plataforma**; hoje todo perfil semeado tem unidade |
+| `nome` | `varchar(60)` | | Administrador, Gerente, Atendente, Cozinha, Operador, Entregador |
+| `nome_normalizado` | `varchar(60)` | | Maiúsculo — é por ele que o `RoleStore` procura. **Único por unidade**: `(unidade_id, nome_normalizado)` |
 | `descricao` | `varchar(200)` | | O que ele faz, em português |
 | `sistema` | `boolean` | | Perfil do sistema não pode ser renomeado nem excluído |
+| `carimbo_de_concorrencia` | `varchar(200)` | ⭘ | Do framework |
 
-#### `permissao` — a capacidade
+> ⚠⚠ **O papel do Identity é global por desenho** — o framework põe índice único no nome, um
+> "Gerente" no sistema inteiro. Era o conflito nº 1 da ADR-0021, e a configuração o resolve:
+> o índice global é **removido** e o único passa a ser **`(unidade_id, nome_normalizado)`** —
+> exatamente o que `RN-GER-009` já exigia de toda chave única. Dois restaurantes têm, cada um,
+> o seu "Gerente".
+
+#### `permissao` — **não existe mais** *(ADR-0022 §3)*
+
+A tabela saiu com a migração para o Identity. A lista do que existe — código `recurso.acao`,
+descrição em português, módulo — é o **`CatalogoDeAcesso`, em código**; o banco guarda apenas
+**o que foi concedido**, como claim de papel na tabela abaixo. Uma permissão nova no catálogo
+não pede migration: ela ganha política de autorização na partida e passa a poder ser concedida.
+
+#### `perfil_permissao` — quem tem o quê *(agora claim de papel)*
 
 | Coluna | Tipo | | O que guarda |
 |--------|------|---|--------------|
-| `id` | `uuid` | 🔑 | |
-| `codigo` | `varchar(60)` | | `pedido.cancelar`, `custo.visualizar`. **Único** |
-| `descricao` | `varchar(200)` | | O que ela permite, em português — é o que aparece na tela |
-| `modulo` | `varchar(3)` | | A que módulo pertence: `GER`, `VEN` |
+| `id` | `integer` | 🔑 | Gerado pelo banco — o formato do framework, exceção única à regra "chave nasce na aplicação" |
+| `perfil_id` | `uuid` | 🔗 | |
+| `tipo` | `varchar(60)` | ⭘ | Sempre `permissao` nas linhas que o sistema grava |
+| `valor` | `varchar(200)` | ⭘ | O código concedido: `pedido.cancelar`, `custo.visualizar` |
 
-#### `perfil_permissao` — quem tem o quê
+#### As três tabelas do Identity que existem e ficam vazias
 
-| Coluna | Tipo | | |
-|--------|------|---|---|
-| `perfil_id` | `uuid` | 🔑 🔗 | |
-| `permissao_id` | `uuid` | 🔑 🔗 | A chave é **o par** |
+| Tabela | Para quê | Por que está vazia |
+|--------|----------|--------------------|
+| `usuario_perfil` | O N:N usuário × papel do framework | ⚠⚠ **De propósito.** `RN-GER-010` fixa **um** perfil por usuário, e a fonte é `usuario.perfil_id` — que carrega a FK, a matriz de delegação e a trilha. Popular as duas seria manter duas fontes do mesmo fato, que divergem em silêncio |
+| `usuario_claim` | Claim direta de usuário | Sem uso hoje — a permissão é sempre do papel |
+| `usuario_login` | Login externo (Google etc.) | Não é requisito. O esquema pronto é o que a ADR-0022 quis dizer com "login externo deixa de ser reescrita e passa a ser configuração" |
+
+E `usuario_token` guarda token que o **próprio Identity** emite (2FA, provedores) — também sem uso
+hoje. ⚠ **Não confundir com `token_acesso`**, que continua nosso: convite e redefinição de senha
+são token opaco, de uso único, guardado só como hash — o provedor do Identity não guarda token, e
+a regra (`RN-GER-033`) decidiu guardar.
 
 ### Grupo 2 — O que se vende
 
@@ -329,9 +387,18 @@ duas vezes ao mesmo perfil.
 | `canal` | `integer` | | Por onde entrou: delivery próprio, balcão, mesa |
 | `observacao` | `varchar(500)` | ⭘ | "sem cebola" |
 | `dh_criacao` | `timestamptz` | | |
+| `criado_por` | `uuid` | 🔗 ⭘ | Quem registrou. Nulo no pedido que o **cliente** fez pelo cardápio público |
 | `dh_confirmacao` / `dh_finalizacao` | `timestamptz` | ⭘ | |
 | `motivo_cancelamento` | `varchar(500)` | ⭘ | Cancelar **exige** motivo |
+| `dh_cancelamento` | `timestamptz` | ⭘ | `RN-VEN-058` — o **instante** do cancelamento, em campo próprio. Antes ia em `dh_finalizacao`, e cancelado e finalizado ficavam indistinguíveis por data |
+| `cancelado_por_usuario_id` | `uuid` | 🔗 ⭘ | `RN-VEN-058` — **quem** cancelou. Fica no pedido, e não só na trilha: a trilha chega com atraso, em outro banco, e quem acabou de cancelar veria um traço no lugar do próprio nome |
 | `dh_exclusao` / `excluido_por_usuario_id` / `motivo_exclusao` | vários | ⭘ | Exclusão lógica: some das telas, fica no banco |
+
+> ⚠ **Os três responsáveis — `criado_por`, `cancelado_por_usuario_id` e `excluido_por_usuario_id`
+> — são chaves estrangeiras de verdade**, com `Restrict`, desde 19/08/2026. Antes eram `uuid`
+> soltos: apontar um usuário que não existe passava. Foi a pergunta que originou a ADR-0021 — e a
+> FK foi resolvida **antes** de o Identity entrar, porque o que faltava era integridade
+> referencial, não framework.
 
 > ⚠ **Por que o pedido copia o fuso e a virada da casa?** Porque relatório fechado não pode mudar
 > sozinho. Se a casa passar a fechar às 5h, os pedidos antigos continuam classificados pela régua
@@ -377,6 +444,7 @@ duas vezes ao mesmo perfil.
 | `unidade_id` / `modulo_id` | `uuid` | 🔗 | |
 | `vigencia_inicio` / `vigencia_fim` | `timestamptz` | | **Contratação tem vigência** — dá para responder "o que esta casa tinha contratado em março" |
 | `justificativa` | `varchar(500)` | ⭘ | |
+| `dh_criacao` / `criado_por` | | ⭘ | Quando e por quem — `criado_por` aqui é valor, sem FK |
 
 `modulo_dependencia` liga módulo a módulo: Vendas depende de Gerais, Estoque depende de Produção.
 Uma restrição do banco impede que um módulo dependa de si mesmo.
@@ -393,6 +461,7 @@ tempo de preparo.
 | `valor` | `varchar(50)` | | |
 | `vigencia_inicio` / `vigencia_fim` | `timestamptz` | | **Valor nunca é sobrescrito** — a vigência anterior é fechada e uma nova nasce |
 | `justificativa` | `varchar(500)` | ⭘ | |
+| `dh_criacao` / `criado_por` | | ⭘ | Quando e por quem — `criado_por` aqui é valor, sem FK |
 
 > Isso é o que permite explicar um cálculo do mês passado: a leitura é sempre **na data do evento**,
 > não no valor de hoje.
@@ -502,7 +571,7 @@ agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o ba
 
 | Visão | Responde |
 |-------|----------|
-| `vw_pedido_resumo` | Uma linha por pedido, com o total **já somado** e a contagem de itens |
+| `vw_pedido_resumo` | Uma linha por pedido, com o total **já somado**, a contagem de itens e — desde `RN-VEN-058` — o instante e o **nome de quem cancelou**. O `JOIN` com `usuario` é `LEFT`, sempre: pedido cancelado antes da regra não tem responsável, e consulta que perde linha ao ganhar coluna é o defeito mais caro que uma visão pode ter |
 | `vw_pedido_item` | Os itens, com o total da linha calculado |
 | `vw_operacao_dia` | Faturamento, contagem e valor em andamento por (unidade, dia operacional) |
 | `vw_produto_vendido` | Quanto de cada produto saiu — agrupado pelo **nome praticado na venda** |
@@ -520,7 +589,7 @@ agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o ba
 | `vw_modulo_dependencia` | As arestas do grafo, já com a sigla dos **dois** lados |
 | `vw_unidade_modulo` | As habilitações, com vigência |
 | `vw_perfil` | O perfil, com a contagem de usuários |
-| `vw_perfil_permissao` | O que cada perfil concede |
+| `vw_perfil_permissao` | O que cada perfil concede — desde a ADR-0022 ela lê as **claims de papel**: `valor` sai como `codigo`, e a descrição **não está aqui de propósito** — o texto para gente vive no `CatalogoDeAcesso`, e o handler o resolve de lá. ⚠ O `unidade_id` vem **do perfil**, porque a claim não tem unidade: sem essa coluna a visão não seria filtrável, e o administrador de uma casa leria as permissões de todas as outras |
 | `vw_usuario` | Quem opera, já recortado por unidade |
 | `vw_parametro` | O catálogo de parâmetros |
 | `vw_parametro_valor` | O valor por unidade, com vigência |
@@ -535,11 +604,12 @@ agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o ba
 > Quem decide o que vale é o **instante que o handler recebeu**: uma visão presa a "agora" tornaria
 > impossível perguntar "o que estava habilitado no mês passado?".
 >
-> ⚠⚠ **`vw_usuario` faz `COALESCE(unidade_id, uuid-zero)`**, e é a única que precisa disso:
-> `usuario` é a única tabela onde `unidade_id` admite nulo, porque o usuário de **plataforma** não
-> pertence a restaurante nenhum (`RN-GER-014`). O zero é sentinela — não é igual a nenhuma unidade
-> real, então o usuário de plataforma continua invisível ao restaurante, que é o enunciado de
-> `RN-GER-016`.
+> ⚠⚠ **Três visões fazem `COALESCE(unidade_id, uuid-zero)`** — `vw_usuario`, e desde a ADR-0022
+> também `vw_perfil` e `vw_perfil_permissao`: `usuario` e `perfil` são as tabelas onde
+> `unidade_id` admite nulo, porque o usuário de **plataforma** não pertence a restaurante nenhum
+> (`RN-GER-014`) e o perfil ganhou a mesma porta. O zero é sentinela — não é igual a nenhuma
+> unidade real, então o que é da plataforma continua invisível ao restaurante, que é o enunciado
+> de `RN-GER-016` — e visível à plataforma, que atravessa o filtro.
 
 > ⚠⚠ **Toda visão recortada por unidade expõe `unidade_id`**, e o contexto de leitura recusa mapear
 > uma que não a tenha. Vazamento entre restaurantes na **leitura** é invisível: o número continua
@@ -553,6 +623,17 @@ agregação mora, e o motivo é o mesmo que faz o resto do sistema preferir o ba
 > excluído vale para o modelo de escrita e **não alcança visão** — é o `WHERE dh_exclusao IS NULL`
 > dentro de cada uma que faz o pedido excluído sumir da leitura.
 
+### E uma visão materializada — `dim_tempo`
+
+A dimensão do dia operacional (`SPEC-GER-002`): uma linha por dia, de 2024 a 2040, com dia da
+semana em português, semana, mês, trimestre — e os limites exatos do dia **já em UTC**
+(`inicio_utc` / `fim_utc`, o fim **exclusivo**), para consulta por período usar índice em
+`dh_criacao` sem recalcular a virada. Serve ao módulo analítico (onda 9).
+
+> ⚠ A virada aqui está **cravada em 4 horas**, igual ao padrão da coluna gerada — de propósito. A
+> virada **por casa** (`RN-GER-036`) vive nas colunas copiadas para a linha do pedido; a dimensão é
+> régua geral, e migration é história: ela não muda de significado porque uma constante mudou.
+
 ---
 
 ## Parte 4 — O que o banco garante sozinho
@@ -565,7 +646,8 @@ O sistema valida em **duas camadas**, deliberadamente:
 | Mecanismo | Onde aparece | O que garante |
 |-----------|--------------|---------------|
 | **Chave única** | `unidade.cnpj`, `usuario.email`, `usuario.cpf`, `unidade.slug` | Não existem dois |
-| **Chave única composta** | `pedido (unidade, dia operacional, número)` | O número do pedido não repete no mesmo dia da mesma casa |
+| **Chave única composta** | `pedido (unidade, dia operacional, número)` · `perfil (unidade, nome normalizado)` | O número do pedido não repete no mesmo dia da mesma casa; o perfil não repete o nome **dentro** da casa — e repete entre casas, que é o que a ADR-0022 §2 corrigiu no padrão global do Identity |
+| **Chave estrangeira de responsável** | `pedido.criado_por`, `.cancelado_por_usuario_id`, `.excluido_por_usuario_id` — `Restrict` | Não se grava responsável que não existe, e não se apaga usuário que responde por um pedido |
 | **Coluna calculada** | `pedido.data_operacional`, `log_auditoria.data_operacional` | A regra do dia operacional não depende de ninguém lembrar |
 | **Restrição de valor** | `ck_modulo_codigo`, `ck_parametro_tipo`, `ck_log_operacao`, `ck_arquivo_tamanho` | O código do módulo tem duas ou três letras maiúsculas; a operação da trilha é uma das quatro; arquivo vazio não é arquivo |
 | **Restrição contra ciclo** | `ck_modulo_dependencia_ciclo` | Um módulo não depende de si mesmo |
@@ -582,6 +664,8 @@ consulta de um restaurante não varrer o dado dos outros.
 |--------|----------|
 | `pedido (unidade, dia operacional, número)` — único | Numeração diária, e a busca por número |
 | `pedido (unidade, dia operacional, status)` | O painel: "os pedidos abertos de hoje" |
+| `perfil (unidade, nome normalizado)` — único | O "Gerente" de cada casa é dela — ver ADR-0022 §2 |
+| `usuario (nome_de_usuario_normalizado)` — único | É por ele que o `UserManager` procura. Redundante com o e-mail (o nome o espelha) e fica: removê-lo faria o `FindByName` varrer a tabela |
 | `log_auditoria (unidade, entidade, registro, ocorrência)` | "O que aconteceu com este pedido" |
 | `token_acesso (hash)` — único | Achar o link em uma leitura |
 | `arquivo (unidade, pasta)` | "As fotos desta casa" — e `unidade_id` vem primeiro, como em todo índice transacional |
@@ -591,9 +675,17 @@ consulta de um restaurante não varrer o dado dos outros.
 ## Parte 5 — Como este documento foi gerado
 
 As tabelas acima vieram do **snapshot do mapeamento objeto-relacional** — o mesmo arquivo que o
-sistema usa para criar o banco. As restrições e gatilhos vieram das **migrations**. Isso significa
-que, se o código mudar e este documento não for regerado, a diferença é detectável: basta comparar
-com o snapshot.
+sistema usa para criar o banco — e da migration `Fundacao`. As restrições que o EF Core não
+expressa (`EXCLUDE`, `CHECK` de catálogo), as seeds, a `dim_tempo` e as 17 visões vivem no arquivo
+parceiro `Fundacao.Complemento.cs`, escrito à mão. Se o código mudar e este documento não for
+regerado, a diferença é detectável: basta comparar com o snapshot.
 
-**Fontes:** `backend/src/GrelhaHub.Infrastructure/Persistence/Migrations/GrelhaHubDbContextModelSnapshot.cs`
-e o diretório de migrations ao lado.
+> ⚠ **Desde 19/08/2026 a história das migrations tem um único capítulo.** As 18 anteriores foram
+> substituídas pela `Fundacao` (ADR-0022 §6): o esquema do Identity renomeia colunas de `usuario`
+> e `perfil`, e o retrofit deixaria um histórico de `ALTER` sobre `ALTER` contando um caminho que
+> ninguém percorreu. Foi autorizado porque **não há dado em produção** — e é a última vez que sai
+> barato: a partir do primeiro cliente real, migration se soma, nunca se apaga.
+
+**Fontes:** `backend/src/GrelhaHub.Infrastructure/Persistence/Migrations/GrelhaHubDbContextModelSnapshot.cs`,
+`20260819212714_Fundacao.cs` e `20260819212714_Fundacao.Complemento.cs`, mais as configurações em
+`Persistence/Configurations/`.

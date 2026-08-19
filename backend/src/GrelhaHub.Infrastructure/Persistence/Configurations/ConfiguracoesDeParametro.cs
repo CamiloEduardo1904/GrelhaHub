@@ -72,6 +72,22 @@ public sealed class ParametroValorConfiguration : IEntityTypeConfiguration<Param
         // RN-GER-001 — quem alterou o parametro. SPEC-GER-003 CA-6.
         builder.Property(v => v.CriadoPorUsuarioId).HasColumnName("criado_por");
 
+        // ADR-0022 / RN-GER-001 — `criado_por` é REFERÊNCIA, e não `Guid` solto.
+        //
+        // ⚠ O commit que resolveu isto no `pedido` deixou estas de fora, e a documentação de
+        // arquitetura apontou a incoerência: três colunas com o mesmo nome, o mesmo significado e
+        // regras diferentes. Coluna que aponta para gente e não tem chave é coluna que aceita um id
+        // inexistente sem ninguém recusar.
+        //
+        // `Restrict` como as do pedido: usuário não se apaga (RN-GER-002), e apagá-lo jamais pode
+        // levar junto o registro que ele criou.
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(v => v.CriadoPorUsuarioId)
+            .HasConstraintName("fk_parametro_valor_criado_por")
+            .OnDelete(DeleteBehavior.Restrict);
+
+
         builder.HasOne(v => v.Parametro)
             .WithMany()
             .HasForeignKey(v => v.ParametroId)

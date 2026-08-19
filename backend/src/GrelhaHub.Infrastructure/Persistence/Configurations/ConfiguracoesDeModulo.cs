@@ -77,6 +77,22 @@ public sealed class UnidadeModuloConfiguration : IEntityTypeConfiguration<Unidad
         // RN-GER-001 — qual usuario de plataforma habilitou ou desabilitou o modulo.
         builder.Property(u => u.CriadoPorUsuarioId).HasColumnName("criado_por");
 
+        // ADR-0022 / RN-GER-001 — `criado_por` é REFERÊNCIA, e não `Guid` solto.
+        //
+        // ⚠ O commit que resolveu isto no `pedido` deixou estas de fora, e a documentação de
+        // arquitetura apontou a incoerência: três colunas com o mesmo nome, o mesmo significado e
+        // regras diferentes. Coluna que aponta para gente e não tem chave é coluna que aceita um id
+        // inexistente sem ninguém recusar.
+        //
+        // `Restrict` como as do pedido: usuário não se apaga (RN-GER-002), e apagá-lo jamais pode
+        // levar junto o registro que ele criou.
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(u => u.CriadoPorUsuarioId)
+            .HasConstraintName("fk_unidade_modulo_criado_por")
+            .OnDelete(DeleteBehavior.Restrict);
+
+
         builder.HasOne(u => u.Modulo)
             .WithMany()
             .HasForeignKey(u => u.ModuloId)

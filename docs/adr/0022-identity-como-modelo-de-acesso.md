@@ -142,6 +142,24 @@ vez que ela é barata.** A partir do primeiro cliente real, migration se soma �
 - `UserManager.DeleteAsync` existe e **nunca pode ser chamado** (`RN-GER-002`). Um teste de
   arquitetura passa a recusar a build se aparecer
 
+> ### ⚠⚠ A garantia que a migração perdeu em silêncio — e como ela voltou
+>
+> A `perfil_permissao` anterior tinha **PK composta `(perfil_id, permissao_id)`**: o banco recusava
+> conceder a mesma permissão duas vezes ao mesmo perfil. O `IdentityRoleClaim` tem PK `int` de
+> identidade e **nenhuma restrição sobre o par** — então a garantia saiu do banco sem nada acusar, e
+> passou a depender de existir um único escritor.
+>
+> Quem a encontrou foi a **atualização da documentação de arquitetura**, ao redesenhar o dicionário
+> de dados a partir do modelo real. Nenhum teste falhou; nenhum gate reclamou. É o modo de falha que
+> este ADR mais deveria temer: **a regressão que passa porque ninguém a estava medindo.**
+>
+> Restaurada como índice único `(perfil_id, tipo, valor)` — o trio, e não só o par, para um tipo de
+> claim novo poder reusar um valor que já existe como permissão.
+>
+> ⚠ E a mesma varredura apontou três `criado_por` sem chave — em `usuario`, `parametro_valor` e
+> `unidade_modulo` — enquanto as três do `pedido` já eram referência. Corrigidas junto: coluna que
+> aponta para gente e não tem chave aceita um id inexistente sem ninguém recusar.
+
 **O que NÃO muda**
 
 - `MatrizDeDelegacao` (`RN-GER-024`) continua custom — o Identity não tem equivalente, e ela nasceu

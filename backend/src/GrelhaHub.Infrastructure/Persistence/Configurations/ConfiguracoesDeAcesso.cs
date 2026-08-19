@@ -84,6 +84,25 @@ public sealed class PerfilPermissaoConfiguration : IEntityTypeConfiguration<Iden
         // o nome é do projeto.
         builder.HasIndex(claim => claim.RoleId).HasDatabaseName("ix_perfil_permissao_perfil");
 
+        // ⚠⚠ ESTA ÚNICA RESTAURA UMA GARANTIA QUE A MIGRAÇÃO PARA O IDENTITY PERDEU EM SILÊNCIO.
+        //
+        // A `perfil_permissao` anterior tinha PK COMPOSTA `(perfil_id, permissao_id)`: o banco
+        // recusava conceder a mesma permissão duas vezes ao mesmo perfil. O `IdentityRoleClaim`
+        // tem PK `int` de identidade e nenhuma restrição sobre o par — então a garantia saiu do
+        // banco e passou a depender de existir um único escritor (a semeadura do cadastro).
+        //
+        // Depender do "único escritor" é aceitar que o segundo escritor, no dia em que existir,
+        // duplique sem que nada recuse. É exatamente a ordem que o ADR-0009 inverte: o banco
+        // garante que o dado nunca fica inválido; a aplicação garante que o usuário não chega lá.
+        //
+        // ⚠ Sobre `(RoleId, ClaimType, ClaimValue)` e não só `(RoleId, ClaimValue)`: hoje só existe
+        // o tipo `permissao`, e restringir apenas pelo valor impediria um tipo NOVO de reusar um
+        // valor que já existe como permissão. A chave é o trio.
+        builder
+            .HasIndex(claim => new { claim.RoleId, claim.ClaimType, claim.ClaimValue })
+            .IsUnique()
+            .HasDatabaseName("uq_perfil_permissao");
+
     }
 }
 

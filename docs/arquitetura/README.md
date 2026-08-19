@@ -78,7 +78,7 @@ teste. É isso que torna o projeto defensável: **nenhuma decisão é só "a gen
 
 | Onde | O que tem |
 |------|-----------|
-| [`docs/03-catalogo-de-regras-de-negocio.md`](../03-catalogo-de-regras-de-negocio.md) | As 180 regras, com estado e mecanismo |
+| [`docs/03-catalogo-de-regras-de-negocio.md`](../03-catalogo-de-regras-de-negocio.md) | As 190 regras, com estado e mecanismo |
 | [`docs/adr/`](../adr/) | As decisões de arquitetura, com o que foi descartado e por quê |
 | [`docs/08-design-system.md`](../08-design-system.md) | A identidade visual e as onze regras de tela |
 
@@ -132,11 +132,15 @@ Os números de tabelas, colunas e tipos deste capítulo **foram extraídos do mo
 sistema, não escritos de memória. Quando o banco mudar, este documento fica desatualizado e
 precisa ser regerado — e é por isso que ele diz sempre a data da última extração.
 
-**Última extração: 18/08/2026 (segunda), fim do dia.** **Três bancos**: 19 tabelas na aplicação, 2
-no banco de log, 1 no banco de arquivo, e **17 visões de leitura**.
+**Última extração: 19/08/2026.** **Três bancos**: 22 tabelas e 1 visão materializada na aplicação,
+2 tabelas no banco de log, 1 no banco de arquivo, e **17 visões de leitura**.
 
-> ⚠ A primeira extração deste documento dizia "19 tabelas", a segunda dizia "18", e esta diz "19"
+> ⚠ A primeira extração deste documento dizia "19 tabelas", a segunda dizia "18", e a terceira "19"
 > de novo. Não é erro de contagem: no mesmo dia a arquitetura mudou **quatro** vezes — a trilha saiu
 > para banco próprio (ADR-0017), a sessão de suporte foi removida (ADR-0020), a leitura ganhou
 > visões (ADR-0019) e a imagem virou binário no banco (ADR-0018), acrescentando `arquivo`. É por
 > isso que este documento diz a DATA da extração em vez de fingir ser atemporal.
+>
+> A extração de 19/08/2026 diz "22": o modelo de acesso migrou para o ASP.NET Core Identity
+> (ADR-0022) — a tabela `permissao` saiu, e entraram as quatro tabelas acessórias do framework,
+> com nome em português.

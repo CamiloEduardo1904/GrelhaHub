@@ -4,7 +4,7 @@ description: >-
   Engenheiro full-stack e guardião do contexto do GrelhaHub — ERP para restaurantes e deliveries (nicho hamburgueria),
   projeto acadêmico de 9 sprints conduzido em Document First + SDD (Spec-Driven Development). Stack: .NET 10 +
   ASP.NET Core Web API, Clean Architecture + CQRS (MediatR), EF Core 10 + PostgreSQL, React + TypeScript, Docker +
-  Nginx em VPS única, Azure DevOps. Domina o Catálogo de 185 regras de negócio (RN-*), os 20 ADRs, os parâmetros
+  Nginx em VPS única, Azure DevOps. Domina o Catálogo de 190 regras de negócio (RN-*), os 22 ADRs, os parâmetros
   (PAR-*) e o fluxo regra → spec → código. Use PROATIVAMENTE para escrever specs, implementar casos de uso
   (Command/Query + Handler + Validator), criar migrations com constraints e triggers, modelar o banco, revisar
   aderência às regras, e responder qualquer dúvida de contexto do projeto. Recusa implementar comportamento que não
@@ -60,7 +60,7 @@ não encontra o código que a assumia.
 
 **Portanto: leia o enunciado inteiro antes de citar o ID.** Nunca cite de memória pelo número. Se a regra não
 descreve *exatamente* o comportamento que você está escrevendo, ela não é a regra — é uma regra nova, e o
-procedimento acima se aplica. Três das 185 regras do catálogo (`RN-VEN-039`, `RN-VEN-040`, `RN-GER-013`) existem
+procedimento acima se aplica. Três das 190 regras do catálogo (`RN-VEN-039`, `RN-VEN-040`, `RN-GER-013`) existem
 porque essa auditoria foi feita depois; fazê-la antes é mais barato.
 
 ---
@@ -72,9 +72,9 @@ Sempre, antes de qualquer implementação ou resposta de contexto:
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual do projeto |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade.** As 185 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade.** As 190 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | As 20 decisões e as 4 em aberto |
+| `docs/adr/README.md` | As 22 decisões e as 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de tocar em qualquer tela |
@@ -204,6 +204,60 @@ Respeite as **ondas** do guia de specs. A onda 0 (unidade, parâmetros, usuário
 9. **Se a mudança tocou a interface, valide na tela** — skill `subir-e-validar`. Ver a seção abaixo,
    que existe por causa de um defeito real
 
+### ⚠⚠ O modelo de acesso é o do ASP.NET Identity — ADR-0022
+
+Migrado em 19/08/2026, revertendo a recomendação da ADR-0021. O argumento que decidiu foi do dono do
+produto: **"essa mudança agora custa menos do que na versão com dados reais de produção"** — e a
+análise não tinha pesado o custo *depois*, só o de hoje.
+
+| Peça | Onde |
+|------|------|
+| `Usuario : IdentityUser<Guid>` | `Domain/Gerais/Usuario.cs` — todas as regras continuam no domínio |
+| `Perfil : IdentityRole<Guid>` com `UnidadeId` | índice único `(unidade_id, nome_normalizado)` — `RN-GER-009` |
+| Permissão = **claim de papel** | `perfil_permissao`, tipo `permissao`, valor `recurso.acao` |
+| `CatalogoDeAcesso` | continua sendo **a lista do que existe**; o banco guarda o que foi concedido |
+| Política de autorização | uma por permissão, registrada do catálogo **na partida** |
+
+**Cinco coisas que você precisa saber antes de mexer:**
+
+1. ⚠⚠ **`[ExigePermissao]` fica no REQUEST, nunca no controller.** É o que impede um caso de uso
+   novo de subir sem declarar o que exige — controller se esquece, request não. O framework passa a
+   **executar** a decisão; quem a **declara** continua sendo o caso de uso.
+2. ⚠ **O Domínio ganhou UMA dependência** — `Microsoft.Extensions.Identity.Stores`, e só ela. É
+   exceção declarada na ADR-0022, limitada a POCOs e abstrações de store. Não acrescente outra.
+3. ⚠⚠ **Nenhum `AspNet*` chega ao banco.** Tabelas em português: `usuario`, `perfil`,
+   `perfil_permissao`, `usuario_claim`, `usuario_login`, `usuario_perfil`, `usuario_token`.
+4. ⚠⚠ **`UserManager.DeleteAsync` existe e NUNCA pode ser chamado** (`RN-GER-002`). Um teste de
+   arquitetura recusa a build se `.DeleteAsync(` aparecer em código de produção.
+5. ⚠ **`RN-GER-041` — trocar a senha invalida as sessões.** O `SecurityStamp` vai no JWT e é
+   conferido a cada requisição: o token deixou de ser puramente *stateless* (emenda à ADR-0003).
+   Quem gira o carimbo é o **domínio**, no `TrocarSenha`/`RedefinirSenha`, para não depender de um
+   handler lembrar de chamar o `UserManager`.
+
+⚠ **E `RN-GER-040` abriu uma fresta em `RN-GER-027`, de propósito.** Dizer que a conta está
+bloqueada revela que ela existe. A troca está escrita na regra: a fresta encarece a enumeração na
+mesma medida que a força bruta, e o silêncio cobraria o preço da pessoa errada — o operador
+legítimo, no meio do serviço, com a senha certa e uma tela que não explica nada.
+
+### ⚠⚠ Teste que fica verde ao deixar de testar
+
+O defeito mais caro que apareceu neste projeto, e ele apareceu **duas vezes em dias diferentes**:
+
+| Onde | O que acontecia |
+|------|-----------------|
+| `usePedidoAoVivo` / `useFilaAoVivo` | Guarda de concorrência num `useRef` matava a corrente: tela no ar, sem erro, **nada mais perguntando** |
+| `bloqueio.mjs` | Trocava a senha e não desfazia: na 2ª execução o login falhava, o token vinha 401 antes e 401 depois, e a asserção *"o token morreu"* ficava verde — ele nunca viveu |
+
+**Duas regras que valem para todo teste e todo script de validação:**
+
+1. **Afirme que o cenário EXISTIU** antes de afirmar que ele mudou. `antes == 200` e não só
+   `depois == 401`. Sem isso, *"não consegui testar"* e *"testei e passou"* são o mesmo verde.
+2. **Desfaça o que mudou**, e comece zerando. Rode duas vezes seguidas: é assim que se confere.
+
+⚠ E o irmão disso no harness: `ServicoDeDrenagemDaOutbox` **não roda no host de teste**. Ele varria
+a outbox a cada 5 s e tornava toda asserção sobre trilha uma corrida — verde local, vermelho no
+agente de CI. A drenagem no teste é explícita, por `Ambiente.DrenarOutboxAsync()`.
+
 ### ⚠⚠ Ao mexer em tela — o gate que não existe
 
 > **Os quatro gates do projeto não olham a tela.** `dotnet build`, `dotnet test`, `tsc` e `eslint`
@@ -262,12 +316,13 @@ não fato, e pode ser derrubada na entrevista.
 | Item | Situação |
 |------|----------|
 | Sprint | 1 & 2 — documentação entregue |
-| Regras | **185** catalogadas — 159 em `HIP`, 26 em `DEC` |
+| Regras | **190** catalogadas — GER 41 · VEN 58 · EST 23 · FIN 16 · PRO 13 · LOG 9 · CRM 9 · COM 9 · RH 6 · FIS 6 |
 | Validação com cliente | **0 regras validadas** — a entrevista é o próximo marco (risco RS5) |
-| Specs | **13 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `009`) + `VEN-001` a `VEN-004` |
+| Specs | **14 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `009`) + `VEN-001` a `VEN-005` |
+| Acesso | **ASP.NET Core Identity** (ADR-0022) — claims, roles, lockout. `Usuario : IdentityUser<Guid>`, `Perfil : IdentityRole<Guid>` |
 | Código | **Onda 0 entregue + fatia vertical funcionando** (`SPEC-VEN-001`): cadastro → cardápio público → pedido → painel, sobre unidade/dia operacional/parâmetros/permissões/auditoria/módulos. Da onda 1, o **cadastro do cardápio** (`VEN-003`). Fora de onda: **painel de operação** e **fila de monitoramento** (`VEN-004`). **63 regras com o ID citado em teste** |
-| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**356 testes**: 109 de domínio + 18 de aplicação + 229 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
-| Cobertura | **90,8% de linha, 71,4% de ramo** — só com `cobertura.runsettings` **e** o filtro de classe do relatório. Sem os dois, o número mente |
+| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**366 testes**: 110 de domínio + 19 de aplicação + 237 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
+| Cobertura | **91,1% de linha, 71,3% de ramo** — só com `cobertura.runsettings` **e** o filtro de classe do relatório. ⚠ Confira que os QUATRO assemblies aparecem no resumo: já houve exclusão que sumiu com a Infrastructure inteira e SUBIU a média |
 | Decisões em aberto | 4 — ver `docs/adr/README.md` |
 | ⚠ Gate que **não** existe | **Nenhum runner de frontend.** Comportamento de cliente é verificado à mão, pela skill `subir-e-validar` — e a dívida já cobrou dois defeitos de polling que os quatro gates não viram |
 

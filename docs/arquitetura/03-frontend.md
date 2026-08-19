@@ -259,6 +259,14 @@ Toda mensagem que o usuário lê **vem do servidor** — o frontend não reescre
 texto próprio. Quando o servidor recusa citando uma regra, o número dela aparece na tela, e é o que
 permite ao suporte responder sem adivinhar.
 
+> ⚠ **Nem todo `401` é sessão morta.** O interceptor de `api.ts` derruba a sessão quando um `401`
+> chega com token na mão — é o que faz o token invalidado por troca de senha (`RN-GER-041`) levar
+> de volta ao login em vez de deixar a tela com dado velho. Mas nas **rotas de credencial**
+> (login, definir/esquecer senha, troca de senha) o `401` é a resposta da operação, e a lista
+> `ROTAS_DE_CREDENCIAL` impede o logout: é por ela que a mensagem de conta bloqueada
+> (`RN-GER-040`) — com o tempo que falta — chega inteira à tela em vez de ser substituída pelo
+> formulário de entrada.
+
 ### Os gates
 
 | Comando | O que garante |

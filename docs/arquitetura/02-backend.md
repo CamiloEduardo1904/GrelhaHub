@@ -47,12 +47,15 @@ flowchart LR
 |--------|-----------|---------------------------|
 | **API** | Recebe a requisição HTTP e devolve a resposta | Não sabe calcular nada |
 | **Aplicação** | Orquestra: valida, chama a regra, grava | Não sabe o que é HTTP |
-| **Domínio** | As regras de negócio e os conceitos | **Não conhece banco nem framework nenhum** |
+| **Domínio** | As regras de negócio e os conceitos | **Não conhece banco nem framework de mensagens** |
 | **Infraestrutura** | Banco, e-mail, arquivos | Não decide regra |
 
-> ⚠ **O domínio não tem nenhuma dependência externa** — nem do banco, nem do framework de
-> mensagens. Isso não é purismo: é o que permite testar a regra do dia operacional sem subir nada,
-> e o que impede uma troca de tecnologia de arrastar a regra junto.
+> ⚠ **O domínio tem exatamente UMA dependência externa, e ela é declarada** (ADR-0022 §1):
+> `Microsoft.Extensions.Identity.Stores`, o pacote de POCOs do Identity de que `Usuario` e
+> `Perfil` herdam. Ele não traz EF Core, não traz o runtime do ASP.NET, não traz MediatR — e a
+> regra original continua valendo para o que ela existia: o domínio não depende de infraestrutura
+> de persistência nem de mensageria. É o que permite testar a regra do dia operacional sem subir
+> nada, e o que impede uma troca de tecnologia de arrastar a regra junto.
 
 ### As duas travas que sempre aparecem
 
@@ -62,6 +65,17 @@ flowchart LR
   existe para ele.
 - *Permissão* — **esta pessoa pode?** Dentro de uma casa que tem Vendas, o atendente vê o pedido e
   não vê o faturamento.
+
+### E duas garantias sobre a senha, desde 19/08/2026
+
+**Errar a senha cinco vezes trava a conta por quinze minutos.** A mensagem diz que travou e quanto
+tempo falta — travar em silêncio puniria o operador legítimo no meio do serviço, com a senha certa
+e uma tela dizendo só "credenciais inválidas". O bloqueio expira sozinho: nunca vira uma fila de
+desbloqueio para alguém atender.
+
+**Trocar a senha derruba as sessões antigas.** Todo acesso emitido antes da troca morre na
+requisição seguinte. Sem isso, quem teve a senha vazada trocava a senha e o invasor continuava
+dentro por até oito horas — sessão que não morre com a senha não é sessão, é chave copiada.
 
 ### Onde cada regra é imposta — a decisão que define o projeto
 
@@ -99,9 +113,9 @@ dizendo qual campo corrigir.
 
 ```
 backend/src/
-├── GrelhaHub.Domain/          as regras e os conceitos — sem dependências
+├── GrelhaHub.Domain/          as regras e os conceitos — uma dependência declarada (ADR-0022)
 │   ├── Common/                Dinheiro, Quantidade, CPF, CNPJ, Dia operacional
-│   ├── Gerais/                Unidade, Usuário, Perfil, Permissão, Módulo, Parâmetro
+│   ├── Gerais/                Unidade, Usuário, Perfil, CatalogoDeAcesso, Módulo, Parâmetro
 │   ├── Vendas/                Pedido, Item, Status
 │   └── Cardapio/              Categoria, Produto
 │
@@ -215,6 +229,11 @@ Três peças interceptam **toda** gravação, sem nenhum caso de uso precisar ch
 
 > ⚠ **A ordem importa.** O de unidade roda **antes** do de auditoria: invertido, a trilha
 > registraria a unidade vazia do registro que acabou de nascer.
+>
+> ⚠ **E o de auditoria exige diferença REAL de valor, não só a marca de "modificado".** O motivo é
+> o Identity (ADR-0022): o `UserStore` grava por `Update(user)`, que marca a entidade **inteira**
+> como alterada — sem a comparação, cada falha de login sujaria a trilha com nome, CPF e e-mail
+> "alterados" que não mudaram. A comparação erra para o lado antigo: lista a mais, nunca a menos.
 
 ### A trilha atravessa dois bancos — ADR-0017
 
@@ -308,29 +327,93 @@ lado que não mente para o usuário.
 | Regra de negócio recusou | `422` | A mensagem **e o número da regra** — é o que liga o erro ao catálogo |
 | Sem permissão | `403` | Qual permissão falta |
 | Módulo não contratado | `403` | Qual módulo |
-| Sessão expirada | `401` | Volta para a tela de entrada |
+| Conta bloqueada (`RN-GER-040`) | `401` | Que está bloqueada e **quanto tempo falta** — o restante, não a duração cheia: quem tenta de novo aos dez minutos lê "5 minutos", não um novo "15" |
+| Sessão expirada — ou invalidada por troca de senha (`RN-GER-041`) | `401` | Volta para a tela de entrada |
 
 > ⚠ **`401` só quando a sessão morreu.** Senha atual incorreta na troca de senha é `422`, não
 > `401` — quem já está autenticado não tem falta de autenticação; o que falhou foi o valor
 > digitado. Confundir os dois expulsava o usuário da tela antes de ele ler a mensagem.
+>
+> ⚠ O `401` do **login** (senha errada, conta bloqueada) é resposta da operação, não morte de
+> sessão — e o frontend sabe disso: as rotas de credencial estão numa lista que impede o
+> interceptor de transformar esse `401` em logout, e a mensagem chega inteira à tela.
 
-### Segurança, em quatro linhas
+### Identidade e acesso — ADR-0022
 
-- Senha nunca é guardada — só o **hash**, irreversível.
-- Link de acesso (convite, "esqueci minha senha") é **de uso único**, com validade curta, guardado
-  **só como hash**.
-- Ninguém concede acesso que não possui: uma **matriz de delegação** recusa, e o sistema **não
-  sobe** se um perfil novo não declarar o que delega.
-- O endereço do link do e-mail vem de **configuração**, nunca do cabeçalho da requisição — é o furo
+Desde 19/08/2026 o modelo de identidade é o **ASP.NET Core Identity**: `Usuario` herda de
+`IdentityUser<Guid>`, `Perfil` de `IdentityRole<Guid>`, e o hash, a política de senha, o lockout e
+o carimbo de segurança passam a ser mecanismo do framework — nas áreas em que o projeto **não**
+tem opinião própria. Onde ele tem — perfil por unidade, delegação, usuário de plataforma, exclusão
+lógica, token opaco — a regra continua nossa, e a ADR registra cada fronteira.
+
+Entra por `AddIdentityCore`, e **não** `AddIdentity`: o pacote completo registraria autenticação
+por cookie e redirecionamento para `/Account/Login` — aqui a autenticação é JWT (ADR-0003), e o
+Identity é gestão de credencial e papel, nada mais.
+
+#### A autorização é a do ASP.NET — e quem declara continua sendo o caso de uso
+
+A permissão concedida virou **claim de papel** (`perfil_permissao`, tipo `permissao`, valor
+`recurso.acao`), viaja no JWT emitido no login, e a verificação virou **política de autorização**:
+na partida, a API registra **uma política por permissão do `CatalogoDeAcesso`**, com o mesmo nome
+do código. Permissão nova no catálogo ganha política sozinha — não há segunda lista a manter.
+
+> ⚠ **`[ExigePermissao]` permanece no request, e isso é deliberado** (ADR-0022 §3). A tentação era
+> trocar tudo por `[Authorize(Policy = ...)]` no controller, e seria uma perda: o atributo no
+> *request* é o que garante que nenhum caso de uso novo suba sem declarar o que exige — controller
+> se esquece, request não, porque a partida recusa operação sem declaração. O `PermissaoBehavior`
+> resolve a política pelo `IAuthorizationService`: o framework **executa** a decisão; quem a
+> **declara** continua sendo o caso de uso.
+
+#### O bloqueio por tentativa — `RN-GER-040`
+
+Quem confere a senha é o `SignInManager`, com `lockoutOnFailure: true`: a falha incrementa
+`falhas_de_acesso`, a quinta grava `bloqueado_ate` por quinze minutos, e o acerto zera o contador
+— tudo do framework, nada nosso. As constantes vivem em `PoliticaDeBloqueio`, **nomeando** os
+parâmetros que copiam (`PAR-GER-004`, `PAR-GER-005`): o escopo é global porque quem tenta entrar
+ainda não tem unidade.
+
+> ⚠ **A mensagem de bloqueio revela que a conta existe**, e isso abre uma fresta em `RN-GER-027`
+> (login que responde igual para senha errada e conta inexistente). A fresta é **aceita e
+> declarada**: enumerar contas passa a custar cinco tentativas por endereço, e o silêncio cobraria
+> o preço da pessoa errada — o operador legítimo, no meio do serviço, sem saber por que a senha
+> certa não entra.
+
+#### A sessão morre com a senha — `RN-GER-041`, e o JWT deixou de ser puramente *stateless*
+
+O `SecurityStamp` do usuário viaja no token (claim `carimbo`) e é conferido **a cada requisição
+autenticada** contra o que está gravado. Trocar ou redefinir a senha regenera o carimbo — **no
+domínio** (`TrocarSenha`/`RedefinirSenha`), não num `UserManager` que o handler poderia esquecer
+de chamar —, e todo token emitido antes falha na comparação: `401` na requisição seguinte.
+
+> ⚠ **O custo é assumido e registrado (emenda à ADR-0003):** uma consulta por requisição — uma
+> coluna, pela chave primária —, e o JWT deixa de ser puramente *stateless*. A alternativa era o
+> buraco que a ADR-0021 encontrou: senha vazada, senha trocada, e o atacante dentro por mais oito
+> horas. Token **sem** carimbo também falha, fechado — aceitar seria manter viva exatamente a
+> sessão que a regra existe para matar.
+
+#### O que continua nosso, com o porquê
+
+- **`MatrizDeDelegacao`** (`RN-GER-024`) — ninguém concede acesso que não possui; o sistema **não
+  sobe** se um perfil novo não declarar o que delega. O Identity não tem equivalente.
+- **`token_acesso`** (`RN-GER-032` a `035`) — convite e "esqueci minha senha" são token opaco, de
+  uso único, guardado **só como hash**. O provedor do Identity não guarda token, e a regra decidiu
+  guardar. E o endereço do link vem de **configuração**, nunca do cabeçalho da requisição — o furo
   clássico da troca de senha.
+- **Usuário de plataforma** (`RN-GER-014`) — sem unidade, sem perfil, bypass próprio.
+- **A exclusão física continua proibida** (`RN-GER-002`) — `UserManager.DeleteAsync` existe na API
+  do framework e **nunca pode ser chamado**: um teste de arquitetura
+  (`ExclusaoFisicaDeIdentityTests`) recusa a build se `.DeleteAsync(` aparecer em código de
+  produção.
+- Senha nunca é guardada — só o **hash**, irreversível, que já era do Identity antes da migração
+  (`RNF-005`).
 
 ### Testes
 
 | Tipo | Quantidade | O que provam |
 |------|-----------:|--------------|
-| Domínio | 92 | As regras isoladas: dia operacional, dinheiro, CPF |
-| Aplicação | 18 | Fecho de dependência, modelo do e-mail, e a **separação de CQRS verificada** |
-| Integração | 209 | **PostgreSQL de verdade** — dois bancos, num contêiner, com a API real |
+| Domínio | 110 | As regras isoladas: dia operacional, dinheiro, CPF |
+| Aplicação | 19 | Fecho de dependência, modelo do e-mail, e a **separação de CQRS verificada** |
+| Integração | 237 | **PostgreSQL de verdade** — os três bancos, num contêiner, com a API real |
 
 **Nada de banco em memória.** O provider em memória não executa restrição, gatilho nem coluna
 calculada — daria falsa confiança exatamente nas regras que mais importam.

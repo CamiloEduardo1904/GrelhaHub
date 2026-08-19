@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GrelhaHub.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(GrelhaHubDbContext))]
-    [Migration("20260819212714_Fundacao")]
+    [Migration("20260819222202_Fundacao")]
     partial class Fundacao
     {
         /// <inheritdoc />
@@ -457,6 +457,9 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_parametro_valor");
 
+                    b.HasIndex("CriadoPorUsuarioId")
+                        .HasDatabaseName("ix_parametro_valor_criado_por");
+
                     b.HasIndex("ParametroId")
                         .HasDatabaseName("ix_parametro_valor_parametro_id");
 
@@ -731,6 +734,9 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_unidade_modulo");
 
+                    b.HasIndex("CriadoPorUsuarioId")
+                        .HasDatabaseName("ix_unidade_modulo_criado_por");
+
                     b.HasIndex("ModuloId")
                         .HasDatabaseName("ix_unidade_modulo_modulo_id");
 
@@ -874,6 +880,9 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasIndex("Cpf")
                         .IsUnique()
                         .HasDatabaseName("uq_usuario_cpf");
+
+                    b.HasIndex("CriadoPorUsuarioId")
+                        .HasDatabaseName("ix_usuario_criado_por");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -1103,6 +1112,10 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasIndex("RoleId")
                         .HasDatabaseName("ix_perfil_permissao_perfil");
 
+                    b.HasIndex("RoleId", "ClaimType", "ClaimValue")
+                        .IsUnique()
+                        .HasDatabaseName("uq_perfil_permissao");
+
                     b.ToTable("perfil_permissao", (string)null);
                 });
 
@@ -1286,6 +1299,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.ParametroValor", b =>
                 {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("CriadoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_parametro_valor_criado_por");
+
                     b.HasOne("GrelhaHub.Domain.Gerais.Parametro", "Parametro")
                         .WithMany()
                         .HasForeignKey("ParametroId")
@@ -1326,6 +1345,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.UnidadeModulo", b =>
                 {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("CriadoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_unidade_modulo_criado_por");
+
                     b.HasOne("GrelhaHub.Domain.Gerais.Modulo", "Modulo")
                         .WithMany()
                         .HasForeignKey("ModuloId")
@@ -1345,6 +1370,12 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Usuario", b =>
                 {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("CriadoPorUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_usuario_criado_por");
+
                     b.HasOne("GrelhaHub.Domain.Gerais.Perfil", "Perfil")
                         .WithMany()
                         .HasForeignKey("PerfilId")
