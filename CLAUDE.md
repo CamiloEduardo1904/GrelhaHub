@@ -47,7 +47,7 @@ Não implemente "provisoriamente".
 | `docs/README.md` | Mapa e estado atual |
 | `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 188 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | 20 decisões e 4 em aberto |
+| `docs/adr/README.md` | 21 decisões (a 0021 é **proposta**) e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
@@ -271,6 +271,23 @@ o destino que **existe**: entrar). "Preço a partir de R$ X" fixaria política e
 montar pedido com a loja fechada, para enviar na abertura" é **pedido agendado**, que `RN-VEN-048`
 não prevê — o que a regra pedia e faltava era recusar o **envio** na tela, não só no servidor.
 
+
+⚠⚠ **19/08/2026 — DUAS LACUNAS DE SEGURANÇA ABERTAS, achadas ao avaliar o ASP.NET Identity**
+([ADR-0021](docs/adr/0021-identity-do-aspnet-core.md), **proposta, aguarda decisão**):
+
+1. **Não há bloqueio por tentativa no login.** `RN-GER-027` protege contra **enumeração de contas**
+   (a resposta é igual para senha errada e conta inexistente) e **não** contra força bruta. Senha de
+   8 caracteres sem limite de tentativas é atacável.
+2. **O JWT sobrevive à troca de senha** — não há *security stamp* nem revogação, e o token vale
+   até 8 h (`Jwt:ExpiracaoEmMinutos`). ⚠ Isto já estava documentado abaixo, em `RF-SEG-005`, como
+   detalhe de usabilidade: *"trocar a senha NÃO derruba a pendência do token que já está na mão"*. O
+   contorno da tela é de usabilidade; **quem teve a senha vazada troca a senha e o atacante segue
+   dentro por oito horas.**
+
+⚠ **O `PasswordHasher` do Identity JÁ é usado** (`RNF-005`, PBKDF2 com salt) — a pasta se chama
+`Infrastructure/Identity/`. O que a ADR-0021 recusa é `AspNetUsers`/`AspNetRoles`/`UserManager`, com
+sete motivos; o principal é que **papel do Identity é global e o perfil do GrelhaHub é por unidade**
+(`RN-GER-009` exige `unidade_id` como primeira coluna de toda chave única).
 
 ⚠⚠ **19/08/2026 — a FILA DE MONITORAMENTO** (`RN-VEN-054`, `RN-VEN-055`, `SPEC-VEN-004`). Aba
 **Monitor**, ao lado de Operação: o que ainda está na casa, em dois blocos — **em aberto** (Aberto,

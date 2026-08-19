@@ -30,6 +30,7 @@ de ideia — cria-se um novo que o supersede, preservando o raciocínio históri
 | [0018](0018-imagem-como-binario-no-banco.md) | Imagem como **binário no banco**, entregue em bytes ou base64 — substitui o ADR-0015 | Aceito e implementado |
 | [0019](0019-cqrs-com-modelo-de-leitura-proprio.md) | **CQRS de verdade**: a leitura ganha modelo próprio, lido de visões. Emenda o ADR-0002, que declarou a sigla sem a separação | Aceito — **16 de 16 convertidas** |
 | [0020](0020-a-trilha-substitui-a-sessao-de-suporte.md) | **A sessão de suporte é removida**: o controle passa a ser a trilha, não o portão. Emenda o ADR-0013 | Aceito |
+| [0021](0021-identity-do-aspnet-core.md) ⚠ | **ASP.NET Core Identity: o que adotar, e o que não** — o `PasswordHasher` já está em uso; `AspNetUsers`/`AspNetRoles` ficam de fora, com sete motivos. ⚠⚠ A investigação achou **duas lacunas de segurança reais** | **Proposta** — aguarda decisão |
 
 ## Decisões ainda em aberto
 
