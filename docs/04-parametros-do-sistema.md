@@ -44,6 +44,8 @@ o número no banco e nada aconteceria.
 | PAR-VEN-009 | Ciclos com a fila vazia antes de afrouxar — `RN-VEN-055` | 4 | `useFilaAoVivo.ts` | idem |
 | PAR-GER-002 | Validade do link de redefinição | 60 min | `EmissorDeLinkDeAcesso` | Parâmetro de **escopo global**: `parametro_valor` é por unidade, e a solicitação é anônima — no instante do pedido ainda não se sabe de que unidade é a pessoa, e o usuário de plataforma não tem nenhuma |
 | PAR-GER-003 | Validade do convite de primeiro acesso | 72 h | `EmissorDeLinkDeAcesso` | idem |
+| PAR-GER-004 | Tentativas de login antes do bloqueio — `RN-GER-040` | 5 | `LockoutOptions`, na partida | Escopo **global**, como os dois acima: quem tenta entrar ainda não tem unidade |
+| PAR-GER-005 | Duração do bloqueio — `RN-GER-040` | 15 min | `LockoutOptions`, na partida | idem |
 
 Os três obstáculos são reais e diferentes entre si: um é **de rota** (a tela do cliente é pública
 e não autentica), outro é **de escopo** (o parâmetro é por unidade, e quem pede o link de acesso
