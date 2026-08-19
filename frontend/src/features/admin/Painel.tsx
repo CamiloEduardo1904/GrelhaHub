@@ -14,10 +14,11 @@ import { Cardapio } from './Cardapio';
 import { encerrarSessao, lerSessao, pode } from './sessao';
 import { comoConsulta, iso, periodoDeHoje, type Periodo } from '../../services/periodo';
 import { FiltroDePeriodo } from './FiltroDePeriodo';
+import { Monitor } from './Monitor';
 import { Operacao } from './Operacao';
 import { Usuarios } from './Usuarios';
 
-type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe' | 'loja' | 'operacao';
+type Aba = 'pedidos' | 'cardapio' | 'link' | 'equipe' | 'loja' | 'operacao' | 'monitor';
 
 /**
  * A aba de equipe só existe para quem consegue ver usuário (`RN-GER-010`). Esconder é
@@ -36,6 +37,11 @@ const ABAS: { chave: Aba; nome: string; permissao?: string }[] = [
   // RN-GER-038 — o painel de operacao tem permissao PROPRIA, separada de pedido.visualizar:
   // o atendente ve o pedido da mesa 4 e nao ve o faturamento da semana.
   { chave: 'operacao', nome: 'Operação', permissao: 'operacao.visualizar' },
+
+  // RN-VEN-054 — a fila do que ainda está na casa. ⚠ Permissão é `pedido.visualizar`, e NÃO
+  // `operacao.visualizar`: a fila não agrega nada, é um recorte da mesma lista com menos campos.
+  // Quem prepara o sanduíche precisa dela; quem prepara o sanduíche não vê faturamento.
+  { chave: 'monitor', nome: 'Monitor', permissao: 'pedido.visualizar' },
 ];
 
 export function Painel() {
@@ -74,13 +80,33 @@ export function Painel() {
   }, [periodo]);
 
   useEffect(() => {
+    // Carga imediata — ao montar, ao trocar o período e ao VOLTAR para uma aba. Dado de quinze
+    // segundos atrás na tela de quem acabou de chegar é o mesmo problema com outro nome.
     void carregar();
 
-    // O painel fica aberto o serviço inteiro e precisa mostrar pedido novo sem
-    // alguém apertar F5. Polling resolve nesta fatia; tempo real entra com o KDS.
-    const timer = setInterval(() => void carregar(), 15_000);
+    // ⚠⚠ RN-VEN-055 — a CORRENTE de polling só existe na aba que a usa.
+    //
+    // Aqui havia um `setInterval` incondicional: ele consultava a cada 15 s **com a aba de
+    // cardápio à frente, com a janela escondida e com o monitor aberto**. Abrir a fila de
+    // monitoramento passou a SOMAR uma corrente em vez de trocá-la — duas telas perguntando a
+    // mesma coisa ao mesmo tempo, e nenhuma das duas sabendo da outra.
+    //
+    // O `document.hidden` dentro do callback é o segundo lado: aba de fundo não precisa perguntar
+    // nada. ⚠ Aqui um `return` seco é seguro, e em `useFilaAoVivo` NÃO seria — `setInterval`
+    // continua disparando sozinho, então pular um ciclo não solta a corrente; lá a corrente é uma
+    // cadeia de `setTimeout`, e quem suspende precisa reagendar.
+    if (aba !== 'pedidos') {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      if (!document.hidden) {
+        void carregar();
+      }
+    }, 15_000);
+
     return () => clearInterval(timer);
-  }, [carregar]);
+  }, [aba, carregar]);
 
   async function agir(id: string, caminho: string, corpo?: unknown) {
     try {
@@ -147,6 +173,12 @@ export function Painel() {
 
         {/* RN-GER-038 — a aba só existe para quem tem a permissão, e a rota recusa de todo jeito. */}
         {aba === 'operacao' && <Operacao />}
+
+        {/* RN-VEN-054 / RN-VEN-055 — a fila do que ainda está na casa, com corrente própria.
+            `ativo` sai da condição real e não de um `true` literal: hoje o componente é
+            desmontado ao sair da aba, e no dia em que alguém o mantiver montado o polling continua
+            suspenso pelo motivo certo. */}
+        {aba === 'monitor' && <Monitor restaurante={restaurante} ativo={aba === 'monitor'} />}
 
         {aba === 'cardapio' && <Cardapio categorias={cardapio} aoMudar={carregar} />}
 

@@ -13,6 +13,7 @@ using GrelhaHub.Application.Features.Gerais.Parametros;
 using GrelhaHub.Application.Features.Gerais.Usuarios;
 using GrelhaHub.Application.Features.Vendas.AlterarStatusPedido;
 using GrelhaHub.Application.Features.Vendas.CancelarEExcluirPedido;
+using GrelhaHub.Application.Features.Vendas.FilaDeMonitoramento;
 using GrelhaHub.Application.Features.Vendas.ListarPedidos;
 using GrelhaHub.Application.Features.Vendas.ResumoDaOperacao;
 using GrelhaHub.Application.Features.Gerais.Acesso;
@@ -405,6 +406,24 @@ public sealed class PedidosController(ISender sender) : ControllerBase
         [FromQuery] Guid? unidadeId,
         CancellationToken ct) =>
         Ok(await sender.Send(new ListarPedidosQuery(status, de, ate, unidadeId), ct));
+
+    /// <summary>
+    /// <c>RN-VEN-054</c> ⚠ — a <b>fila de monitoramento</b>: o que ainda está na casa.
+    /// <para>
+    /// <b>Sem <c>de</c> e sem <c>ate</c>, e a ausência é a regra.</b> A fila não é recortada por
+    /// período: o pedido aberto às 23h50 que atravessou a virada (<c>RN-GER-006</c>) continua para
+    /// ser entregue, e sumiria se o recorte fosse o dia operacional corrente. O que sai da fila sai
+    /// por <b>estado</b> — <c>Entregue</c>, <c>Finalizado</c> ou <c>Cancelado</c> —, nunca por data.
+    /// </para>
+    /// <para>
+    /// ⚠ A resposta <b>não traz telefone nem observação</b> (<c>SPEC-VEN-004</c> §3). É contrato, e
+    /// não filtro de tela.
+    /// </para>
+    /// </summary>
+    [HttpGet("fila")]
+    public async Task<ActionResult<IReadOnlyList<PedidoNaFilaDto>>> Fila(
+        [FromQuery] Guid? unidadeId, CancellationToken ct) =>
+        Ok(await sender.Send(new FilaDeMonitoramentoQuery(unidadeId), ct));
 
     /// <summary>
     /// <c>RN-GER-038</c> — o painel de operação. <b>Permissão própria</b>, não

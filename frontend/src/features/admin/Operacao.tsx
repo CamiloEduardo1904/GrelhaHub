@@ -20,6 +20,22 @@ import { FiltroDePeriodo } from './FiltroDePeriodo';
  * sombra macia, cantos redondos, animação de entrada. Barra é retângulo; retângulo a Chapa desenha.
  */
 
+/**
+ * A partir de quantos dias a série passa a **rarear rótulo** — `RN-VEN-050`.
+ *
+ * **Quatorze e não trinta:** duas semanas já enchem a faixa de rótulos num tablet em retrato, e o
+ * limiar precisa disparar antes de a tela ficar ilegível, não depois.
+ *
+ * ⚠ **Não vira `PAR-*`, e a recusa é deliberada.** Parâmetro é valor com significado **comercial**
+ * — quem mexe muda a política da casa. Este é limiar de **apresentação**: quem o mexe muda a
+ * legibilidade de um gráfico. Pô-lo em `parametro_valor` daria ao restaurante um botão para
+ * configurar o que ele nunca vai querer configurar, e ao catálogo uma regra que não é de negócio.
+ */
+const DIAS_ANTES_DE_RAREAR = 14;
+
+/** Quantos rótulos de data a faixa comporta antes de começarem a se encostar. */
+const ROTULOS_VISIVEIS = 12;
+
 interface DiaDaOperacao {
   dia: string;
   faturamento: number;
@@ -119,9 +135,16 @@ export function Operacao({ unidadeId }: { unidadeId?: string }) {
             />
           </div>
 
-          <GraficoDeFaturamento serie={resumo.serie} />
-
+          {/* ⚠ A ORDEM É DECISÃO, e mudou em 19/08/2026: o ranking sobe para logo abaixo dos
+              indicadores. Os dois blocos respondem perguntas de peso diferente — "o que vende" é
+              acionável no mesmo turno (o que repor, o que empurrar), e "como foi a semana" é
+              leitura de gestão. O gráfico ocupa a altura de uma tela inteira quando o período é de
+              trinta dias, e empurrava o ranking para baixo da dobra: quem abria o painel para
+              decidir a compra do dia rolava a tela toda vez, e quem não rolava não sabia que
+              havia mais coisa. */}
           <MaisVendidos produtos={resumo.maisVendidos} />
+
+          <GraficoDeFaturamento serie={resumo.serie} />
         </>
       )}
     </div>
@@ -168,6 +191,28 @@ function GraficoDeFaturamento({ serie }: { serie: DiaDaOperacao[] }) {
   const teto = Math.max(...serie.map((d) => d.faturamento), 0);
   const melhor = teto > 0 ? serie.findIndex((d) => d.faturamento === teto) : -1;
 
+  /**
+   * ⚠ **Trinta dias não é "sete dias com mais barras".** Em 19/08/2026 o mês inteiro ocupava mais
+   * de uma tela: trinta rótulos de data lado a lado, trinta valores em cima das barras e uma tabela
+   * de trinta linhas — a maioria delas zeros — logo abaixo. O bloco deixava de ser um gráfico e
+   * virava um relatório impresso na vertical.
+   *
+   * `RN-VEN-050` fecha a saída fácil: **dia sem pedido não some**, porque série com dia faltando faz
+   * o olho ler queda onde houve fechamento. Então nada é removido — muda-se o que cada barra
+   * **diz**. A barra continua lá; o rótulo é que rareia, e o dado exato está na tabela.
+   */
+  const serieLonga = serie.length > DIAS_ANTES_DE_RAREAR;
+
+  /** Um rótulo a cada N dias, mais o primeiro, o último e o melhor — que é o que o olho procura. */
+  const passo = Math.max(1, Math.ceil(serie.length / ROTULOS_VISIVEIS));
+
+  const temRotulo = (indice: number) =>
+    !serieLonga
+    || indice === 0
+    || indice === serie.length - 1
+    || indice === melhor
+    || indice % passo === 0;
+
   if (serie.length === 0) {
     return null;
   }
@@ -191,14 +236,26 @@ function GraficoDeFaturamento({ serie }: { serie: DiaDaOperacao[] }) {
       ) : (
         /* `role="img"` com um rótulo que diz o total: leitor de tela não percorre barra. A tabela
            abaixo do gráfico é a versão navegável do mesmo dado — e não uma segunda fonte. */
-        <div className="grafico-barras" role="img" aria-label={`Faturamento de ${serie.length} dias operacionais`}>
+        <div
+          className="grafico-barras"
+          /* O atributo é o que deixa o CSS estreitar a barra sem o componente medir pixel. */
+          data-longa={serieLonga || undefined}
+          role="img"
+          aria-label={`Faturamento de ${serie.length} dias operacionais`}
+        >
           {serie.map((dia, indice) => {
             const altura = teto === 0 ? 0 : (dia.faturamento / teto) * 100;
 
             return (
               <div className="barra-dia" key={dia.dia}>
+                {/* Na série longa só o melhor dia mostra o valor: trinta números de seis dígitos
+                    encostados um no outro não são legíveis nem em tablet, e o valor de cada dia
+                    está na tabela abaixo — que é a versão navegável da mesma série, e não uma
+                    segunda fonte. */}
                 <span className="barra-valor">
-                  {dia.faturamento > 0 ? valor.format(dia.faturamento) : ''}
+                  {dia.faturamento > 0 && (!serieLonga || indice === melhor)
+                    ? valor.format(dia.faturamento)
+                    : ''}
                 </span>
 
                 <div className="barra-trilho">
@@ -210,7 +267,12 @@ function GraficoDeFaturamento({ serie }: { serie: DiaDaOperacao[] }) {
                   />
                 </div>
 
-                <span className="barra-rotulo">{diaCurto(dia.dia)}</span>
+                {/* ⚠ Rótulo ausente NÃO é barra ausente: a barra do dia sem rótulo continua
+                    desenhada, e o dia inteiro fica no `title`. `RN-VEN-050` fala do dia, não do
+                    texto embaixo dele. */}
+                <span className="barra-rotulo" title={dia.dia}>
+                  {temRotulo(indice) ? diaCurto(dia.dia) : ''}
+                </span>
               </div>
             );
           })}
@@ -218,27 +280,41 @@ function GraficoDeFaturamento({ serie }: { serie: DiaDaOperacao[] }) {
       )}
 
       {teto > 0 && (
-        <div className="rolagem">
-          <table>
-            <caption>O mesmo dado, dia a dia</caption>
-            <thead>
-              <tr>
-                <th>Dia operacional</th>
-                <th className="num">Pedidos</th>
-                <th className="num">Faturamento</th>
-              </tr>
-            </thead>
-            <tbody>
-              {serie.map((dia) => (
-                <tr key={dia.dia}>
-                  <td className="dado">{dia.dia}</td>
-                  <td className="num">{dia.pedidos}</td>
-                  <td className="num">{moeda.format(dia.faturamento)}</td>
+        /* ⚠ **Dobrada, nunca truncada** — e a diferença é a regra. Cortar em "os sete primeiros
+           dias" esconderia dia **sem dizer que escondeu**, que é o defeito de leitura que
+           `RN-VEN-050` existe para impedir. A dobra diz quantos dias estão lá dentro e devolve
+           todos com um clique. Aberta no período curto, fechada no longo: é exatamente onde ela
+           deixa de ser leitura e vira rolagem. */
+        <details className="dobra" open={!serieLonga}>
+          <summary>
+            <span className="dobra-titulo">O mesmo dado, dia a dia</span>
+            <span className="dado dobra-conta">{serie.length} dias</span>
+          </summary>
+
+          <div className="rolagem rolagem-alta">
+            <table>
+              {/* Sai da tela e continua para o leitor de tela: o `<summary>` acima diz o mesmo, e
+                  a frase repetida atrapalha quem navega por voz. */}
+              <caption className="somente-leitor">O mesmo dado, dia a dia</caption>
+              <thead>
+                <tr>
+                  <th>Dia operacional</th>
+                  <th className="num">Pedidos</th>
+                  <th className="num">Faturamento</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {serie.map((dia) => (
+                  <tr key={dia.dia}>
+                    <td className="dado">{dia.dia}</td>
+                    <td className="num">{dia.pedidos}</td>
+                    <td className="num">{moeda.format(dia.faturamento)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
     </section>
   );

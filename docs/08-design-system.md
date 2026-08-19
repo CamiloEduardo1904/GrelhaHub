@@ -222,7 +222,7 @@ E o **ritmo vertical**, na mesma escala:
 
 ## 3. Componentes
 
-Oito novos. O resto é token.
+Nove novos. O resto é token.
 
 ### `<Grelha etapa={n} de={6} />`
 
@@ -414,6 +414,45 @@ permissão nova, e a tela passaria a prometer o que o servidor recusa.
 >
 > Decisão do dono do produto. Se um dia o restaurante ganhar perfil personalizado — em que o nome
 > deixa de dizer o conteúdo —, esta linha volta a ser discutida.
+
+### `<CapaDaCasa />`
+
+A identidade da casa no topo da tela: **logo, nome, e o que a tela é**. `RN-GER-026` — a logo do
+restaurante manda; a listra do GrelhaHub só aparece quando não há logo, porque numa vitrine de
+restaurante quem assina é o restaurante.
+
+Nasceu na vitrine pública e no acompanhamento do pedido. Em 19/08/2026 ganhou o **terceiro
+chamador** — a fila de monitoramento — e por isso **mudou de casa**: saiu de `features/publico/`
+para `components/`. Componente usado por duas áreas do produto que mora dentro de uma delas é o
+começo de uma cópia.
+
+| Propriedade | Quando entra |
+|-------------|--------------|
+| `urlLogo`, `nomeFantasia` | sempre |
+| `endereco` | **só no cardápio público.** Endereço é para quem vai até lá; na fila e no acompanhamento é linha morta ocupando o topo |
+| `aberta` + `horarios` | só onde há venda a recusar (`RN-VEN-048`) |
+| `chamada` | a assinatura da tela. `undefined` cai em "Do pedido à brasa" |
+
+### O divisor de bloco — `RN-VEN-054`
+
+Na fila de monitoramento, a faixa que separa **em aberto** de **pronto**. Mesmo desenho do divisor
+de dia operacional (`RN-GER-006`): `<Grelha>`, título, contagem à direita, e a régua esticando até
+a borda.
+
+```
+▌ EM ABERTO  ─────────────────────────────  4 PEDIDOS
+▌ PRONTO     ─────────────────────────────  2 PEDIDOS
+```
+
+**`CHAPA-02` decide qual é âmbar, e a escolha não é "o primeiro".** É **pronto** — o bloco que
+exige ação de alguém agora. No divisor de dia, o âmbar é o dia mais recente; aqui, a pergunta que a
+tela responde é outra, e a barra segue a pergunta.
+
+⚠ **O bloco vazio não some.** "Nada pronto" é informação para quem está esperando na frente do
+balcão; um bloco que desaparece obriga o olho a reconstruir a tela toda vez que o último pedido
+sai dela.
+
+---
 
 ---
 

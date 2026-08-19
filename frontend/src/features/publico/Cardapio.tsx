@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ContadorDeCaracteres } from '../../components/ContadorDeCaracteres';
 import { Grelha } from '../../components/Grelha';
-import { CapaDaCasa } from './CapaDaCasa';
+import { CapaDaCasa } from '../../components/CapaDaCasa';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import { MAXIMO_OBSERVACAO_DO_PEDIDO } from '../../services/limites';
 import type { CardapioPublico, ProdutoPublico } from '../../services/tipos';

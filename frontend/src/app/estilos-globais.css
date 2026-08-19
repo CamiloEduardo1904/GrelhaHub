@@ -3195,3 +3195,180 @@ button.link-discreto {
 .atalhos-de-semana .rotulo {
   margin-right: 0.15rem;
 }
+
+/* ============================================================================
+   FILA DE MONITORAMENTO — RN-VEN-054 ⚠, RN-VEN-055 ⚠⚠ · SPEC-VEN-004
+
+   A tela que responde "o que ainda tenho para entregar". Ela reusa quase tudo:
+   a capa da casa do cardápio, a comanda da lista de pedidos, o divisor de bloco
+   com o mesmo desenho do divisor de dia operacional. O que é novo aqui cabe em
+   quatro regras — e isso é o resultado que se quer de um design system.
+
+   ⚠ CSS novo em TOKEN (CHAPA-13). O resto do painel ainda está em rem solto, e a
+   varredura global é decisão pendente (§2.3 do design system) — mas nada novo
+   entra fora da escala.
+   ============================================================================ */
+
+.monitor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+}
+
+/* A MESMA capa do cardápio, com três ajustes de contexto — RN-GER-026.
+
+   Na vitrine ela é a faixa de topo da PÁGINA e pode ser alta: é o primeiro
+   contato de quem chegou de fora. Aqui ela é um BLOCO dentro do painel, acima de
+   uma fila que precisa aparecer sem rolagem no tablet — então ganha moldura e
+   sombra sólida (CHAPA-01, como toda placa), e perde altura.
+
+   ⚠ Sem endereço e sem selo de aberto: os dois são para quem vai até lá. Quem
+   olha esta tela já está dentro da casa. */
+.monitor .vitrine-capa {
+  padding: var(--esp-3) var(--esp-2);
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+}
+
+.monitor .vitrine-capa h1 {
+  font-size: var(--texto-xl);
+}
+
+.monitor .logo-casa {
+  max-height: 96px;
+}
+
+.bloco-de-fila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+}
+
+/* ⚠ O bloco vazio NÃO some — "nada pronto" é informação para quem está esperando
+   na frente do balcão. Um bloco que desaparece obriga o olho a reconstruir a tela
+   toda vez que o último pedido sai dela.
+
+   CHAPA-10 — é prosa, e vai na cor do texto. `.secundario` já resolve o tamanho;
+   o que esta regra faz é a moldura tracejada, que diz "espaço reservado" sem
+   escrever nada. */
+.fila-vazia {
+  margin: 0;
+  padding: var(--esp-3) var(--esp-2);
+  border: 2px dashed var(--rule);
+  text-align: center;
+}
+
+/* A tela DIZ que afrouxou a cadência (RN-VEN-055). Sem esta linha, "está mais
+   devagar de propósito" e "parou de perguntar" são a mesma tela — a armadilha
+   que RN-VEN-047 documenta do lado do cliente. */
+.fila-cadencia {
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+}
+
+/* RN-GER-006 ⚠⚠ — a data que desempata dois números iguais na fila. Discreta ao
+   lado do número gigante, e presente só quando há mais de um dia operacional na
+   tela: com um dia só não existem duas comandas iguais para distinguir. */
+.comanda-dia {
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+  align-self: center;
+
+  /* ⚠ `.comanda-id` é `space-between`, e com três filhos o do meio fica CENTRALIZADO — a data
+     pousaria no vazio, longe do número que ela desempata. `margin-right: auto` a encosta no
+     número, que é onde ela significa alguma coisa. */
+  margin-right: auto;
+}
+
+/* ============================================================================
+   A DOBRA — RN-VEN-050, 19/08/2026
+
+   ⚠ Dobrar NÃO é truncar, e a diferença é a regra inteira. Cortar a tabela em
+   "os sete primeiros dias" esconderia dia sem dizer que escondeu — o defeito de
+   leitura que RN-VEN-050 existe para impedir. A dobra diz quantos dias estão lá
+   dentro, e devolve todos com um clique.
+
+   Trinta dias de série davam uma tabela de trinta linhas, quase todas zeradas,
+   abaixo de um gráfico que já ocupava uma tela.
+   ============================================================================ */
+
+.dobra {
+  border: var(--traco);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.dobra > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  padding: var(--esp-1) var(--esp-2);
+  min-height: var(--toque-admin);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* O triângulo nativo é o repertório que a §5 recusa: ele vem arredondado, cinza e
+   diferente em cada navegador. O sinal aqui é o mesmo traço do resto da Chapa. */
+.dobra > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dobra > summary::before {
+  content: "+";
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--brasa-texto);
+}
+
+.dobra[open] > summary::before {
+  content: "−";
+}
+
+.dobra-titulo {
+  font-family: var(--mono);
+  font-size: var(--texto-2xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-right: auto;
+}
+
+.dobra-conta {
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Teto de altura: mesmo aberta, a tabela nunca mais empurra o resto da página
+   para fora do alcance. Rola dentro da própria moldura. */
+.rolagem-alta {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+/* ============================================================================
+   SÉRIE LONGA — o gráfico de trinta dias
+
+   `data-longa` é posto pelo componente quando a série passa de quatorze dias.
+   ⚠ Nenhuma barra some: RN-VEN-050 fala do DIA, e o dia continua desenhado. O
+   que muda é a largura e o que está escrito embaixo.
+   ============================================================================ */
+
+.grafico-barras[data-longa] .barra-dia {
+  min-width: 1.1rem;
+}
+
+.grafico-barras[data-longa] {
+  gap: 0.2rem;
+}
+
+/* O rótulo vazio precisa continuar ocupando a linha: sem altura, as colunas com
+   data e as sem data teriam alturas diferentes e o chão do gráfico ondularia. */
+.grafico-barras[data-longa] .barra-rotulo {
+  min-height: 0.9rem;
+  font-size: 0.58rem;
+}

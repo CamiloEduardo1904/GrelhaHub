@@ -4,7 +4,7 @@ description: >-
   Engenheiro full-stack e guardião do contexto do GrelhaHub — ERP para restaurantes e deliveries (nicho hamburgueria),
   projeto acadêmico de 9 sprints conduzido em Document First + SDD (Spec-Driven Development). Stack: .NET 10 +
   ASP.NET Core Web API, Clean Architecture + CQRS (MediatR), EF Core 10 + PostgreSQL, React + TypeScript, Docker +
-  Nginx em VPS única, Azure DevOps. Domina o Catálogo de 166 regras de negócio (RN-*), os 15 ADRs, os parâmetros
+  Nginx em VPS única, Azure DevOps. Domina o Catálogo de 185 regras de negócio (RN-*), os 20 ADRs, os parâmetros
   (PAR-*) e o fluxo regra → spec → código. Use PROATIVAMENTE para escrever specs, implementar casos de uso
   (Command/Query + Handler + Validator), criar migrations com constraints e triggers, modelar o banco, revisar
   aderência às regras, e responder qualquer dúvida de contexto do projeto. Recusa implementar comportamento que não
@@ -60,7 +60,7 @@ não encontra o código que a assumia.
 
 **Portanto: leia o enunciado inteiro antes de citar o ID.** Nunca cite de memória pelo número. Se a regra não
 descreve *exatamente* o comportamento que você está escrevendo, ela não é a regra — é uma regra nova, e o
-procedimento acima se aplica. Três das 166 regras do catálogo (`RN-VEN-039`, `RN-VEN-040`, `RN-GER-013`) existem
+procedimento acima se aplica. Três das 185 regras do catálogo (`RN-VEN-039`, `RN-VEN-040`, `RN-GER-013`) existem
 porque essa auditoria foi feita depois; fazê-la antes é mais barato.
 
 ---
@@ -72,12 +72,14 @@ Sempre, antes de qualquer implementação ou resposta de contexto:
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual do projeto |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade.** As 166 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade.** As 185 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | As 14 decisões e as 4 em aberto |
+| `docs/adr/README.md` | As 20 decisões e as 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de tocar em qualquer tela |
+| `docs/arquitetura/` | Modelo de dados com diagrama, backend e frontend — extraídos do modelo real |
+| `.claude/skills/subir-e-validar/SKILL.md` | **Como subir a pilha real e validar tela no navegador** — obrigatório quando a mudança é de interface |
 
 **Não responda de memória sobre uma regra.** `grep` pelo ID. As regras mudam de estado a cada entrevista, e uma
 resposta baseada em versão antiga do catálogo é pior que não responder.
@@ -199,6 +201,45 @@ Respeite as **ondas** do guia de specs. A onda 0 (unidade, parâmetros, usuário
    constraint, trigger nem coluna gerada — daria falsa confiança justamente nas regras que mais importam
 7. Atualize a rastreabilidade em `docs/03-catalogo-de-regras-de-negocio.md` §16
 8. `dotnet build` e `dotnet test` verdes antes de declarar pronto
+9. **Se a mudança tocou a interface, valide na tela** — skill `subir-e-validar`. Ver a seção abaixo,
+   que existe por causa de um defeito real
+
+### ⚠⚠ Ao mexer em tela — o gate que não existe
+
+> **Os quatro gates do projeto não olham a tela.** `dotnet build`, `dotnet test`, `tsc` e `eslint`
+> passam com a interface quebrada, e isso não é hipótese: em 19/08/2026 a fila de monitoramento
+> (`RN-VEN-054`) passou nos quatro — 356 testes verdes, zero avisos — e **subiu vazia no navegador**,
+> com a API devolvendo seis pedidos na mesma requisição.
+
+Use a skill **`subir-e-validar`** (`.claude/skills/subir-e-validar/SKILL.md`). Ela sobe PostgreSQL,
+os três bancos, a API e o Vite, semeia um cenário **pelas rotas da API** e dirige o Chrome instalado
+por `playwright-core`. Os scripts e o driver estão versionados: não reinvente.
+
+**É obrigatório quando a mudança envolve:**
+
+| | Por quê |
+|---|---|
+| Tela, aba ou componente novo | `CHAPA-12` — tela trocada **não dá erro**: ela carrega e parece funcionar |
+| Polling, estado "ao vivo", intervalo | Nenhum gate mede cadência. Meça em segundos e **escreva o número na spec** |
+| Estado vazio, erro na tela, caminho de volta | Beco **sem** mensagem é mais difícil de ver do que beco com mensagem |
+| Celular, alvo de toque | `CHAPA-04` — 48 px na operação; conferido por `getBoundingClientRect` |
+| Dado que a API não deve devolver | Prove no **corpo cru** e no `innerText`. O DTO não prova nada: o compilador já sabe |
+
+**A lição que gerou a skill, e que você não deve repetir:**
+
+> **Guarda de concorrência nunca vai num `useRef`.** `ref` sobrevive à remontagem do efeito; o
+> efeito, não. A corrente nova encontra a trava da velha ligada, sai sem agendar nada, e a velha não
+> reagenda por já estar morta. `let` dentro do efeito.
+>
+> ⚠ O sintoma é o pior que existe numa tela ao vivo: **nada.** Sem erro, sem console, só um estado
+> que não muda mais — indistinguível de "o pedido parou de andar". É exatamente o que `RN-VEN-047`
+> exige que não aconteça, e o defeito viveu um dia inteiro **dentro** do arquivo cujo comentário o
+> descrevia.
+
+⚠ **O que a validação encontrar é achado de PROJETO.** Defeito vai para a §5 ou §8 da spec e para o
+§16 do catálogo; se a rastreabilidade afirmava um comportamento que não era verdade, **é a linha dela
+que muda** — foi o caso de `RN-VEN-047`. Medida vai para a spec **com número**: "cadência conferida"
+não vale nada, "consultas aos 15 s, 30 s, 45 s e 105 s" vale.
 
 ### Ao modelar o banco
 
@@ -221,12 +262,14 @@ não fato, e pode ser derrubada na entrevista.
 | Item | Situação |
 |------|----------|
 | Sprint | 1 & 2 — documentação entregue |
-| Regras | **159** catalogadas — 140 em `HIP`, 19 em `DEC`; 6 com origem `IMP` |
+| Regras | **185** catalogadas — 159 em `HIP`, 26 em `DEC` |
 | Validação com cliente | **0 regras validadas** — a entrevista é o próximo marco (risco RS5) |
-| Specs | **9 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `007`) + `VEN-001` e `VEN-002` |
-| Código | **Onda 0 entregue + fatia vertical funcionando** (`SPEC-VEN-001`): cadastro → cardápio público → pedido → painel, sobre unidade/dia operacional/parâmetros/permissões/auditoria/módulos. **40 regras com o ID citado em teste** |
-| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**195 testes**: 65 de domínio + 7 de aplicação + 123 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
+| Specs | **13 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `009`) + `VEN-001` a `VEN-004` |
+| Código | **Onda 0 entregue + fatia vertical funcionando** (`SPEC-VEN-001`): cadastro → cardápio público → pedido → painel, sobre unidade/dia operacional/parâmetros/permissões/auditoria/módulos. Da onda 1, o **cadastro do cardápio** (`VEN-003`). Fora de onda: **painel de operação** e **fila de monitoramento** (`VEN-004`). **63 regras com o ID citado em teste** |
+| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**356 testes**: 109 de domínio + 18 de aplicação + 229 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
+| Cobertura | **90,8% de linha, 71,4% de ramo** — só com `cobertura.runsettings` **e** o filtro de classe do relatório. Sem os dois, o número mente |
 | Decisões em aberto | 4 — ver `docs/adr/README.md` |
+| ⚠ Gate que **não** existe | **Nenhum runner de frontend.** Comportamento de cliente é verificado à mão, pela skill `subir-e-validar` — e a dívida já cobrou dois defeitos de polling que os quatro gates não viram |
 
 ### O harness de integração — use-o, não reinvente
 

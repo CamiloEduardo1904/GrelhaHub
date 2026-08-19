@@ -196,3 +196,38 @@ export interface PedidoResumo {
   observacao?: string;
   itens: ItemResumo[];
 }
+
+/**
+ * `RN-VEN-054` ⚠ — o pedido como a **fila de monitoramento** o recebe.
+ *
+ * ⚠⚠ **Não há `telefone` nem `observacao` aqui, e a ausência é o contrato.** Não são campos
+ * opcionais que a tela decide esconder: a API **não os envia** (`SPEC-VEN-004` §3). É `CHAPA-05`
+ * do lado do dado — não há cadeado porque não há campo.
+ *
+ * O tipo é estruturalmente compatível com {@link PedidoResumo}, e é por isso que a `<Comanda>`
+ * aceita os dois sem `if`: os dois campos que faltam já são opcionais lá, então o que a fila
+ * entrega é um `PedidoResumo` em que eles simplesmente nunca chegaram. **A comanda não sabe que
+ * está numa fila** — ela desenha o que recebeu.
+ */
+export interface PedidoNaFila {
+  id: string;
+  unidadeId: string;
+  numero: number;
+  canal: string;
+  status: StatusPedido;
+
+  /** `RN-CRM-003` — quem pediu. Fica: é como se chama quem vem buscar. */
+  cliente?: string;
+
+  total: number;
+  quantidadeDeItens: number;
+  criadoEm: string;
+
+  /**
+   * `RN-GER-006` ⚠⚠ — a fila **não tem recorte de período**, então ela pode trazer pedido de
+   * ontem. A tela marca o que não é do dia corrente: `numero` reinicia a cada virada.
+   */
+  dataOperacional: string;
+
+  itens: { produto: string; quantidade: number; precoPraticado: number }[];
+}

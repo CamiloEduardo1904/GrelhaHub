@@ -26,6 +26,7 @@ flowchart TB
 
     subgraph REST["👨‍🍳 Painel do restaurante — /painel"]
         PE["Pedidos"]
+        MO["Monitor<br/><small>a fila do que está na casa</small>"]
         OP["Operação"]
         CD["Cardápio"]
         EQ["Equipe"]
@@ -52,6 +53,7 @@ qualquer forma —, mas aba que abre em "você não pode" é pior do que aba aus
 | Aba | Quem vê | Permissão |
 |-----|---------|-----------|
 | **Pedidos** | Todos que operam | `pedido.visualizar` |
+| **Monitor** | Todos que operam | `pedido.visualizar` |
 | **Operação** ⭐ | Administrador e Gerente | `operacao.visualizar` |
 | **Cardápio** | Quem gere o cardápio | `cardapio.visualizar` |
 | **Equipe** | Quem administra pessoas | `usuario.visualizar` |
@@ -62,6 +64,30 @@ qualquer forma —, mas aba que abre em "você não pode" é pior do que aba aus
 > precisa ver o pedido da mesa 4; o faturamento da semana é outra pergunta e responde a quem
 > responde pelo resultado. Agregado de venda é o passo anterior a margem — conceder junto abriria
 > por uma porta lateral o que a regra de custo fecha na porta da frente.
+>
+> ⚠ **E por que "Monitor" NÃO tem?** Pelo mesmo raciocínio, invertido: a fila não agrega nada. Ela é
+> um recorte da lista que `pedido.visualizar` já entrega, com **menos** campos — sem telefone e sem
+> observação. Uma permissão nova ali daria a impressão de proteger algo que a permissão antiga já
+> mostra por inteiro, e permissão que não protege nada é pior que permissão nenhuma.
+
+### As três telas de pedido respondem três perguntas
+
+Elas parecem redundantes na lista de abas e não são. É a diferença entre **quanto**, **o que** e
+**o que falta** — e nenhuma responde bem a pergunta das outras duas.
+
+| Tela | A pergunta | Recorte | Atualiza |
+|------|-----------|---------|----------|
+| **Pedidos** | O que entrou no dia? | Período de **dia operacional**, agrupado por dia | A cada 15 s, **só com a aba à frente** |
+| **Monitor** | O que ainda tenho para entregar? | **Nenhum** — o que está vivo está na fila, inclusive o de ontem | 15 s com movimento, 60 s com a fila vazia |
+| **Operação** | Quanto a casa vendeu? | Período, abre em 7 dias | Ao mudar o filtro |
+
+> ⚠ **A lista de pedidos responde "o que falta" cada vez pior conforme a noite avança**, e é essa a
+> lacuna que o Monitor fecha: às onze da noite, os três pedidos pendentes estão espalhados entre
+> quarenta comandas já finalizadas, e a única forma de achá-los é ler o selo de cada uma.
+>
+> ⚠⚠ **As três nunca perguntam ao mesmo tempo.** A corrente de polling da lista de pedidos existe
+> apenas enquanto a aba dela está à frente e a janela está visível — antes disso, abrir o Monitor
+> **somava** uma corrente em vez de trocá-la (`RN-VEN-055`).
 
 ### A identidade visual, em uma página
 
@@ -116,6 +142,7 @@ frontend/src/
 ├── components/               peças reusadas, do design system
 │   ├── Grelha.tsx            a listra âmbar
 │   ├── Comanda.tsx           o cartão do pedido
+│   ├── CapaDaCasa.tsx        logo e nome — cardápio, acompanhamento e monitor
 │   ├── Selo.tsx              o estado, com borda e cor
 │   ├── Dialogo.tsx           confirmação — nunca `confirm()` do navegador
 │   ├── CampoDeData.tsx       data sem o widget do navegador
@@ -155,13 +182,49 @@ O painel de pedidos e o painel de operação usam o mesmo filtro de **dia operac
 > nomeando o bloco: "Hoje · 2026-08-18 · 4 pedidos". O agrupamento não é organização visual — é o
 > que impede uma leitura errada.
 
+### O monitor — a fila do que está na casa
+
+Dois blocos, **em aberto** e **pronto**, atualizados sozinhos. Sai da fila quem chega a Entregue,
+Finalizado ou Cancelado — sempre por **estado**, nunca por data.
+
+| Decisão | Por quê |
+|---------|---------|
+| Sem recorte de período | O pedido que atravessou a virada **continua para ser entregue**. Recortar pelo dia corrente o faria sumir da tela de quem ainda vai preparar |
+| Sem telefone e sem observação | É tela de ambiente compartilhado. E a API **não envia** os campos: não há cadeado porque não há campo |
+| O nome do cliente fica | É como se chama quem vem buscar |
+| Ordem FIFO, o mais antigo primeiro | A fila responde "quem está esperando há mais tempo". Pôr o recém-chegado na frente inverteria a única pergunta que ela faz |
+| A barra âmbar é a do bloco **pronto** | Uma por grupo, e é o bloco que exige ação de alguém agora |
+
+> ⚠ **O bloco vazio não some.** "Nada pronto" é informação para quem está esperando na frente do
+> balcão; um bloco que desaparece obriga o olho a reconstruir a tela toda vez que o último pedido
+> sai dela.
+>
+> ⚠⚠ **A cadência acompanha o MOVIMENTO, não o relógio da tela.** Quinze segundos com fila; um
+> minuto depois de quatro ciclos com a fila vazia; e volta ao ritmo curto no primeiro pedido que
+> aparecer. Afrouxar por tempo em tela — que é o que a tela do cliente faz, e com razão — seria o
+> erro exato aqui: **a tela aberta há mais tempo é a da noite cheia**, quando a cozinha mais precisa
+> do ritmo curto. E o monitor esquecido ligado com a casa fechada é justamente o caso que consumiria
+> a madrugada inteira de requisições.
+
 ### O painel de operação
 
 | Bloco | O que mostra |
 |-------|--------------|
 | **Indicadores** | Faturamento, ticket médio, o que está no salão, cancelados |
-| **Gráfico por dia** | Uma barra por dia operacional; a mais alta é âmbar |
 | **Mais vendidos** | Ranking por quantidade, com o total |
+| **Gráfico por dia** | Uma barra por dia operacional; a mais alta é âmbar |
+
+> **A ordem mudou em 19/08/2026, e a razão é a dobra da tela.** "O que vende" é acionável no mesmo
+> turno — o que repor, o que empurrar —, e "como foi a semana" é leitura de gestão. Com trinta dias
+> o gráfico ocupa uma tela inteira e empurrava o ranking para baixo: quem não rolava não sabia que
+> havia mais coisa.
+>
+> ⚠ **Trinta dias não é "sete dias com mais barras".** Na série longa o rótulo de data **rareia** e
+> só o melhor dia mostra o valor; a tabela dia a dia vira uma **dobra**, fechada por padrão, com
+> teto de altura. ⚠⚠ **Dobrar não é truncar:** cortar em "os sete primeiros dias" esconderia dia sem
+> dizer que escondeu. A dobra diz quantos dias estão lá dentro e devolve todos com um clique — e
+> **nenhuma barra some**, porque dia sem venda que desaparece faz o olho ler continuidade onde houve
+> fechamento.
 
 > ⚠ **O que está no salão fica fora do faturamento**, e o rótulo diz isso onde o número aparece.
 > Contar o que ainda pode ser cancelado dá um número que **encolhe sozinho** depois — e número que

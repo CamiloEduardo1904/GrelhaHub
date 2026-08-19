@@ -1,7 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Grelha } from '../../components/Grelha';
-import { CapaDaCasa } from './CapaDaCasa';
+import { CapaDaCasa } from '../../components/CapaDaCasa';
 import { Selo } from '../../components/Selo';
 import { api, mensagemDeErro, moeda, valor } from '../../services/api';
 import { CICLO, etapaDe, ROTULO_STATUS } from '../../services/ciclo';

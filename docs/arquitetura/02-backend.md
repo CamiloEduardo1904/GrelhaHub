@@ -157,7 +157,12 @@ flowchart TB
 > porque o projeto declarou "CQRS" num documento e entregou outra coisa por dois meses **sem
 > ninguém notar** — a divergência não apareceu porque nada a media.
 >
-> **A conversão terminou: 16 de 16 consultas, 17 visões.** Ela foi feita por partes, e o que faltava
+> **A conversão terminou: 16 de 16 consultas, 17 visões** — 17 consultas com a fila de
+> monitoramento, que nasceu já do lado da leitura e **sem visão nova**: visão se justifica por
+> agregação, e a fila filtra em vez de somar. Uma `vw_fila` seria a mesma soma escrita num segundo
+> lugar, com o destino de toda segunda escrita.
+>
+> A conversão original: Ela foi feita por partes, e o que faltava
 > ficava **nomeado** no próprio teste, numa lista que só andava para baixo — um teste recusava
 > infrator fora dela, outro recusava nome nela que já tinha sido convertido. É o que impediu "por
 > partes" de virar "pela metade, para sempre".

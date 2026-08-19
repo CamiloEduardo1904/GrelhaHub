@@ -1,0 +1,14 @@
+{
+  "name": "grelhahub-driver-de-validacao",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Dirige o Chrome instalado contra o GrelhaHub local. NÃO faz parte do build do produto — vive em .claude/skills/ de propósito, fora de frontend/, para não entrar no pacote nem no lint da aplicação.",
+  "scripts": {
+    "monitor": "node exemplos/monitor.mjs",
+    "operacao": "node exemplos/operacao.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

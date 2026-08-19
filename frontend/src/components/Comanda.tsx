@@ -13,7 +13,27 @@ import { Selo } from './Selo';
  * o usuário ler qualquer texto. O número domina porque precisa ser lido do
  * outro lado da cozinha.
  */
-export function Comanda({ pedido, acoes }: { pedido: PedidoResumo; acoes?: ReactNode }) {
+export function Comanda({
+  pedido,
+  acoes,
+  diaOperacional,
+}: {
+  pedido: PedidoResumo;
+  acoes?: ReactNode;
+
+  /**
+   * `RN-GER-006` ⚠⚠ — o dia operacional do pedido, quando a tela precisa distingui-lo.
+   *
+   * **Só a fila de monitoramento passa isto, e só quando há mais de um dia nela** (`RN-VEN-054`):
+   * `numero` é único por (unidade, dia operacional) e REINICIA a cada virada, então a comanda nº 1
+   * de ontem é idêntica à nº 1 de hoje. Na lista de pedidos quem resolve isso é o divisor de dia,
+   * que agrupa; a fila é FIFO e não agrupa, então a marca vai na própria comanda.
+   *
+   * ⚠ `undefined` some com a marca. Exibi-la sempre seria ruído: com um dia só na tela não há duas
+   * comandas iguais para distinguir.
+   */
+  diaOperacional?: string;
+}) {
   const cancelado = pedido.status === 'Cancelado';
 
   /**
@@ -39,6 +59,9 @@ export function Comanda({ pedido, acoes }: { pedido: PedidoResumo; acoes?: React
       <div className="comanda-corpo">
         <div className="comanda-id">
           <span className="numero-pedido">{pedido.numero}</span>
+
+          {/* RN-GER-006 — a data que desempata dois números iguais. Dado: mono, tabular. */}
+          {diaOperacional && <span className="comanda-dia dado">{diaOperacional}</span>}
 
           <span className="comanda-estado">
             <Selo status={pedido.status} />

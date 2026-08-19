@@ -37,15 +37,20 @@ o número no banco e nada aconteceria.
 
 | Código | Decisão | Valor | Onde está hoje | O que falta para promover |
 |--------|---------|-------|----------------|---------------------------|
-| PAR-VEN-005 | Intervalo inicial do acompanhamento do pedido | 15 s | `usePedidoAoVivo.ts` | Rota **anônima** que devolva parâmetro — a tela do cliente não autentica |
+| PAR-VEN-005 | Intervalo inicial do acompanhamento do pedido **e da fila** (`RN-VEN-047`, `RN-VEN-055`) | 15 s | `usePedidoAoVivo.ts` e `useFilaAoVivo.ts` | Rota **anônima** que devolva parâmetro — a tela do cliente não autentica |
 | PAR-VEN-006 | Consultas antes de afrouxar | 10 | `usePedidoAoVivo.ts` | idem |
 | PAR-VEN-007 | Intervalo depois de afrouxar | 25 s | `usePedidoAoVivo.ts` | idem |
+| PAR-VEN-008 | Intervalo da fila de monitoramento **ociosa** — `RN-VEN-055` | 60 s | `useFilaAoVivo.ts` | Rota de leitura de parâmetro **por código na tela** — a fila é autenticada, então o obstáculo aqui **não** é o de `PAR-VEN-005`: é que o valor é por unidade e a tela precisaria de uma requisição extra na montagem, antes de saber a que ritmo perguntar |
+| PAR-VEN-009 | Ciclos com a fila vazia antes de afrouxar — `RN-VEN-055` | 4 | `useFilaAoVivo.ts` | idem |
 | PAR-GER-002 | Validade do link de redefinição | 60 min | `EmissorDeLinkDeAcesso` | Parâmetro de **escopo global**: `parametro_valor` é por unidade, e a solicitação é anônima — no instante do pedido ainda não se sabe de que unidade é a pessoa, e o usuário de plataforma não tem nenhuma |
 | PAR-GER-003 | Validade do convite de primeiro acesso | 72 h | `EmissorDeLinkDeAcesso` | idem |
 
-Os dois obstáculos são reais e diferentes: um é **de rota** (público não autenticado), o outro é
-**de escopo** (o parâmetro é por unidade). Enquanto não forem resolvidos, quem mudar o número muda
-a constante — e o código do parâmetro no comentário é o que faz o `grep` encontrar o lugar.
+Os três obstáculos são reais e diferentes entre si: um é **de rota** (a tela do cliente é pública
+e não autentica), outro é **de escopo** (o parâmetro é por unidade, e quem pede o link de acesso
+ainda não tem uma), e o terceiro é **de momento** — `PAR-VEN-008` e `PAR-VEN-009` vivem numa tela
+autenticada, que **poderia** ler o parâmetro, mas precisaria de uma requisição a mais antes de saber
+a que ritmo perguntar. Enquanto não forem resolvidos, quem mudar o número muda a constante — e o
+código do parâmetro no comentário é o que faz o `grep` encontrar o lugar.
 ---
 
 ## 2. `PAR-VEN-003` — falta de saldo de insumo

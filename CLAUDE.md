@@ -7,6 +7,11 @@ errada, mesmo quando o código funciona.
 > **Existe um agente dedicado a este projeto:** `grelhahub-engineer`
 > (`.claude/agents/grelhahub-engineer.md`). Use-o para implementar, escrever specs, modelar
 > o banco ou responder dúvidas de contexto — ele carrega o catálogo de regras e os ADRs.
+>
+> **E existe uma skill para validar tela:** `subir-e-validar`
+> (`.claude/skills/subir-e-validar/`). Ela sobe PostgreSQL, os três bancos, a API e o Vite, semeia
+> um cenário pelas rotas da API e dirige o Chrome instalado. ⚠⚠ **Os quatro gates não olham a
+> tela** — foi assim que a fila de monitoramento passou em 356 testes e subiu vazia no navegador.
 
 ---
 
@@ -40,13 +45,14 @@ Não implemente "provisoriamente".
 | Arquivo | Para quê |
 |---------|----------|
 | `docs/README.md` | Mapa e estado atual |
-| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 183 regras |
+| `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 185 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
 | `docs/adr/README.md` | 20 decisões e 4 em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
 | `docs/arquitetura/` | Modelo de dados com diagrama, backend e frontend — extraído do modelo real |
+| `.claude/skills/subir-e-validar/SKILL.md` | **Subir a pilha real e validar a tela** — obrigatório em mudança de interface |
 
 **Nunca responda de memória sobre uma regra** — `grep` pelo ID. As regras mudam de estado a
 cada entrevista.
@@ -194,13 +200,23 @@ reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:Tes
 cd frontend
 npm ci                       # sem isto, o `npm run` abaixo sai 0 sem rodar nada
 npm run lint && npm run build
+
+# Validação em TELA — o gate que os quatro acima não cobrem
+bash .claude/skills/subir-e-validar/scripts/subir.sh     # Postgres + 3 bancos + API + Vite
+bash .claude/skills/subir-e-validar/scripts/semear.sh    # cenário pelas ROTAS da API
+cd .claude/skills/subir-e-validar/driver && npm install && node exemplos/monitor.mjs
+bash .claude/skills/subir-e-validar/scripts/derrubar.sh
 ```
+
+⚠ **`--migrate`, em inglês.** Escrita como `--migrar` a flag é ignorada em SILÊNCIO e o processo sobe
+como servidor: a API responde `/api/health`, e os bancos de log e de arquivo ficam vazios — a trilha
+falha em toda operação e o primeiro upload dá 500. O startup de Development migra **só** o principal.
 
 ---
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **183 regras catalogadas: 157 em `HIP`, 26 em `DEC`;
+Sprint 1 & 2 — documentação entregue. **185 regras catalogadas: 159 em `HIP`, 26 em `DEC`;
 nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
@@ -211,7 +227,7 @@ inativo → espera o módulo RH, onda 10).
 **Existe uma fatia vertical funcionando** — `SPEC-VEN-001`, fora da ordem das ondas:
 cadastro de restaurante → cardápio público em `/c/:slug` → pedido → painel do restaurante.
 Backend, frontend, migration `Fundacao` e pipeline de deploy. 26 regras com código, e
-**62 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
+**63 regras têm o ID citado no `DisplayName` de um teste** ao todo. A dívida de cada simplificação está na §8 da spec — **um pedido
 que não baixa estoque hoje não significa que a regra mudou**, significa que o estoque ainda
 não existe.
 
@@ -255,6 +271,55 @@ o destino que **existe**: entrar). "Preço a partir de R$ X" fixaria política e
 montar pedido com a loja fechada, para enviar na abertura" é **pedido agendado**, que `RN-VEN-048`
 não prevê — o que a regra pedia e faltava era recusar o **envio** na tela, não só no servidor.
 
+
+⚠⚠ **19/08/2026 — a FILA DE MONITORAMENTO** (`RN-VEN-054`, `RN-VEN-055`, `SPEC-VEN-004`). Aba
+**Monitor**, ao lado de Operação: o que ainda está na casa, em dois blocos — **em aberto** (Aberto,
+Confirmado, Em produção) e **pronto**. Sai da fila quem chega a Entregue, Finalizado ou Cancelado.
+As três telas de pedido respondem três perguntas diferentes, e é isso que impede a redundância:
+**Pedidos** diz o que entrou no dia, **Operação** diz quanto a casa vendeu, **Monitor** diz o que
+falta entregar — e a lista responde essa última cada vez pior conforme a noite avança, porque ela
+cresce.
+
+- ⚠⚠ **A fila NÃO tem recorte de período, e isso é a regra.** O pedido aberto às 23h50 que
+  atravessou a virada continua para ser entregue: ele sai da fila por **estado**, nunca por data.
+  Com mais de um dia operacional na fila, a comanda ganha a **data** — `numero` reinicia a cada
+  virada, e a nº 1 de ontem é idêntica à de hoje. ⚠ A tela **não calcula** dia operacional (isso é
+  `RN-GER-006`, e mora no banco): ela só pergunta se há mais de um dia na resposta.
+- ⚠⚠ **A cadência sai do MOVIMENTO, não do relógio da tela** (`RN-VEN-055`): 15 s (`PAR-VEN-005`)
+  com fila; 60 s (`PAR-VEN-008`) depois de 4 ciclos (`PAR-VEN-009`) com a fila **vazia**; e volta ao
+  ritmo curto no primeiro pedido. Afrouxar por tempo em tela — que é o que `RN-VEN-047` faz do lado
+  do cliente, e com razão — seria o erro exato aqui: **a tela aberta há mais tempo é a da noite
+  cheia**. O que esta tela não tem é estado terminal: ela fica ligada o serviço inteiro.
+- ⚠⚠ **A lista de pedidos consultava a cada 15 s com QUALQUER aba à frente e com a janela
+  escondida.** Abrir o monitor passou a **somar** uma corrente em vez de trocá-la. Agora o
+  `setInterval` do `Painel` só existe na aba `pedidos` e pula o ciclo com `document.hidden`. ⚠ Ali
+  um `return` seco é seguro porque `setInterval` continua disparando; em `useFilaAoVivo` a corrente
+  é uma cadeia de `setTimeout`, e **quem suspende reagenda** — trocar um pelo outro mata a tela em
+  silêncio.
+- ⚠ **A fila não devolve telefone nem observação, e não é a tela que esconde:** os campos não
+  existem em `PedidoNaFilaDto`. `CHAPA-05` do lado do servidor. O **nome do cliente fica** — é como
+  se chama quem vem buscar. ⚠⚠ A observação é instrução de preparo (`RN-VEN-052`) e continua
+  **inteira na comanda** da aba Pedidos: **a fila não substitui a comanda de preparo**, e a
+  `SPEC-VEN-004` §8 declara isso como a pergunta aberta da próxima entrevista (item 23 da fila de
+  validação). Se a cozinha adotar a fila como comanda, a observação volta e a regra muda com ela.
+- `CapaDaCasa` saiu de `features/publico/` para `components/` — três chamadores agora, e componente
+  compartilhado que mora dentro de uma área é o começo de uma cópia.
+
+⚠⚠ **A trava de "uma requisição por vez" NUNCA vai num `useRef`.** `ref` sobrevive à remontagem do
+efeito; o efeito, não. A corrente nova encontrava a trava da VELHA ligada, saía sem agendar nada, e a
+velha não reagendava por já estar morta — **tela no ar, sem erro, e nada mais perguntando**. Vale
+`let emVoo` dentro do efeito, e mais nada. ⚠ O defeito estava nas **duas** correntes: nasceu com
+`useFilaAoVivo` e já existia em `usePedidoAoVivo` desde 18/08, alcançável por "Tentar agora" com uma
+requisição em voo — ou seja, `RN-VEN-047` afirmava "suspender nunca solta a corrente" enquanto o
+código fazia o contrário. **Nada disso aparecia em `tsc`, em `eslint` nem nos 356 testes:** foi um
+navegador de verdade, com a pilha de pé, que mostrou a fila vazia na tela e cheia na API. É a dívida
+do runner de frontend cobrando juros — ver `SPEC-VEN-004` §5.
+
+⚠ **No painel de operação, o ranking subiu para acima do gráfico**, e a série de 30 dias ganhou
+régua: rótulo de data **rareia**, só o melhor dia mostra o valor, e a tabela dia a dia virou uma
+**dobra** fechada com teto de altura. ⚠⚠ **Dobrar não é truncar** — cortar em "os sete primeiros
+dias" esconderia dia sem dizer que escondeu, que é o defeito de leitura que `RN-VEN-050` existe para
+impedir. Nenhuma barra some.
 
 ⚠⚠ **18/08/2026 — quatro mudanças estruturais no mesmo dia**, todas com ADR:
 
@@ -300,9 +365,11 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **351 testes** — 109 de domínio + 18 de aplicação + 224 de integração |
+| `dotnet test -c Release` | ✔ **356 testes** — 109 de domínio + 18 de aplicação + 229 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
+| **Validação em tela** | ✔ 19/08/2026 — fila, cadência, celular e `CHAPA-02`/`04` conferidos em Chrome real. ⚠⚠ **Não é gate automático:** roda à mão, pela skill `subir-e-validar` |
+| ⚠⚠ Runner de frontend | ✖ **não existe.** Dois defeitos de polling passaram pelos quatro gates acima e só um navegador os viu |
 
 > ⚠⚠ **A cobertura que o projeto citava — 95,4% — estava inflada.** As migrations do EF Core são
 > milhares de linhas GERADAS e contavam como cobertas só porque a suíte cria o banco na partida.

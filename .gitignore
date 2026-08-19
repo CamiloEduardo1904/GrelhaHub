@@ -49,6 +49,14 @@ yarn-error.log*
 Thumbs.db
 desktop.ini
 
+# ---------- Validacao em tela (.claude/skills/subir-e-validar) ----------
+#
+# As capturas se TIRAM de novo a cada validacao, e nao se versionam: imagem commitada
+# envelhece em silencio e passa a ser citada como se fosse a tela atual — o mesmo motivo
+# de `cobertura/` nao entrar. O driver e os scripts, sim: eles sao a receita.
+.claude/skills/subir-e-validar/driver/*.png
+.claude/skills/subir-e-validar/driver/exemplos/*.png
+
 # ---------- Local ----------
 .claude/settings.local.json
 *.local

@@ -1,12 +1,19 @@
-import { Grelha } from '../../components/Grelha';
-import type { HorarioPublico } from '../../services/tipos';
+import { Grelha } from './Grelha';
+import type { HorarioPublico } from '../services/tipos';
 
 /**
- * A capa da casa — usada na vitrine e no acompanhamento do pedido.
+ * A capa da casa — na vitrine, no acompanhamento do pedido e na fila de monitoramento.
  *
- * **Componente, e não markup repetido nas duas telas.** Quando o cliente sai do cardápio para
+ * **Componente, e não markup repetido nas telas.** Quando o cliente sai do cardápio para
  * acompanhar o pedido ele não muda de estabelecimento, e a tela precisa dizer isso sem que ele
  * pense a respeito: mesmo nome, mesma logo, mesmo endereço, no mesmo lugar.
+ *
+ * ⚠ **Mudou de `features/publico/` para `components/` em 19/08/2026, com o terceiro chamador.**
+ * A fila de monitoramento (`RN-VEN-054`) é tela da GESTÃO e usa a mesma capa — componente
+ * compartilhado por duas áreas do produto que mora dentro de uma delas é o começo de uma cópia.
+ *
+ * ⚠ **`endereco` é opcional, e a fila NÃO o passa.** Endereço é para quem vai até lá; na tela de
+ * quem já está dentro da casa ele é linha morta ocupando o topo.
  *
  * **`CHAPA-02`** — a listra da marca aparece **só quando a casa não tem logo**. Com logo, a marca
  * do GrelhaHub em cima dela competiria com a do restaurante na vitrine dele.

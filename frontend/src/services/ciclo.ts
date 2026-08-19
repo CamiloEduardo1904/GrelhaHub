@@ -68,3 +68,29 @@ export function etapaDe(status: StatusPedido): number {
 export function rotaDeAvanco(status: StatusPedido): 'confirmar' | 'avancar' {
   return status === 'Aberto' ? 'confirmar' : 'avancar';
 }
+
+/** `RN-VEN-054` — os dois blocos da fila de monitoramento. */
+export type BlocoDaFila = 'aberto' | 'pronto';
+
+/**
+ * `RN-VEN-054` — em que bloco da fila este pedido aparece.
+ *
+ * **Dois blocos e não seis, porque a pergunta da fila é binária:** falta preparar, ou está
+ * esperando para sair. `Aberto`, `Confirmado` e `Em produção` são três respostas para a mesma
+ * pergunta — o pedido ainda está sendo feito —, e o estado exato continua legível no `<Selo>` da
+ * comanda. Quem quer o detalhe tem o detalhe; quem quer a fila tem a fila.
+ *
+ * ⚠ **Esta função NÃO decide quem entra na fila, e a distinção importa.** Quem entra é o servidor
+ * (`GET /v1/pedidos/fila`), e é o único lugar onde essa lista existe. Repeti-la aqui criaria a
+ * segunda implementação que diverge em silêncio — o defeito que `DiaOperacionalParidadeTests`
+ * existe para pegar. Aqui só se responde "onde desenho o que já veio".
+ */
+export function blocoDaFila(status: StatusPedido): BlocoDaFila {
+  return status === 'Pronto' ? 'pronto' : 'aberto';
+}
+
+/** O rótulo de cada bloco. `RN-VEN-054` — o rótulo nomeia o que o bloco mostra (`CHAPA-12`). */
+export const ROTULO_DO_BLOCO: Record<BlocoDaFila, string> = {
+  aberto: 'Em aberto',
+  pronto: 'Pronto',
+};

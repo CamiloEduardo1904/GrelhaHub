@@ -120,7 +120,9 @@ export function usePedidoAoVivo(
 
   // Refs e não estado: mudar qualquer um destes NÃO deve reiniciar o efeito, senão o timer é
   // recriado a cada resposta e o intervalo real deixa de ser o intervalo.
-  const emVoo = useRef(false);
+  //
+  // ⚠ `emVoo` NÃO está aqui, e a ausência é a correção de 19/08/2026 — ver o `let` dentro do
+  // efeito. Guarda de concorrência que sobrevive à remontagem estrangula a corrente seguinte.
   const falhasSeguidas = useRef(0);
 
   // RN-VEN-047 — consultas FEITAS nesta tela, para saber quando afrouxar o intervalo. Ref e não
@@ -151,14 +153,33 @@ export function usePedidoAoVivo(
     let vivo = true;
     let timer: number | undefined;
 
+    /**
+     * ⚠⚠ **Uma requisição por vez — POR CORRENTE, e é aqui que a versão anterior morria.**
+     *
+     * Isto era um `useRef`, e o `ref` **sobrevive à remontagem**. O efeito, não. Quando o efeito
+     * refaz — troca de dependência, `atualizarAgora`, ou o duplo `mount` que o `StrictMode` faz em
+     * desenvolvimento —, a corrente nova encontrava o `emVoo` da corrente VELHA ainda ligado, saía
+     * pelo `return` seco e **não agendava nada**. A requisição velha então terminava, via o seu
+     * `vivo` já `false`, e também não reagendava.
+     *
+     * Resultado: **a tela no ar, sem erro nenhum, e nada mais perguntando.** É exatamente o modo de
+     * falha que `RN-VEN-047` enuncia — *suspender não é cessar* —, entrando pela porta que o próprio
+     * guarda-corpo abriu.
+     *
+     * `let` dentro do efeito faz o guarda valer para **esta** corrente e nenhuma outra. Uma
+     * remontagem com requisição velha em voo custa uma requisição sobreposta, uma vez; a resposta
+     * dela é descartada pelo `vivo`. Corrente morta custa a tela inteira, para sempre.
+     */
+    let emVoo = false;
+
     async function consultar() {
       // Uma requisição por vez. Sem isto, rede lenta empilha pedidos e o polling manso vira
       // enxurrada justamente no cliente que está com sinal ruim.
-      if (emVoo.current) {
+      if (emVoo) {
         return;
       }
 
-      emVoo.current = true;
+      emVoo = true;
       consultasFeitas.current += 1;
 
       try {
@@ -190,7 +211,7 @@ export function usePedidoAoVivo(
         falhasSeguidas.current += 1;
         setSemConexao(true);
       } finally {
-        emVoo.current = false;
+        emVoo = false;
 
         if (vivo) {
           agendar();
@@ -246,7 +267,7 @@ export function usePedidoAoVivo(
       // Consulta em voo: não dá para disparar outra (item 3), e quem está em voo reagenda no
       // `finally`. Mas o `clearTimeout` acima já apagou o temporizador — se a corrente dependesse
       // deste caminho, ela pararia aqui. Reagendar é o que fecha o buraco.
-      if (emVoo.current) {
+      if (emVoo) {
         agendar();
         return;
       }
