@@ -124,6 +124,7 @@ que falhou. Os exemplos são validações **reais**, e cada um sai com **código
 | `operacao.mjs` | A série de 30 dias (`RN-VEN-050`) — nenhuma barra some |
 | `tema.mjs` | Os três estados do tema, `CHAPA-11` nas superfícies e a ausência de piscada |
 | `cancelamento.mjs` | O bloco de cancelamento (`RN-VEN-058`) e o fluxo vertical do painel |
+| `bloqueio.mjs` | Lockout (`RN-GER-040`) e a morte do token na troca de senha (`RN-GER-041`) |
 
 Copie o mais próximo do que você mudou.
 
@@ -196,6 +197,19 @@ cada medida provou:
 > falso, e perseguir defeito falso é como se perde a tarde.**
 
 ---
+
+> ### ⚠⚠ Exemplo que MUDA o estado do mundo tem de desfazer o que fez
+>
+> `bloqueio.mjs` bloqueia conta e troca senha. A primeira versão dele não desfazia, e a **segunda
+> execução passava provando nada**: o login falhava, o token vinha 401 antes e 401 depois, e a
+> asserção *"o token morreu"* ficava verde por ele nunca ter vivido.
+>
+> Duas regras que valem para qualquer exemplo novo:
+>
+> 1. **Afirme que o cenário existiu** antes de afirmar que ele mudou — `antes === 200`, e não só
+>    `depois === 401`. Sem isso, "não consegui testar" e "testei e passou" são o mesmo verde.
+> 2. **Desfaça no fim**, e comece zerando. `bloqueio.mjs` roda duas vezes seguidas e passa nas duas
+>    — é assim que se confere.
 
 ## 6. Derrubar
 
