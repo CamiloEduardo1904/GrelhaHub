@@ -34,8 +34,14 @@ export function CapaDaCasa({
   aberta?: boolean;
   horarios?: HorarioPublico[];
 
-  /** Substitui a assinatura "do pedido à brasa" — o acompanhamento diz o que a tela é. */
-  chamada?: string;
+  /**
+    * Substitui a assinatura "do pedido à brasa" — o acompanhamento diz o que a tela é.
+    *
+    * ⚠ **`null` remove a linha inteira**, e é diferente de `undefined`, que cai no texto padrão. O
+    * painel de senha (`RN-VEN-054`) passa `null`: a assinatura da casa é da VITRINE, para quem
+    * chega de fora, e na parede da cozinha ela ocupa a linha que os números querem.
+    */
+  chamada?: string | null;
 }) {
   return (
     <header className="vitrine-capa">
@@ -58,7 +64,7 @@ export function CapaDaCasa({
         </p>
       )}
 
-      <p className="tagline">{chamada ?? 'Do pedido à brasa'}</p>
+      {chamada !== null && <p className="tagline">{chamada ?? 'Do pedido à brasa'}</p>}
     </header>
   );
 }

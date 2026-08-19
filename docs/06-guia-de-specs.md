@@ -243,7 +243,8 @@ usuário).
 |------|--------|----------|--------|
 | [SPEC-VEN-001](specs/SPEC-VEN-001-cardapio-publico-e-pedido.md) | Cardápio público e pedido online | **`ENTREGUE`** 17/08/2026 | 26 regras — ver cabeçalho |
 | [SPEC-VEN-002](specs/SPEC-VEN-002-imagem-de-produto-e-logo.md) | Imagem do produto e logo da unidade | **`ENTREGUE`** 17/08/2026 — antecipada da onda 1 | `RN-VEN-042`, `RN-GER-026` |
-| [SPEC-VEN-004](specs/SPEC-VEN-004-fila-de-monitoramento.md) ⚠ | Fila de monitoramento — o que ainda está na casa | **`ENTREGUE`** 19/08/2026 | `RN-VEN-054`, `RN-VEN-055` |
+| [SPEC-VEN-004](specs/SPEC-VEN-004-fila-de-monitoramento.md) ⚠⚠ | **Painel de senha** — o número do pedido na parede, em duas colunas | **`ENTREGUE`** 19/08/2026 | `RN-VEN-054` *(revisada)*, `RN-VEN-055`, `RN-VEN-056` |
+| [SPEC-VEN-005](specs/SPEC-VEN-005-lista-de-pedidos-por-grupo.md) ⚠ | Lista de pedidos por grupo — o concluído chega fechado | **`ENTREGUE`** 19/08/2026 | `RN-VEN-057` |
 
 ### Onda 1 — cadastro
 

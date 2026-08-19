@@ -198,36 +198,37 @@ export interface PedidoResumo {
 }
 
 /**
- * `RN-VEN-054` ⚠ — o pedido como a **fila de monitoramento** o recebe.
+ * `RN-VEN-054` ⚠⚠ — o pedido como o **painel de senha** o recebe.
  *
- * ⚠⚠ **Não há `telefone` nem `observacao` aqui, e a ausência é o contrato.** Não são campos
- * opcionais que a tela decide esconder: a API **não os envia** (`SPEC-VEN-004` §3). É `CHAPA-05`
- * do lado do dado — não há cadeado porque não há campo.
+ * **Cinco campos, e a magreza é o cumprimento da regra.** O painel exibe o **número** e nada mais,
+ * então nome, telefone, observação, itens, canal e valor **não existem neste contrato** — não são
+ * nulos, não são opcionais que a tela esconde: a API não os envia (`SPEC-VEN-004` §3). É `CHAPA-05`
+ * do lado do dado.
  *
- * O tipo é estruturalmente compatível com {@link PedidoResumo}, e é por isso que a `<Comanda>`
- * aceita os dois sem `if`: os dois campos que faltam já são opcionais lá, então o que a fila
- * entrega é um `PedidoResumo` em que eles simplesmente nunca chegaram. **A comanda não sabe que
- * está numa fila** — ela desenha o que recebeu.
+ * ⚠⚠ **A versão anterior deste tipo trazia a comanda inteira**, e era estruturalmente compatível
+ * com {@link PedidoResumo} justamente para a `<Comanda>` aceitar os dois. Com a revisão de
+ * 19/08/2026 essa compatibilidade **acabou de propósito**: o painel não desenha comanda, e um tipo
+ * que ainda coubesse lá convidaria alguém a passá-lo para ela de novo.
  */
 export interface PedidoNaFila {
+  /** Chave do React. ⚠ Nunca `numero`: ele reinicia a cada virada e repete entre unidades. */
   id: string;
+
+  /** `RN-GER-009` — de qual unidade. */
   unidadeId: string;
+
+  /** O que o painel exibe. Único por (unidade, dia operacional), e **reinicia**. */
   numero: number;
-  canal: string;
+
+  /** Só para escolher a coluna — preparando ou pronto. O painel não escreve estado por pedido. */
   status: StatusPedido;
 
-  /** `RN-CRM-003` — quem pediu. Fica: é como se chama quem vem buscar. */
-  cliente?: string;
-
-  total: number;
-  quantidadeDeItens: number;
-  criadoEm: string;
-
   /**
-   * `RN-GER-006` ⚠⚠ — a fila **não tem recorte de período**, então ela pode trazer pedido de
-   * ontem. A tela marca o que não é do dia corrente: `numero` reinicia a cada virada.
+   * `RN-GER-006` ⚠⚠ — o dia operacional do pedido.
+   *
+   * A fila **não tem recorte de período**, então ela traz o pedido que atravessou a virada. Num
+   * painel de senha isso é mais perigoso do que era na comanda: o #1 de ontem e o #1 de hoje são
+   * **o mesmo algarismo na parede**. A tela carrega a data no número de dia anterior.
    */
   dataOperacional: string;
-
-  itens: { produto: string; quantidade: number; precoPraticado: number }[];
 }

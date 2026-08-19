@@ -94,3 +94,55 @@ export const ROTULO_DO_BLOCO: Record<BlocoDaFila, string> = {
   aberto: 'Em aberto',
   pronto: 'Pronto',
 };
+
+/** `RN-VEN-057` — os três grupos da lista de pedidos. */
+export type GrupoDaLista = 'casa' | 'concluido' | 'cancelado';
+
+/**
+ * `RN-VEN-057` — em que grupo da lista este pedido cai.
+ *
+ * **Três, e não seis:** a pergunta da lista é "ainda preciso fazer algo com isto?". `Aberto` a
+ * `Pronto` respondem *sim*; `Entregue` e `Finalizado`, *não*; `Cancelado` é a terceira resposta, e
+ * merece grupo próprio porque **não é conclusão** — não entra no faturamento (`RN-VEN-049`) e é o
+ * que alguém procura quando confere a taxa de cancelamento do dia.
+ *
+ * ⚠ **Não é `faseDe` com outro nome.** `faseDe` tem quatro valores e serve à `<Grelha>` e ao
+ * `<Selo>`, onde `Pronto` é `andamento` e `Entregue` é `fim`. Aqui `Pronto` é **casa** — o pedido
+ * está na mão de alguém —, e essa é a distinção que o agrupamento existe para fazer. Duas
+ * perguntas parecidas, respostas diferentes; por isso são duas funções, como
+ * `pedidoEncerrado` e `faseDe` já são.
+ */
+export function grupoDaLista(status: StatusPedido): GrupoDaLista {
+  if (status === 'Cancelado') return 'cancelado';
+  if (status === 'Entregue' || status === 'Finalizado') return 'concluido';
+
+  return 'casa';
+}
+
+/**
+ * O rótulo de cada grupo — `CHAPA-12`: o rótulo nomeia o que o grupo mostra.
+ *
+ * ⚠ "Na casa" e não "Em aberto": `Aberto` é um dos estados **dentro** do grupo, e usar o nome de um
+ * estado para nomear o conjunto faria o operador ler "só os que ninguém confirmou ainda".
+ */
+export const ROTULO_DO_GRUPO: Record<GrupoDaLista, string> = {
+  casa: 'Na casa',
+  concluido: 'Concluídos',
+  cancelado: 'Cancelados',
+};
+
+/** A ordem em que os grupos aparecem: o que exige ação primeiro. */
+export const GRUPOS_DA_LISTA: GrupoDaLista[] = ['casa', 'concluido', 'cancelado'];
+
+/**
+ * `RN-VEN-057` ⚠ — o pedido chega **colapsado**?
+ *
+ * Concluído e cancelado, sim: são o histórico do dia, e era a rolagem deles que enterrava o que
+ * ainda falta preparar. O que está na casa chega aberto — é a rotina de quem está olhando.
+ *
+ * ⚠ **Isto é só o estado INICIAL.** O clique manda nos dois sentidos, e é o que torna "colapsar"
+ * diferente de "esconder".
+ */
+export function chegaColapsado(status: StatusPedido): boolean {
+  return grupoDaLista(status) !== 'casa';
+}

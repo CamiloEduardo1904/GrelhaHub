@@ -65,7 +65,12 @@ public sealed class FilaDeMonitoramentoTests(AmbienteDeIntegracao ambiente)
 
         // FIFO — quem espera há mais tempo primeiro. Ordenar pelo mais recente poria o pedido que
         // acabou de entrar na frente de quem está esperando há vinte minutos.
-        fila.Should().BeInAscendingOrder(p => p.CriadoEm);
+        //
+        // ⚠ A afirmação é sobre a ORDEM DOS IDS, e não sobre `CriadoEm`: o campo saiu do contrato
+        // com a revisão de RN-VEN-054 (o painel de senha exibe o número e nada mais). Os quatro
+        // foram criados nesta sequência, então a ordem esperada é exatamente esta — o que afirma
+        // mais do que a versão anterior, e não menos.
+        fila.Select(p => p.Id).Should().Equal(aberto, confirmado, emProducao, pronto);
     }
 
     [Fact(DisplayName = "RN-VEN-054 — entregue, finalizado e cancelado SAEM da fila")]
@@ -106,8 +111,8 @@ public sealed class FilaDeMonitoramentoTests(AmbienteDeIntegracao ambiente)
             .And.NotContain(cancelado);
     }
 
-    [Fact(DisplayName = "RN-VEN-054 — a fila NÃO devolve telefone nem observação, e devolve o nome")]
-    public async Task Fila_NaoDevolveTelefoneNemObservacao()
+    [Fact(DisplayName = "RN-VEN-054 — a fila devolve CINCO campos: nem nome, nem telefone, nem observação, nem item")]
+    public async Task Fila_DevolveApenasONumeroEOQuePrecisaParaDesenhaLo()
     {
         var restaurante = await CadastrarRestauranteAsync("Brasa Discreta", "52525252000191");
         var produto = await CriarProdutoAsync(restaurante, "Prato Discreto", 20.00m);
@@ -126,19 +131,35 @@ public sealed class FilaDeMonitoramentoTests(AmbienteDeIntegracao ambiente)
         // que responde isso.
         var corpo = await resposta.Content.ReadAsStringAsync();
 
+        // ⚠⚠ ESTE CASO INVERTEU em 19/08/2026, e a inversão é o registro da revisão de RN-VEN-054.
+        // Ele afirmava `corpo.Should().Contain("Cliente Da Fila")`, com o comentário "e o nome
+        // fica: é como se chama quem vem buscar". Passou a não ficar: quem vem buscar é chamado
+        // pelo NÚMERO, e o nome era a segunda forma de dizer a mesma coisa. Um teste que inverte
+        // junto com a regra é o que impede a regra de mudar sozinha.
+        corpo.Should().NotContain("Cliente Da Fila", "o painel de senha exibe o número, e nada mais");
         corpo.Should().NotContain(TelefoneDoCliente, "a fila é tela de ambiente compartilhado");
         corpo.Should().NotContain(ObservacaoDoCliente, "a observação continua inteira na comanda");
-        corpo.Should().NotContain("telefone", "não é campo nulo: o campo não existe no contrato");
-        corpo.Should().NotContain("observacao");
 
-        // E o nome fica: é como se chama quem vem buscar.
-        corpo.Should().Contain("Cliente Da Fila");
+        // Os NOMES dos campos, e não só os valores: o que a regra promete é que o campo não existe,
+        // e campo nulo passaria pela asserção de valor sem passar por esta.
+        foreach (var ausente in new[] { "cliente", "telefone", "observacao", "itens", "total", "canal", "criadoEm" })
+        {
+            corpo.Should().NotContain(ausente, $"`{ausente}` saiu do contrato com a revisão");
+        }
 
-        // A lista de pedidos, essa SIM devolve os dois — a fila não os esconde de quem precisa
-        // deles, ela apenas não é a tela onde eles pertencem.
+        // E os cinco que ficam. `numero` é o que a parede exibe; `dataOperacional` é o que impede
+        // dois "#1" de se confundirem nela (RN-GER-006).
+        foreach (var presente in new[] { "id", "unidadeId", "numero", "status", "dataOperacional" })
+        {
+            corpo.Should().Contain(presente);
+        }
+
+        // A lista de pedidos, essa SIM devolve tudo — a fila não esconde de quem precisa, ela
+        // apenas não é a tela onde esses campos pertencem.
         var comanda = await (await gestao.GetAsync(new Uri("/api/v1/pedidos", UriKind.Relative)))
             .Content.ReadAsStringAsync();
 
+        comanda.Should().Contain("Cliente Da Fila");
         comanda.Should().Contain(TelefoneDoCliente);
         comanda.Should().Contain(ObservacaoDoCliente);
     }

@@ -115,6 +115,39 @@ curl -s -o /dev/null -X POST "$API/v1/pedidos/$CANCELADO/cancelar" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"motivo":"Cliente desistiu na porta"}';                            echo "   cancelado   $CANCELADO"
 
+# ⚠ A fila de PICO — o cenário que revelou o defeito de escala de 19/08/2026.
+#
+# Com 6 pedidos qualquer desenho de fila parece certo. Com 60, a versão que
+# desenhava comanda completa dava quinze linhas de cartão — seis telas de rolagem, com a
+# coluna "pronto" embaixo de todas elas. Meça com PICO antes de decidir layout de fila.
+#
+#   PICO=54 bash semear.sh    → 60 pedidos vivos ao todo
+PICO=${PICO:-0}
+
+if [ "$PICO" -gt 0 ]; then
+  echo "── PICO: mais $PICO pedidos, na proporção de uma NOITE REAL ─────────────"
+  #
+  # ⚠⚠ A proporção importa mais que o número, e errá-la faz a medida mentir. A primeira
+  # versão deste bloco deixava quase tudo VIVO — e com 59 dos 62 na casa, o agrupamento de
+  # `RN-VEN-057` não tinha o que economizar: a queixa que originou a regra é a das onze da
+  # noite, quando o que falta preparar divide espaço com DEZENAS de comandas já concluídas.
+  #
+  # Às 23h de uma hamburgueria: a maioria já saiu, um punhado está na chapa, alguns
+  # desistiram. É isso que se semeia aqui.
+  for i in $(seq 1 "$PICO"); do
+    ID=$(pedido $(( (i % 7) + 1 )) $(( (i % 3) + 1 )) "Pico $i")
+
+    case $(( i % 10 )) in
+      0)     anda "$ID" confirmar
+             curl -s -o /dev/null -X POST "$API/v1/pedidos/$ID/cancelar"                -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json'                -d '{"motivo":"Cliente desistiu na porta"}' ;;   # ~10% cancelados
+      1|2)   anda "$ID" confirmar avancar avancar ;;             # ~20% na casa, prontos
+      3)     : ;;                                                # ~10% na casa, abertos
+      *)     anda "$ID" confirmar avancar avancar avancar avancar ;;  # ~60% concluídos
+    esac
+  done
+  echo "   $PICO acrescentados — ~60% concluídos, ~30% na casa, ~10% cancelados"
+fi
+
 echo "── série longa, para o painel de operação ───────────────────────────────"
 HISTORICO=()
 for i in $(seq 1 14); do
@@ -148,7 +181,10 @@ curl -s "$API/v1/pedidos/fila" -H "Authorization: Bearer $TOKEN" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 print(f'  fila: {len(d)} pedidos')
-for p in d: print(f\"    #{p['numero']:<3} {p['status']:<11} {p['dataOperacional']}  {p['cliente']}\")
+for p in d[:8]: print(f\"    #{p['numero']:<3} {p['status']:<11} {p['dataOperacional']}\")
+if len(d) > 8: print(f'    ... e mais {len(d) - 8}')
+# ⚠ RN-VEN-054 — cinco campos, e a lista existe para DENUNCIAR um sexto. Se aparecer
+# 'cliente', 'telefone' ou 'itens' aqui, alguém reabriu o contrato do painel de senha.
 print('  campos:', ', '.join(d[0].keys()) if d else '(vazia)')"
 echo
 echo "  entrar em http://localhost:5173/entrar  →  dona@brasa.local / $SENHA"

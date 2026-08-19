@@ -1,28 +1,23 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CapaDaCasa } from '../../components/CapaDaCasa';
-import { Comanda } from '../../components/Comanda';
 import { Grelha } from '../../components/Grelha';
-import { api, mensagemDeErro } from '../../services/api';
-import { blocoDaFila, PROXIMA_ACAO, ROTULO_DO_BLOCO, rotaDeAvanco } from '../../services/ciclo';
+import { blocoDaFila, ROTULO_DO_BLOCO } from '../../services/ciclo';
 import type { BlocoDaFila } from '../../services/ciclo';
 import type { MeuRestaurante, PedidoNaFila } from '../../services/tipos';
 import { useFilaAoVivo } from './useFilaAoVivo';
 
 /**
- * A fila de monitoramento — `RN-VEN-054` ⚠, `RN-VEN-055` ⚠⚠, `SPEC-VEN-004`.
+ * O painel de senha — `RN-VEN-054` ⚠⚠, `RN-VEN-055` ⚠⚠, `RN-VEN-056`, `SPEC-VEN-004`.
  *
- * **A pergunta que nenhuma das outras duas telas respondia.** O painel de operação responde
- * *quanto* a casa vendeu; a lista de pedidos responde *o que entrou no dia*. Nenhuma responde **o
- * que ainda tenho para entregar** — e a lista responde pior conforme a noite avança, porque ela
- * cresce: às onze horas, os três pendentes estão espalhados entre quarenta comandas finalizadas, e
- * a única forma de achá-los é ler o selo de cada uma.
+ * **Duas colunas lado a lado, e dentro delas só NÚMERO.**
  *
- * **A capa é a mesma do cardápio — sem o endereço.** `RN-GER-026`: a logo da casa manda. O endereço
- * é para quem vai até lá; na tela de quem já está dentro dela é linha morta ocupando o topo.
+ * ⚠⚠ **A versão de 19/08/2026 pela manhã desenhava a comanda inteira aqui, e estava errada de
+ * escala.** Sessenta pedidos davam quinze linhas de cartão — cerca de seis telas de rolagem —, com
+ * a coluna **pronto** embaixo de todas elas. Numa tela cuja única função é dizer "o seu saiu", a
+ * informação de maior urgência era a mais difícil de alcançar. A regra foi revisada antes deste
+ * código, e o enunciado dela carrega o porquê.
  *
- * ⚠ **Sem telefone e sem observação, e não porque a tela esconde:** a API não os envia
- * (`RN-VEN-054`). É `CHAPA-05` do lado do dado — não há cadeado porque não há campo. O nome fica,
- * porque é como se chama quem vem buscar.
+ * **O que sobrou é o que a parede precisa:** o número, e a coluna em que ele está.
  */
 export function Monitor({
   restaurante,
@@ -37,146 +32,237 @@ export function Monitor({
   ativo: boolean;
 }) {
   const { fila, carregando, atualizadoEm, semConexao, erro, atualizarAgora } = useFilaAoVivo(ativo);
-  const [erroDaAcao, setErroDaAcao] = useState<string | null>(null);
 
-  const emAberto = fila.filter((pedido) => blocoDaFila(pedido.status) === 'aberto');
+  const mural = useRef<HTMLDivElement>(null);
+  const { emTelaCheia, alternarTelaCheia, telaCheiaDisponivel } = useTelaCheia(mural);
+
+  const preparando = fila.filter((pedido) => blocoDaFila(pedido.status) === 'aberto');
   const prontos = fila.filter((pedido) => blocoDaFila(pedido.status) === 'pronto');
 
   /**
-   * `RN-GER-006` ⚠⚠ — quando marcar a data na comanda.
+   * `RN-GER-006` ⚠⚠ — quando o número precisa carregar a data.
    *
    * **A tela NÃO calcula o dia operacional corrente, e não pode:** a virada é cadastrada por
    * unidade (`RN-GER-036`) e derivada no banco. Escrever esse cálculo aqui seria a segunda
    * implementação de uma regra estrutural — o defeito que `DiaOperacionalParidadeTests` existe para
    * pegar.
    *
-   * O que a tela sabe responder é a pergunta que realmente importa: **há mais de um dia na fila?**
-   * A marca existe porque `numero` reinicia a cada virada e a comanda nº 1 de ontem é idêntica à de
-   * hoje. Com um dia só na fila não há duas iguais, e a data seria ruído em toda comanda.
+   * O que a tela sabe responder é a pergunta que importa: **há mais de um dia na fila?** `numero`
+   * reinicia a cada virada, e num painel de senha o #1 de ontem e o #1 de hoje são **o mesmo
+   * algarismo na parede** — sem nome, sem item, sem nada distinguindo. Com um dia só, a data seria
+   * ruído em todo número.
    */
-  const diasNaFila = new Set(fila.map((pedido) => pedido.dataOperacional));
-  const marcarDia = diasNaFila.size > 1;
-
-  async function avancar(pedido: PedidoNaFila) {
-    setErroDaAcao(null);
-
-    try {
-      await api.post(`/v1/pedidos/${pedido.id}/${rotaDeAvanco(pedido.status)}`, {});
-
-      // Consulta na hora: esperar o intervalo deixaria o cartão que acabou de ser tocado no bloco
-      // errado por até 15 s, e a pessoa clicaria de novo.
-      atualizarAgora();
-    } catch (e) {
-      setErroDaAcao(mensagemDeErro(e));
-    }
-  }
+  const dias = new Set(fila.map((pedido) => pedido.dataOperacional));
+  const diaMaisNovo = [...dias].sort().at(-1);
+  const marcarDia = dias.size > 1;
 
   return (
-    <div className="monitor">
-      <CapaDaCasa
-        nomeFantasia={restaurante?.nomeFantasia ?? 'Fila da operação'}
-        urlLogo={restaurante?.urlLogo}
-        chamada="O que ainda está na casa"
-      />
+    <div className={emTelaCheia ? 'monitor mural' : 'monitor'} ref={mural}>
+      <header className="mural-topo">
+        <CapaDaCasa
+          nomeFantasia={restaurante?.nomeFantasia ?? 'Fila da operação'}
+          urlLogo={restaurante?.urlLogo}
+          // ⚠ `null` — e não `undefined`. A assinatura da casa é da VITRINE, para quem chega de
+          // fora; na parede da cozinha ela ocupa a linha que os números querem. `undefined` cairia
+          // no texto padrão, que é justamente o que se está tirando.
+          chamada={null}
+        />
 
-      <SinalAoVivo
-        carregando={carregando}
-        atualizadoEm={atualizadoEm}
-        semConexao={semConexao}
-        ocioso={fila.length === 0}
-        atualizarAgora={atualizarAgora}
-      />
+        <div className="mural-controles">
+          <SinalAoVivo
+            carregando={carregando}
+            atualizadoEm={atualizadoEm}
+            semConexao={semConexao}
+            ocioso={fila.length === 0}
+            atualizarAgora={atualizarAgora}
+          />
 
-      {/* Erro de resposta — 403, módulo desabilitado. Falha de rede não passa por aqui: ela vira
-          o sinal "sem conexão" acima, e a fila exibida continua sendo a última boa. */}
+          {/* RN-VEN-056 — o botão some quando o navegador não tem a API. Botão que não faz nada é
+              pior que botão ausente: quem clica conclui que o sistema está quebrado. */}
+          {telaCheiaDisponivel && (
+            <button type="button" className="btn calada" onClick={() => void alternarTelaCheia()}>
+              {emTelaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
+            </button>
+          )}
+        </div>
+      </header>
+
       {erro && <p className="erro">{erro}</p>}
-      {erroDaAcao && <p className="erro">{erroDaAcao}</p>}
 
-      <BlocoDeFila
-        bloco="aberto"
-        pedidos={emAberto}
-        marcarDia={marcarDia}
-        vazio="Nada em preparo agora."
-        aoAvancar={avancar}
-      />
+      {/* A divisão VERTICAL — RN-VEN-054. Lado a lado, e não empilhadas: o olho de quem espera
+          percorre a coluna "pronto" inteira sem rolar, e é isso que a tela existe para permitir. */}
+      <div className="mural-colunas">
+        <ColunaDaFila
+          bloco="aberto"
+          pedidos={preparando}
+          marcarDia={marcarDia}
+          diaMaisNovo={diaMaisNovo}
+        />
 
-      <BlocoDeFila
-        bloco="pronto"
-        pedidos={prontos}
-        marcarDia={marcarDia}
-        vazio="Nada esperando para sair."
-        aoAvancar={avancar}
-      />
+        <ColunaDaFila
+          bloco="pronto"
+          pedidos={prontos}
+          marcarDia={marcarDia}
+          diaMaisNovo={diaMaisNovo}
+        />
+      </div>
     </div>
   );
 }
 
 /**
- * Um bloco da fila — `RN-VEN-054`.
+ * Uma coluna do painel — `RN-VEN-054`.
  *
- * ⚠ **O bloco vazio NÃO some.** "Nada pronto" é informação para quem está esperando na frente do
- * balcão, e um bloco que desaparece obriga o olho a reconstruir a tela toda vez que o último pedido
- * sai dela.
+ * ⚠ **A coluna vazia NÃO some.** "Nada pronto" é informação para quem está esperando na frente do
+ * balcão, e uma coluna que desaparece faz a outra saltar para o meio da tela — a parede inteira se
+ * reorganiza toda vez que o último pedido sai dela.
  */
-function BlocoDeFila({
+function ColunaDaFila({
   bloco,
   pedidos,
   marcarDia,
-  vazio,
-  aoAvancar,
+  diaMaisNovo,
 }: {
   bloco: BlocoDaFila;
   pedidos: PedidoNaFila[];
   marcarDia: boolean;
-  vazio: string;
-  aoAvancar: (pedido: PedidoNaFila) => Promise<void>;
+  diaMaisNovo?: string;
 }) {
   return (
-    <section className="bloco-de-fila">
-      <header className="divisor-dia">
-        {/* CHAPA-02 — uma barra âmbar por grupo, e aqui ela é o bloco PRONTO. Não é "o primeiro":
-            é o que exige ação de alguém agora. No divisor de dia operacional o âmbar marca o dia
-            mais recente porque lá a pergunta é outra; a barra segue a pergunta da tela. */}
+    <section className="mural-coluna" data-bloco={bloco} data-lotacao={lotacaoDe(pedidos.length)}>
+      <header className="mural-coluna-topo">
+        {/* CHAPA-02 — uma barra âmbar por grupo, e aqui ela é a coluna PRONTO. Não é "a primeira":
+            é a que exige ação de alguém agora. */}
         <Grelha etapa={bloco === 'pronto' ? 0 : -1} de={1} />
 
-        <h3>
-          <span className="divisor-titulo">{ROTULO_DO_BLOCO[bloco]}</span>
-        </h3>
+        <h3>{bloco === 'aberto' ? 'Preparando' : ROTULO_DO_BLOCO[bloco]}</h3>
 
-        <span className="divisor-resumo dado">
-          {pedidos.length} pedido{pedidos.length === 1 ? '' : 's'}
-        </span>
+        <span className="mural-conta dado">{pedidos.length}</span>
       </header>
 
       {pedidos.length === 0 ? (
-        <p className="fila-vazia secundario">{vazio}</p>
+        <p className="mural-vazio">—</p>
       ) : (
-        <div className="grade">
+        <ol className="mural-numeros">
           {pedidos.map((pedido) => (
-            <Comanda
-              key={pedido.id}
-              pedido={pedido}
-              diaOperacional={marcarDia ? pedido.dataOperacional : undefined}
-              acoes={
-                PROXIMA_ACAO[pedido.status] && (
-                  <button type="button" className="btn" onClick={() => void aoAvancar(pedido)}>
-                    {PROXIMA_ACAO[pedido.status]}
-                  </button>
-                )
-              }
-            />
+            <li key={pedido.id}>
+              {/* CHAPA-03 — o número do pedido é o único lugar do produto que leva `--peso`, e é
+                  o mesmo tratamento de `.numero-pedido` na comanda: aqui ele só cresce. */}
+              <span className="mural-numero">{pedido.numero}</span>
+
+              {/* RN-GER-006 ⚠⚠ — a data que impede dois "#1" de se confundirem na parede. Só no
+                  que NÃO é do dia mais novo da fila, e só quando há mais de um dia nela. */}
+              {marcarDia && pedido.dataOperacional !== diaMaisNovo && (
+                <span className="mural-dia dado">{pedido.dataOperacional}</span>
+              )}
+            </li>
           ))}
-        </div>
+        </ol>
       )}
     </section>
   );
 }
 
 /**
+ * ⚠⚠ **O degrau do número acompanha a LOTAÇÃO da coluna, e não é enfeite: sem isto o painel
+ * esconde número exatamente quando mais gente está esperando.**
+ *
+ * Em tela cheia, com o número no degrau grande, cabem cerca de vinte por coluna. No pico de
+ * sessenta, os de baixo saíam da área visível — e a coluna rola, o que numa parede significa
+ * *número que ninguém vai ler*, porque não há mão para rolar a parede.
+ *
+ * O CSS não sabe contar filhos para dimensionar, então quem conta é o componente. Três degraus, e
+ * não uma fórmula contínua: degrau nomeado é escolha; largura calculada por item é o valor
+ * fracionário que `CHAPA-13` recusa.
+ */
+function lotacaoDe(quantos: number): 'baixa' | 'media' | 'alta' {
+  if (quantos <= 12) return 'baixa';
+  if (quantos <= 30) return 'media';
+
+  return 'alta';
+}
+
+/**
+ * `RN-VEN-056` — tela cheia, e a tela do dispositivo sem apagar.
+ *
+ * ⚠⚠ **O bloqueio de suspensão não é acessório: sem ele o modo não cumpre o que promete.** O painel
+ * funciona por dez minutos e o monitor apaga sozinho — e é o tipo de falha que ninguém reporta,
+ * porque parece problema do computador, não do sistema.
+ *
+ * ⚠ **Mas ele é oportunista, nunca condição.** Navegador sem `wakeLock` entra em tela cheia do mesmo
+ * jeito, e a casa resolve pela configuração de energia do sistema. Recusar a tela cheia por falta de
+ * uma API acessória seria trocar o problema de quem tem pelo problema de todos.
+ */
+function useTelaCheia(alvo: React.RefObject<HTMLElement | null>) {
+  const [emTelaCheia, setEmTelaCheia] = useState(false);
+  const trava = useRef<WakeLockSentinel | null>(null);
+
+  const telaCheiaDisponivel =
+    typeof document !== 'undefined' && document.fullscreenEnabled === true;
+
+  const segurarATela = useCallback(async () => {
+    if (!('wakeLock' in navigator)) {
+      return;
+    }
+
+    try {
+      trava.current = await navigator.wakeLock.request('screen');
+    } catch {
+      // Recusa do navegador — bateria fraca, política do sistema. Silencioso de propósito: a tela
+      // cheia já está de pé, e um alerta aqui só teria como ação "não faça nada".
+    }
+  }, []);
+
+  const alternarTelaCheia = useCallback(async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await alvo.current?.requestFullscreen();
+  }, [alvo]);
+
+  useEffect(() => {
+    function aoMudar() {
+      const ligado = document.fullscreenElement === alvo.current;
+      setEmTelaCheia(ligado);
+
+      if (ligado) {
+        void segurarATela();
+      } else {
+        void trava.current?.release();
+        trava.current = null;
+      }
+    }
+
+    // ⚠ A trava CAI sozinha quando a aba é escondida — é o contrato da API, e não um defeito.
+    // Sem esta reaquisição, minimizar a janela uma vez desliga o bloqueio para sempre e o monitor
+    // volta a apagar, com a tela cheia ainda no ar dizendo que está tudo certo.
+    function aoVoltar() {
+      if (!document.hidden && document.fullscreenElement === alvo.current) {
+        void segurarATela();
+      }
+    }
+
+    document.addEventListener('fullscreenchange', aoMudar);
+    document.addEventListener('visibilitychange', aoVoltar);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', aoMudar);
+      document.removeEventListener('visibilitychange', aoVoltar);
+      void trava.current?.release();
+      trava.current = null;
+    };
+  }, [alvo, segurarATela]);
+
+  return { emTelaCheia, alternarTelaCheia, telaCheiaDisponivel };
+}
+
+/**
  * O sinal de que a tela está viva — `RN-VEN-055`.
  *
  * **`CHAPA-06`** — o sinal é a listra âmbar, nunca bolinha pulsando nem emoji. **`CHAPA-08`** —
- * nada pisca: numa tela que fica aberta o serviço inteiro, um indicador que pulsa a cada segundo é
+ * nada pisca: numa tela que fica ligada o serviço inteiro, um indicador que pulsa a cada segundo é
  * ruído permanente.
  *
  * ⚠ **A tela DIZ que afrouxou.** Com a fila vazia a cadência passa a um minuto, e sem esta linha a
@@ -206,7 +292,7 @@ function SinalAoVivo({
       </span>
 
       {!semConexao && ocioso && !carregando && (
-        <span className="rotulo fila-cadencia">Fila vazia · conferindo a cada minuto</span>
+        <span className="rotulo fila-cadencia">Fila vazia · a cada minuto</span>
       )}
 
       {atualizadoEm && !semConexao && (

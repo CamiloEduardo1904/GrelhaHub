@@ -22,6 +22,7 @@ export function EnvioDeImagem({
   rotulo,
   aoEnviar,
   aoRemover,
+  grande = false,
 }: {
   /** Rota da API, relativa a `/api`. */
   rota: string;
@@ -30,6 +31,19 @@ export function EnvioDeImagem({
   aoEnviar: (url: string) => void | Promise<void>;
   /** Quando informado, exibe o botão de remover. `RN-GER-002` — limpa a referência, não o arquivo. */
   aoRemover?: () => void | Promise<void>;
+
+  /**
+   * Miniatura ampliada, para **conferir a imagem** em vez de só constatar que ela existe.
+   *
+   * ⚠ **É a pergunta que muda, não o gosto.** Na tabela do cardápio, 72×54 responde "este produto
+   * tem foto?", e a linha manda no tamanho. No cadastro da logomarca a pergunta é outra — *"a minha
+   * marca ficou boa no cardápio público?"* —, e 72 px não respondem: quem publica descobre depois,
+   * na vitrine, com o cliente olhando junto.
+   *
+   * ⚠ A variante também troca `cover` por `contain`. Cortar a logo pelas bordas para preencher a
+   * moldura é exatamente o defeito que ninguém quer descobrir depois de publicada.
+   */
+  grande?: boolean;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -142,7 +156,7 @@ export function EnvioDeImagem({
     <div className="envio-imagem">
       {urlAtual && !semArquivo ? (
         <img
-          className="miniatura"
+          className={grande ? 'miniatura grande' : 'miniatura'}
           src={miniatura ?? urlAtual}
           alt={rotulo}
           onError={() => setSemArquivo(true)}
@@ -150,7 +164,10 @@ export function EnvioDeImagem({
       ) : (
         // Moldura vazia com traço tracejado: diz "cabe uma imagem aqui" sem inventar um
         // placeholder de "sem foto", que é ruído (CHAPA-06 — e não é emoji).
-        <span className="miniatura vazia" aria-hidden="true" />
+        <span
+          className={grande ? 'miniatura vazia grande' : 'miniatura vazia'}
+          aria-hidden="true"
+        />
       )}
 
       {/* ⚠ "Trocar" e "Remover" não diziam sobre O QUE agiam, e na linha do produto isso custava:

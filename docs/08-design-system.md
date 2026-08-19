@@ -269,6 +269,45 @@ eles estouram a largura do cartão em vez de quebrar.
 A observação **por item** segue o mesmo tratamento em escala menor: rótulo `obs` em `--muted`,
 texto em `--text`, recuado sob o produto a que pertence.
 
+#### A comanda FECHADA — `RN-VEN-057`, 19/08/2026
+
+O concluído e o cancelado chegam numa linha só. Um clique devolve a comanda inteira.
+
+```
+┌─────────────────────────────────────────────────┐
+│ ▌▌▌▌▌▌  #59  DELIVERY  [CANCELADO]   R$ 102,00  │  ← 48 px, `<button aria-expanded>`
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  ← tracejada quando cancelado
+```
+
+| Decisão | Por quê |
+|---------|---------|
+| **`<button>`, não `div` com `onClick`** | Teclado e leitor de tela pelo mesmo caminho do mouse. Numa tela de operação, `Tab` que não alcança o pedido é o operador de mão ocupada perdendo o acesso |
+| **Total sim, cliente não** | Fechada, ela responde *"qual pedido é este e em que pé está"*. Nome e telefone são o detalhe que o clique abre — `RN-GER-039`, dado pessoal não fica à vista sem necessidade |
+| **Canal em rótulo curto** | "Delivery próprio" não cabe, e cortado vira `D.` — que não é rótulo, é ruído ocupando o lugar de um. `Delivery`, porque o outro delivery (`Marketplace`) tem nome próprio |
+| **Coluna mais larga nos grupos fechados** | Cinco elementos somam ~300 px numa coluna de 255: o total transbordava e a **página** rolava na horizontal. Cartão fechado é baixo — largura é o que ele tem de sobra |
+| **A grade não muda ao abrir** | A largura é por **grupo**, não por estado do cartão. Alternar a grade a cada clique reorganizaria a tela inteira, que é o oposto do que o colapso dá |
+| **Cancelado: traço tracejado** | Não fundo vermelho. Fundo colorido num cartão que alguém só está conferindo **comemora o erro** (§5) |
+
+⚠⚠ **Colapsar não é esconder, e a distinção é a regra.** O pedido continua na lista, contado no
+grupo dele, e o clique devolve tudo — inclusive a observação do cliente (`RN-VEN-052`), que nunca é
+truncada. Filtro que remove sem dizer quantos removeu é o defeito que `RN-VEN-050` já enuncia do
+lado do gráfico.
+
+#### O filtro de grupo — `RN-VEN-057`
+
+Quatro chips: `Todos · Na casa · Concluídos · Cancelados`. `CHAPA-02` — exatamente um é âmbar.
+
+⚠ **As contagens são do PERÍODO, nunca do filtro ativo.** Quem olha o chip quer saber o que
+encontraria clicando nele; um contador que respeitasse o filtro mostraria o total do grupo
+selecionado e zero nos outros.
+
+⚠ **`position: sticky`.** Com três dias na tela, o filtro sai do campo de visão justamente quando é
+mais útil — e quem rolou até o fim não sabe mais qual grupo está vendo.
+
+⚠ **O vazio do filtro nomeia o filtro.** Um "nenhum pedido" seco contradiz o chip que acabou de
+anunciar o total do período, e é assim que alguém conclui que o sistema perdeu os pedidos. A saída
+é um botão: *"Ver todos os 62"*.
+
 ### Campo com limite de caracteres
 
 Onde há teto — observação do pedido (80, `RN-VEN-052`), descrição do produto (200,
@@ -433,26 +472,66 @@ começo de uma cópia.
 | `aberta` + `horarios` | só onde há venda a recusar (`RN-VEN-048`) |
 | `chamada` | a assinatura da tela. `undefined` cai em "Do pedido à brasa" |
 
-### O divisor de bloco — `RN-VEN-054`
+### O painel de senha — `RN-VEN-054` ⚠⚠, `RN-VEN-056`
 
-Na fila de monitoramento, a faixa que separa **em aberto** de **pronto**. Mesmo desenho do divisor
-de dia operacional (`RN-GER-006`): `<Grelha>`, título, contagem à direita, e a régua esticando até
-a borda.
+Duas colunas lado a lado, separadas por **traço** e não por vão, e dentro delas **só número**.
 
 ```
-▌ EM ABERTO  ─────────────────────────────  4 PEDIDOS
-▌ PRONTO     ─────────────────────────────  2 PEDIDOS
+┌ PREPARANDO ───────── 40 ┬ PRONTO ──────────── 20 ┐   ← cabeçalho em carvão
+│  3   1   2   4  10  11  │   5    6   12   15     │   ← papel  │  carvão invertido
+│ 2026-08-18              │                        │
+│ 13  14  16  17  19  20  │  18   21   24   27     │   ← âmbar, e um degrau maior
+└─────────────────────────┴────────────────────────┘
 ```
 
-**`CHAPA-02` decide qual é âmbar, e a escolha não é "o primeiro".** É **pronto** — o bloco que
-exige ação de alguém agora. No divisor de dia, o âmbar é o dia mais recente; aqui, a pergunta que a
-tela responde é outra, e a barra segue a pergunta.
+| Decisão | Por quê |
+|---------|---------|
+| **Só o número** | A comanda completa dava ~6 telas de rolagem com 60 pedidos, com a coluna **pronto** embaixo de todas elas. Medido: passou a **1 tela** |
+| **Divisão vertical, por traço** | Empilhar desperdiça a largura e joga "pronto" para baixo da dobra. O que separa na Chapa é o traço de 2px; vão leria como duas placas soltas |
+| **Pronto invertido, em âmbar** | ⚠ A referência que originou a tela usava **verde**, e o design system recusa: verde é `--ok`, que já significa FINALIZADO no selo. Duas cores para dois sentidos apaga os dois (§5). Âmbar é a cor do que exige ação agora |
+| **Pronto um degrau maior** | Quem está de pé procura **um** número, e é o dele saindo. "Preparando" é contexto, e contexto não precisa ser lido do outro lado do salão |
+| **A coluna vazia não some** | Ela vira um `—`. Coluna que desaparece faz a outra saltar para o meio da tela, e a parede se reorganiza toda vez que o último pedido sai |
+| **`--peso` no número** | Mesmo tratamento de `.numero-pedido` na comanda — o único lugar do produto que usa Arial Black. Aqui ele só cresce, e perde o `#` |
 
-⚠ **O bloco vazio não some.** "Nada pronto" é informação para quem está esperando na frente do
-balcão; um bloco que desaparece obriga o olho a reconstruir a tela toda vez que o último pedido
-sai dela.
+#### ⚠⚠ O tamanho acompanha a lotação, e o componente é quem conta
 
----
+`--mural-base` é o degrau da **tela** (`clamp`, um patamar acima em tela cheia). `--mural-numero` é
+o que cada **coluna** resolve a partir dele, por `data-lotacao`:
+
+| Lotação | Pedidos | Multiplicador |
+|---------|--------:|---------------|
+| `baixa` | até 12 | 1,0 |
+| `media` | até 30 | 0,7 |
+| `alta` | acima | 0,5 |
+
+**Sem isto o painel esconde número exatamente quando mais gente está esperando.** No degrau grande
+cabem ~20 por coluna em tela cheia; no pico de 60, os de baixo saíam da área visível — e a coluna
+rola, o que numa parede significa *número que ninguém vai ler*, porque não há mão para rolar a
+parede. O CSS não conta filhos para dimensionar, então quem conta é o componente.
+
+⚠ **Três degraus nomeados, e não uma fórmula contínua.** Degrau é escolha; tamanho calculado por
+item é o valor fracionário que `CHAPA-13` recusa.
+
+#### A exceção declarada a `CHAPA-13`
+
+`--mural-base` é `clamp(…, vw, …)` — **relativo à viewport**, o que a regra normalmente proíbe. A
+exceção é da superfície: um painel de parede existe para preencher a tela em que está pendurado, e
+o mesmo número tem de servir a um monitor de 24" e a um tablet de 10". O `clamp` fixa piso e teto;
+só o meio varia, e continua sendo **um token nomeado**, decidido uma vez.
+
+#### `RN-VEN-056` — o modo mural
+
+Tela cheia por botão, sem barra e sem abas. ⚠ **A tela do dispositivo não apaga enquanto ele está
+ligado** (`navigator.wakeLock`): sem isso o modo funciona por dez minutos e o monitor apaga sozinho,
+que é o mesmo que não existir — e ninguém reporta, porque parece problema do computador.
+
+⚠ O bloqueio é **oportunista, nunca condição**: navegador sem a API entra em tela cheia do mesmo
+jeito. E a trava **cai sozinha** quando a aba é escondida — é o contrato da API —, por isso ela é
+readquirida no `visibilitychange`. Sem essa reaquisição, minimizar a janela uma vez desliga o
+bloqueio para sempre, com a tela cheia ainda no ar dizendo que está tudo certo.
+
+⚠ **O botão some quando `document.fullscreenEnabled` é falso.** Botão que não faz nada é pior que
+botão ausente: quem clica conclui que o sistema está quebrado.
 
 ---
 

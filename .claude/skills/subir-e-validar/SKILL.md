@@ -112,9 +112,32 @@ npm install                 # só playwright-core, ~1 pacote, sem baixar navegad
 node exemplos/monitor.mjs    # a validação da fila de monitoramento, ponta a ponta
 ```
 
-`navegador.mjs` dá o mínimo: `abrir()`, `entrar()`, `foto()`, e a coleta de erro de console, de
-`pageerror` e de requisição que falhou. `exemplos/monitor.mjs` é a validação real de
-`SPEC-VEN-004` — copie-o como ponto de partida.
+`navegador.mjs` dá o mínimo: `abrir()`, `entrar()`, `aba()`, `foto()`, `contador()` para cadência,
+as sondas de `CHAPA-02` e `CHAPA-04`, e a coleta de erro de console, de `pageerror` e de requisição
+que falhou. Os exemplos são validações **reais**, e cada um sai com **código 1** quando algo quebra:
+
+| Exemplo | O que prova |
+|---------|-------------|
+| `monitor.mjs` | Cadência de polling (`RN-VEN-055`) — 15 s com movimento, 60 s ocioso, suspensão por aba |
+| `mural.mjs` | O painel de senha no pico (`RN-VEN-054`, `RN-VEN-056`) — rolagem, colunas, tela cheia |
+| `lista.mjs` | Os grupos da lista (`RN-VEN-057`) — colapso, filtro, e quanto ele economiza |
+| `operacao.mjs` | A série de 30 dias (`RN-VEN-050`) — nenhuma barra some |
+
+Copie o mais próximo do que você mudou.
+
+> ### ⚠⚠ `PICO` — meça com sessenta, não com seis
+>
+> ```bash
+> PICO=54 bash .claude/skills/subir-e-validar/scripts/semear.sh
+> ```
+>
+> Com 6 pedidos **qualquer desenho de fila parece certo**. Foi com 60 que a comanda completa no
+> painel se revelou errada (6 telas de rolagem) e que o agrupamento da lista ganhou número (8,4
+> telas → 4,3).
+>
+> ⚠ E a **proporção** importa mais que o número: a primeira versão do `PICO` deixava quase tudo
+> vivo, e com 59 dos 62 na casa o agrupamento não tinha o que economizar. Ele semeia uma noite
+> real — ~60% concluídos, ~30% na casa, ~10% cancelados.
 
 > ### ⚠ Caminho do navegador com barra normal
 >

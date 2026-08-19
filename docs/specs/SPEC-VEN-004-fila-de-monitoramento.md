@@ -6,7 +6,7 @@
 | Módulo | VEN |
 | Situação | `ENTREGUE` — 19/08/2026 |
 | Onda | Fora da ordem — operação da fatia vertical |
-| Regras implementadas | `RN-VEN-054`, `RN-VEN-055`, `RN-VEN-018`, `RN-GER-006`, `RN-GER-009`, `RN-GER-010`, `RN-GER-016`, `RN-VEN-050` (apresentação) |
+| Regras implementadas | `RN-VEN-054` ⚠⚠ *(revisada 19/08/2026)*, `RN-VEN-055`, `RN-VEN-056`, `RN-VEN-018`, `RN-GER-006`, `RN-GER-009`, `RN-GER-010`, `RN-GER-016`, `RN-VEN-050` (apresentação) |
 | ADRs aplicáveis | [ADR-0009](../adr/0009-onde-as-regras-de-negocio-vivem.md), [ADR-0012](../adr/0012-direcao-visual-chapa.md), [ADR-0019](../adr/0019-cqrs-com-modelo-de-leitura-proprio.md) |
 | Depende de | `SPEC-VEN-001`, `SPEC-GER-004`, `SPEC-GER-009` |
 | Autor / data | 19/08/2026 |
@@ -31,7 +31,8 @@ atualizada sozinha, dividida entre o que falta preparar e o que espera para sair
 
 | Regra | Enunciado resumido | Imposta em | Mecanismo |
 |-------|--------------------|------------|-----------|
-| `RN-VEN-054` | A fila lista só `Aberto`, `Confirmado`, `Em produção` e `Pronto`, em dois blocos; sem telefone e sem observação | Aplicação (leitura) | Filtro de status em `FilaDeMonitoramentoHandler` sobre `vw_pedido_resumo` + **DTO sem os campos** |
+| `RN-VEN-054` ⚠⚠ | **Painel de senha:** exibe o NÚMERO e nada mais, em duas colunas lado a lado | Aplicação (leitura) | Filtro de status em `FilaDeMonitoramentoHandler` + **DTO de cinco campos** |
+| `RN-VEN-056` | Modo mural — tela cheia por botão, com a tela do dispositivo sem apagar | Aplicação (cliente) | `useTelaCheia` em `Monitor.tsx` — `requestFullscreen` + `navigator.wakeLock` |
 | `RN-VEN-055` | Cadência escalonada pelo movimento: 15 s com fila, 60 s com a fila vazia por 4 ciclos | Aplicação (cliente) | `useFilaAoVivo.ts` — e a suspensão da corrente do painel em `Painel.tsx` |
 | `RN-VEN-018` | O ciclo de vida é a fonte do que está vivo e do que saiu | Domínio | `StatusPedido`, já existente |
 | `RN-GER-006` ⚠⚠ | O pedido carrega o seu `data_operacional`; a fila o **exibe** quando não é o dia corrente | Banco | Coluna gerada, já existente — a fila só lê |
@@ -67,23 +68,27 @@ Query: FilaDeMonitoramentoQuery
 
 `GET /api/v1/pedidos/fila` → `IReadOnlyList<PedidoNaFilaDto>`
 
+**Cinco campos.** Medido: **9.483 bytes para 60 pedidos — 158 por pedido.**
+
 | Campo | Tipo | Observação |
 |-------|------|------------|
-| `Id` | `Guid` | Identidade. `Numero` é humano e **repete** entre dias e unidades |
+| `Id` | `Guid` | Chave do React. ⚠ Nunca `Numero`: ele reinicia e repete entre unidades |
 | `UnidadeId` | `Guid` | `RN-GER-009` — a plataforma vê várias casas na mesma resposta |
-| `Numero` | `int` | Reinicia a cada dia operacional |
-| `Canal` | `string` | `RN-VEN-001` |
-| `Status` | `string` | Um dos quatro vivos |
-| `Cliente` | `string?` | **Fica.** É como se chama quem vem buscar |
-| `Total` | `decimal` | `RN-VEN-039`, somado pela visão |
-| `QuantidadeDeItens` | `int` | |
-| `CriadoEm` | `DateTimeOffset` | Alimenta o tempo de espera na comanda |
-| `DataOperacional` | `DateOnly` | A tela marca o que não é do dia corrente |
-| `Itens` | `[]` | `Produto`, `Quantidade`, `PrecoPraticado` |
+| `Numero` | `int` | **O que o painel exibe.** Reinicia a cada dia operacional |
+| `Status` | `string` | Só para escolher a coluna. O painel não escreve estado por pedido |
+| `DataOperacional` | `DateOnly` | `RN-GER-006` ⚠⚠ — o que impede dois "#1" de se confundirem na parede |
 
-> ⚠⚠ **`Telefone` e `Observacao` não existem neste DTO** — não são `null`, não são mascarados,
-> **não estão lá**. É `CHAPA-05` aplicada ao contrato: não há cadeado porque não há campo. A
-> observação por item também fica fora, pela mesma razão.
+> ⚠⚠ **Saíram do contrato com a revisão de 19/08/2026:** `Cliente`, `Telefone`, `Observacao`,
+> `Canal`, `Total`, `QuantidadeDeItens`, `CriadoEm` e `Itens`. Não são `null`, não são mascarados —
+> **não estão lá**. É `CHAPA-05` aplicada ao contrato.
+>
+> A versão anterior devolvia a comanda inteira, ~26 KB para 60 pedidos, **mais uma segunda consulta**
+> para os itens. A segunda consulta deixou de existir. Numa rota consultada a cada 15 s por cada
+> painel aberto, um campo a menos vale mais que qualquer otimização depois.
+>
+> ⚠ `Status` é `string` e não `int` **de propósito** — mas a conversão é feita **em memória**, com o
+> `Select` do banco projetando as cinco colunas cruas: `((StatusPedido)p.Status).ToString()` **não
+> tem tradução para SQL**, e a consulta estouraria em execução, não em compilação.
 
 ### Erros
 
@@ -154,12 +159,21 @@ pela tela é o comando que já existia (`AlterarStatusPedidoCommand`), com os ef
 > **Então** nenhum dos três aparece
 > **E** o cancelado não aparece nem no bloco de aberto nem no de pronto
 
-### CA-3 — a fila não devolve telefone nem observação (`RN-VEN-054`)
+### CA-3 — a fila devolve cinco campos, e o nome do cliente **não** é um deles (`RN-VEN-054`)
 
-> **Dado** um pedido criado com telefone e com observação do cliente
+> **Dado** um pedido criado com nome, telefone e observação
 > **Quando** a fila é consultada
-> **Então** o corpo da resposta **não contém** o telefone nem o texto da observação
-> **E** o nome do cliente **está** lá
+> **Então** o corpo da resposta **não contém** nenhum dos três
+> **E** não contém os nomes de campo `cliente`, `telefone`, `observacao`, `itens`, `total`, `canal`
+> nem `criadoEm`
+> **E** contém `id`, `unidadeId`, `numero`, `status` e `dataOperacional`
+> **E** a lista de pedidos — essa sim — continua devolvendo os três
+
+> ⚠⚠ **Este critério INVERTEU em 19/08/2026.** Ele afirmava que o nome do cliente **estava** na
+> resposta, com a justificativa *"é como se chama quem vem buscar"*. Passou a não estar: quem vem
+> buscar é chamado pelo **número**. Um teste que inverte junto com a regra é o que impede a regra de
+> mudar sozinha — e é por isso que a inversão fica escrita aqui em vez de a linha antiga ser
+> apagada.
 
 ### CA-4 — o pedido que atravessou a virada continua na fila (`RN-VEN-054`, `RN-GER-006`)
 

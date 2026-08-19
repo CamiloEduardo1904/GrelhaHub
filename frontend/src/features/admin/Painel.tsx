@@ -7,7 +7,15 @@ import { IconeImpressora } from '../../components/Icone';
 import { QRCodeSVG } from 'qrcode.react';
 import { Grelha } from '../../components/Grelha';
 import { api, mensagemDeErro } from '../../services/api';
-import { PROXIMA_ACAO, rotaDeAvanco } from '../../services/ciclo';
+import {
+  chegaColapsado,
+  grupoDaLista,
+  GRUPOS_DA_LISTA,
+  PROXIMA_ACAO,
+  ROTULO_DO_GRUPO,
+  rotaDeAvanco,
+} from '../../services/ciclo';
+import type { GrupoDaLista } from '../../services/ciclo';
 import type { CategoriaInterna, MeuRestaurante, PedidoResumo } from '../../services/tipos';
 import { CadastroDeOperacao } from '../plataforma/CadastroDeOperacao';
 import { Cardapio } from './Cardapio';
@@ -243,11 +251,21 @@ function rotuloDoDia(dia: string): string {
   return quando.toLocaleDateString('pt-BR', { weekday: 'long' });
 }
 
-//  saiu daqui: o contador do dia vinha dele, e agora cada bloco conta o seu.
 /**
- * ⚠ `restaurante` saiu das propriedades: o contador vinha de `pedidosDoDia`, que é do dia
- * corrente. Com a lista podendo trazer vários dias, esse número passou a contradizer o que estava
- * na tela — cada bloco conta o seu, e é o único jeito de o contador não mentir.
+ * A lista de pedidos — `RN-VEN-057` ⚠, `RN-GER-006` ⚠⚠.
+ *
+ * **Duas hierarquias, e as duas são obrigatórias por motivos diferentes.**
+ *
+ * `RN-GER-006` manda agrupar por **dia operacional**: `numero` reinicia a cada virada, e sem o
+ * divisor a comanda #1 de hoje e a #1 de ontem aparecem idênticas.
+ *
+ * `RN-VEN-057` manda separar por **grupo** dentro do dia: às onze da noite, o que ainda falta
+ * preparar dividia espaço com dezenas de comandas inteiras que ninguém vai reler, e a rolagem era
+ * toda delas.
+ *
+ * ⚠ `restaurante` saiu das propriedades: o contador vinha de `pedidosDoDia`, que é do dia corrente.
+ * Com a lista podendo trazer vários dias, esse número passou a contradizer o que estava na tela —
+ * cada bloco conta o seu, e é o único jeito de o contador não mentir.
  */
 function Pedidos({
   pedidos,
@@ -260,8 +278,44 @@ function Pedidos({
   // booleano, porque o diálogo mostra o número dele no título.
   const [cancelando, setCancelando] = useState<PedidoResumo | null>(null);
 
+  /** `RN-VEN-057` — o grupo em foco. `todos` mostra os três, separados por divisor. */
+  const [foco, setFoco] = useState<GrupoDaLista | 'todos'>('todos');
+
+  /**
+   * `RN-VEN-057` ⚠⚠ — os pedidos cujo estado de abertura está **invertido** em relação ao padrão.
+   *
+   * **Um conjunto e não dois, e isso é o que faz o clique valer nos dois sentidos.** O padrão vem do
+   * estado do pedido (`chegaColapsado`): concluído e cancelado chegam fechados, o que está na casa
+   * chega aberto. Guardar "os que o usuário abriu" exigiria um segundo conjunto para "os que o
+   * usuário fechou", e o segundo sempre é o que alguém esquece.
+   *
+   * ⚠ O efeito colateral é o certo: um pedido que **anda** enquanto a tela está aberta reassume o
+   * padrão do estado novo. O pedido que acabou de ser entregue fecha sozinho na próxima consulta —
+   * a menos que quem estava olhando o tenha aberto de propósito.
+   */
+  const [alternados, setAlternados] = useState<ReadonlySet<string>>(new Set());
+
   const sessao = lerSessao();
   const podeCancelar = pode(sessao, 'pedido.cancelar');
+
+  function alternar(id: string) {
+    setAlternados((atual) => {
+      const proximo = new Set(atual);
+      if (!proximo.delete(id)) proximo.add(id);
+
+      return proximo;
+    });
+  }
+
+  // ⚠ As contagens dos filtros vêm do PERÍODO INTEIRO, e as dos blocos, do que está exibido —
+  // `RN-VEN-057`. Contador de filtro que respeitasse o filtro ativo mostraria o total do grupo
+  // selecionado e zero nos outros, que é a informação inútil: quem olha o chip quer saber o que
+  // encontraria clicando nele.
+  const totalDoGrupo = (grupo: GrupoDaLista) =>
+    pedidos.filter((pedido) => grupoDaLista(pedido.status) === grupo).length;
+
+  const visiveis =
+    foco === 'todos' ? pedidos : pedidos.filter((pedido) => grupoDaLista(pedido.status) === foco);
 
   if (pedidos.length === 0) {
     return (
@@ -278,64 +332,131 @@ function Pedidos({
 
   return (
     <>
-      {/* ⚠⚠ AGRUPADO POR DIA OPERACIONAL, e o agrupamento é obrigatório — não é organização.
-          `numero` é único por (unidade, dia operacional): ele REINICIA a cada virada. Numa lista
-          de vários dias, a comanda #1 de hoje e a #1 de ontem apareciam lado a lado, idênticas,
-          sem nada dizendo que eram pedidos diferentes — o operador não tinha como saber qual
-          estava lendo. Foi o que o filtro de período revelou no dia em que entrou. */}
-      {agruparPorDiaOperacional(pedidos).map(({ dia, doDia }, indice) => (
-        <section key={dia} className="dia-de-pedidos">
-          <header className="divisor-dia">
-            {/* CHAPA-02 — uma barra âmbar por grupo: o dia mais recente da lista. */}
-            <Grelha etapa={indice === 0 ? 0 : -1} de={1} />
+      {/* RN-VEN-057 — o filtro. CHAPA-02: exatamente um chip é o ativo, e é o âmbar. */}
+      <div className="chips filtro-de-grupo" role="group" aria-label="Filtrar por grupo">
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={foco === 'todos'}
+          onClick={() => setFoco('todos')}
+        >
+          <Grelha etapa={foco === 'todos' ? 0 : -1} de={1} />
+          Todos
+          <span className="dado">{pedidos.length}</span>
+        </button>
 
-            <h3>
-              <span className="divisor-titulo">{rotuloDoDia(dia)}</span>
-              <span className="dado divisor-data">{dia}</span>
-            </h3>
+        {GRUPOS_DA_LISTA.map((grupo) => (
+          <button
+            key={grupo}
+            type="button"
+            className="chip"
+            aria-pressed={foco === grupo}
+            onClick={() => setFoco(grupo)}
+          >
+            <Grelha etapa={foco === grupo ? 0 : -1} de={1} />
+            {ROTULO_DO_GRUPO[grupo]}
+            <span className="dado">{totalDoGrupo(grupo)}</span>
+          </button>
+        ))}
+      </div>
 
-            <span className="divisor-resumo dado">
-              {doDia.length} pedido{doDia.length === 1 ? '' : 's'}
-            </span>
-          </header>
+      {/* ⚠ O filtro pode não achar nada, e o vazio precisa dizer QUE FILTRO está ativo. Um "nenhum
+          pedido" seco aqui contradiz o chip que acabou de anunciar o total do período — e é assim
+          que alguém conclui que o sistema perdeu os pedidos. */}
+      {visiveis.length === 0 ? (
+        <div className="vazio">
+          <Grelha etapa={-1} de={6} alta />
+          <p>
+            Nenhum pedido em <strong>{ROTULO_DO_GRUPO[foco as GrupoDaLista]}</strong> no período.
+          </p>
+          <button type="button" className="btn calada" onClick={() => setFoco('todos')}>
+            Ver todos os {pedidos.length}
+          </button>
+        </div>
+      ) : (
+        /* ⚠⚠ AGRUPADO POR DIA OPERACIONAL, e o agrupamento é obrigatório — não é organização.
+           `numero` é único por (unidade, dia operacional): ele REINICIA a cada virada. Numa lista
+           de vários dias, a comanda #1 de hoje e a #1 de ontem apareciam lado a lado, idênticas,
+           sem nada dizendo que eram pedidos diferentes — o operador não tinha como saber qual
+           estava lendo. Foi o que o filtro de período revelou no dia em que entrou. */
+        agruparPorDiaOperacional(visiveis).map(({ dia, doDia }, indice) => (
+          <section key={dia} className="dia-de-pedidos">
+            <header className="divisor-dia">
+              {/* CHAPA-02 — uma barra âmbar por grupo: o dia mais recente da lista. */}
+              <Grelha etapa={indice === 0 ? 0 : -1} de={1} />
 
-          <div className="grade">
-            {doDia.map((pedido) => (
-              <Comanda
-                key={pedido.id}
-                pedido={pedido}
-                acoes={
-                  <>
-                    {PROXIMA_ACAO[pedido.status] && (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => void aoAgir(pedido.id, rotaDeAvanco(pedido.status))}
-                      >
-                        {PROXIMA_ACAO[pedido.status]}
-                      </button>
-                    )}
+              <h3>
+                <span className="divisor-titulo">{rotuloDoDia(dia)}</span>
+                <span className="dado divisor-data">{dia}</span>
+              </h3>
 
-                    {/* RN-GER-002 — cancelamento exige motivo; a permissão é `pedido.cancelar`.
-                        Esconder aqui é usabilidade; o servidor recusa de todo jeito. */}
-                    {podeCancelar &&
-                      pedido.status !== 'Cancelado' &&
-                      pedido.status !== 'Finalizado' && (
-                        <button
-                          type="button"
-                          className="btn calada perigo"
-                          onClick={() => setCancelando(pedido)}
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                  </>
-                }
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+              <span className="divisor-resumo dado">
+                {doDia.length} pedido{doDia.length === 1 ? '' : 's'}
+              </span>
+            </header>
+
+            {/* RN-VEN-057 — dentro do dia, os grupos. Com um grupo em foco o subdivisor não
+                aparece: o chip já disse o que está na tela, e repetir viraria moldura vazia. */}
+            {(foco === 'todos' ? GRUPOS_DA_LISTA : [foco]).map((grupo) => {
+              const doGrupo = doDia.filter((pedido) => grupoDaLista(pedido.status) === grupo);
+
+              if (doGrupo.length === 0) {
+                return null;
+              }
+
+              return (
+                <div key={grupo} className="grupo-de-pedidos" data-grupo={grupo}>
+                  {foco === 'todos' && (
+                    <p className="divisor-grupo">
+                      <span className="rotulo">{ROTULO_DO_GRUPO[grupo]}</span>
+                      <span className="dado">{doGrupo.length}</span>
+                    </p>
+                  )}
+
+                  <div className="grade">
+                    {doGrupo.map((pedido) => (
+                      <Comanda
+                        key={pedido.id}
+                        pedido={pedido}
+                        colapsada={chegaColapsado(pedido.status) !== alternados.has(pedido.id)}
+                        aoAlternar={() => alternar(pedido.id)}
+                        acoes={
+                          <>
+                            {PROXIMA_ACAO[pedido.status] && (
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => void aoAgir(pedido.id, rotaDeAvanco(pedido.status))}
+                              >
+                                {PROXIMA_ACAO[pedido.status]}
+                              </button>
+                            )}
+
+                            {/* RN-GER-002 — cancelamento exige motivo; a permissão é
+                                `pedido.cancelar`. Esconder aqui é usabilidade; o servidor recusa de
+                                todo jeito. */}
+                            {podeCancelar &&
+                              pedido.status !== 'Cancelado' &&
+                              pedido.status !== 'Finalizado' && (
+                                <button
+                                  type="button"
+                                  className="btn calada perigo"
+                                  onClick={() => setCancelando(pedido)}
+                                >
+                                  Cancelar
+                                </button>
+                              )}
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        ))
+      )}
 
       {cancelando && (
         <Dialogo
@@ -363,6 +484,7 @@ function Pedidos({
     </>
   );
 }
+
 
 function LinkPublico({
   restaurante,
@@ -393,6 +515,10 @@ function LinkPublico({
           urlAtual={restaurante.urlLogo}
           rotulo={`Logo de ${restaurante.nomeFantasia}`}
           aoEnviar={aoMudar}
+          // A logo é o que o CLIENTE vê no topo do cardápio público (RN-GER-026), e é a única
+          // imagem da casa. Conferi-la num selo de 72 px é conferir que ela existe, não que ficou
+          // boa.
+          grande
         />
 
         <p className="secundario">JPEG ou PNG, até 5 MB.</p>

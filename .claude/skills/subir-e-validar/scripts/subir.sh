@@ -27,8 +27,15 @@ docker run -d --name "$CONTEINER" \
 # ⚠ O `sleep` é obrigatório, e a falta dele foi o primeiro defeito deste script: sem espera as 30
 # tentativas se esgotam em menos de um segundo — antes de o Postgres terminar de subir — e o
 # `pg_isready` final derruba o script por `set -e`, com a única mensagem sendo o título do passo.
+#
+# ⚠⚠ E o `-h 127.0.0.1` é o SEGUNDO defeito, mais traiçoeiro: durante o `initdb` a imagem do
+# PostgreSQL sobe um servidor TEMPORÁRIO para criar o banco, e ele escuta APENAS no socket unix.
+# Um `pg_isready` sem host fala com esse socket, responde "pronto", e o passo seguinte esbarra em
+# `FATAL: the database system is shutting down` — porque o servidor temporário estava justamente
+# encerrando para o definitivo assumir. O servidor de verdade é o único que escuta em TCP; por isso
+# a espera é por TCP.
 for _ in $(seq 1 40); do
-  if docker exec "$CONTEINER" pg_isready -U grelhahub -d grelhahub >/dev/null 2>&1; then
+  if docker exec "$CONTEINER" pg_isready -h 127.0.0.1 -p 5432 -U grelhahub -d grelhahub >/dev/null 2>&1; then
     pronto=1
     break
   fi

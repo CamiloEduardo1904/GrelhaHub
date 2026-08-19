@@ -1589,6 +1589,20 @@ tr.apagado td {
   box-shadow: none;
 }
 
+/* A miniatura AMPLIADA — a logomarca, no cadastro do link público.
+   ⚠ `contain` e não `cover`: `cover` preenche a moldura CORTANDO as bordas, o que
+   numa foto de lanche é aceitável e numa marca é o defeito. A sobra aparece na cor
+   da superfície, que é resposta honesta — "a sua logo tem esta proporção" — em vez
+   de um recorte que a vitrine não vai repetir.
+   ⚠ Alto o bastante para revelar o que 72 px escondem: contraste sobre o carvão da
+   capa, texto miúdo dentro da marca, borda branca que ninguém tirou do arquivo. */
+.miniatura.grande {
+  width: 200px;
+  height: 150px;
+  object-fit: contain;
+  padding: var(--esp-1);
+}
+
 /* A logo no topo do cardápio público. Altura limitada: a capa é do NOME da casa, e uma
    logo alta empurraria o cardápio para fora da primeira tela no celular. */
 .logo-casa {
@@ -3197,87 +3211,292 @@ button.link-discreto {
 }
 
 /* ============================================================================
-   FILA DE MONITORAMENTO — RN-VEN-054 ⚠, RN-VEN-055 ⚠⚠ · SPEC-VEN-004
+   PAINEL DE SENHA — RN-VEN-054 ⚠⚠, RN-VEN-055, RN-VEN-056 · SPEC-VEN-004
 
-   A tela que responde "o que ainda tenho para entregar". Ela reusa quase tudo:
-   a capa da casa do cardápio, a comanda da lista de pedidos, o divisor de bloco
-   com o mesmo desenho do divisor de dia operacional. O que é novo aqui cabe em
-   quatro regras — e isso é o resultado que se quer de um design system.
+   ⚠⚠ Esta seção foi REESCRITA em 19/08/2026, e o que ela substituiu era uma
+   grade de comandas completas. O motivo está na regra: sessenta pedidos davam
+   quinze linhas de cartão — cerca de SEIS TELAS de rolagem —, com a coluna
+   "pronto" embaixo de todas elas. Numa tela cuja única função é dizer "o seu
+   saiu", a informação de maior urgência era a mais difícil de alcançar.
 
-   ⚠ CSS novo em TOKEN (CHAPA-13). O resto do painel ainda está em rem solto, e a
-   varredura global é decisão pendente (§2.3 do design system) — mas nada novo
-   entra fora da escala.
+   Duas colunas lado a lado, e dentro delas só número.
    ============================================================================ */
 
 .monitor {
   display: flex;
   flex-direction: column;
-  gap: var(--esp-3);
+  gap: var(--esp-2);
+
+  /* Ocupa a altura que `.conteudo` tem para dar. Sem isto o painel se dimensiona pelo
+     conteúdo e deixa uma faixa vazia embaixo — que no pico dá certo por acidente (a
+     coluna cheia empurra) e na casa devagar parece tela cortada. */
+  flex: 1;
+  min-height: 0;
+
+  /* Os dois degraus do painel. ⚠ CHAPA-13 manda tamanho por TOKEN, e é o que estes
+     são — degraus nomeados, escolhidos uma vez. A unidade relativa à viewport é a
+     exceção declarada: um painel de parede existe para preencher a tela em que
+     está pendurado, e o mesmo número tem de servir a um monitor de 24" e a um
+     tablet de 10". O `clamp` fixa o piso e o teto; o meio é o que varia. */
+  /* `--mural-base` é o degrau da TELA; `--mural-numero` é o que cada coluna resolve a
+     partir dele, conforme a lotação. Duas variáveis porque são duas decisões: quanto a
+     tela permite, e quanto a coluna precisa. */
+  --mural-base: clamp(2rem, 4.5vw, 3.5rem);
+  --mural-numero: var(--mural-base);
+  --mural-celula: calc(var(--mural-base) * 1.3);
 }
 
-/* A MESMA capa do cardápio, com três ajustes de contexto — RN-GER-026.
+/* ---------------------------------------------------------------- o topo */
 
-   Na vitrine ela é a faixa de topo da PÁGINA e pode ser alta: é o primeiro
-   contato de quem chegou de fora. Aqui ela é um BLOCO dentro do painel, acima de
-   uma fila que precisa aparecer sem rolagem no tablet — então ganha moldura e
-   sombra sólida (CHAPA-01, como toda placa), e perde altura.
+.mural-topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--esp-2);
+}
 
-   ⚠ Sem endereço e sem selo de aberto: os dois são para quem vai até lá. Quem
-   olha esta tela já está dentro da casa. */
+/* A capa da casa aqui é uma FAIXA, não a capa da vitrine: logo e nome lado a
+   lado, na horizontal, sem endereço e sem assinatura (RN-VEN-054 passa
+   `chamada={null}`). Na parede, cada linha que não é número é linha perdida. */
 .monitor .vitrine-capa {
-  padding: var(--esp-3) var(--esp-2);
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: var(--esp-2);
+  padding: var(--esp-1) var(--esp-2);
   border: var(--traco);
   box-shadow: var(--elev-2);
 }
 
 .monitor .vitrine-capa h1 {
-  font-size: var(--texto-xl);
+  font-size: var(--texto-lg);
 }
 
 .monitor .logo-casa {
-  max-height: 96px;
+  max-height: 48px;
+  max-width: 140px;
 }
 
-.bloco-de-fila {
+.mural-controles {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--esp-2);
 }
 
-/* ⚠ O bloco vazio NÃO some — "nada pronto" é informação para quem está esperando
-   na frente do balcão. Um bloco que desaparece obriga o olho a reconstruir a tela
-   toda vez que o último pedido sai dela.
-
-   CHAPA-10 — é prosa, e vai na cor do texto. `.secundario` já resolve o tamanho;
-   o que esta regra faz é a moldura tracejada, que diz "espaço reservado" sem
-   escrever nada. */
-.fila-vazia {
-  margin: 0;
-  padding: var(--esp-3) var(--esp-2);
-  border: 2px dashed var(--rule);
-  text-align: center;
+/* Aqui o sinal não tem o filete tracejado do acompanhamento: ele está numa linha
+   de controles, não fechando uma seção. */
+.mural-controles .ao-vivo {
+  border-top: none;
+  padding-top: 0;
 }
 
-/* A tela DIZ que afrouxou a cadência (RN-VEN-055). Sem esta linha, "está mais
-   devagar de propósito" e "parou de perguntar" são a mesma tela — a armadilha
-   que RN-VEN-047 documenta do lado do cliente. */
 .fila-cadencia {
   font-size: var(--texto-2xs);
   color: var(--muted);
 }
 
-/* RN-GER-006 ⚠⚠ — a data que desempata dois números iguais na fila. Discreta ao
-   lado do número gigante, e presente só quando há mais de um dia operacional na
-   tela: com um dia só não existem duas comandas iguais para distinguir. */
-.comanda-dia {
+/* ------------------------------------------------------- as duas colunas */
+
+/* ⚠ A DIVISÃO É VERTICAL, e é o pedido do dono do produto: com só número dentro,
+   empilhar as duas desperdiça a largura inteira da tela e joga "pronto" para
+   baixo da dobra. Lado a lado, o olho de quem espera percorre a coluna do fim
+   sem rolar — que é a única coisa que esta tela existe para permitir. */
+.mural-colunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: var(--traco);
+  box-shadow: var(--elev-2);
+  min-height: 0;
+  flex: 1;
+}
+
+.mural-coluna {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* O traço que separa as duas — a "divisão vertical". Vão não serviria: o que
+   separa na Chapa é o traço de 2px, e um vão vazio leria como duas placas
+   soltas em vez de um painel. */
+.mural-coluna + .mural-coluna {
+  border-left: var(--traco);
+}
+
+.mural-coluna-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+
+  /* CHAPA-11 — quem declara `background` declara `color`. */
+  background: var(--carvao);
+  color: var(--creme);
+  padding: var(--esp-1) var(--esp-2);
+  border-bottom: var(--traco);
+}
+
+.mural-coluna-topo h3 {
+  margin: 0;
+  margin-right: auto;
+  font-family: var(--mono);
+  font-size: var(--texto-2xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.mural-conta {
+  font-size: var(--texto-md);
+  font-weight: 700;
+  color: var(--ambar-chama);
+}
+
+/* ------------------------------------------------------------ os números */
+
+.mural-numeros {
+  list-style: none;
+  margin: 0;
+  padding: var(--esp-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--mural-celula), 1fr));
+  gap: var(--esp-2) var(--esp-1);
+  align-content: start;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.mural-numeros li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+/* CHAPA-03 — o número do pedido é o único lugar do produto que leva `--peso`, e
+   este é o mesmo tratamento de `.numero-pedido` na comanda: só cresce. Sem o
+   `#` do prefixo, que ali distingue número de valor e aqui só rouba largura. */
+.mural-numero {
+  font-family: var(--peso);
+  font-size: var(--mural-numero);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ⚠⚠ RN-GER-006 — a data que impede dois "#1" de se confundirem na parede.
+   `numero` reinicia a cada virada, e no painel de senha não há nome nem item
+   distinguindo: só o algarismo. Aparece apenas no que NÃO é do dia mais novo da
+   fila, e apenas quando há mais de um dia nela. */
+.mural-dia {
   font-size: var(--texto-2xs);
   color: var(--muted);
-  align-self: center;
+  white-space: nowrap;
+}
 
-  /* ⚠ `.comanda-id` é `space-between`, e com três filhos o do meio fica CENTRALIZADO — a data
-     pousaria no vazio, longe do número que ela desempata. `margin-right: auto` a encosta no
-     número, que é onde ela significa alguma coisa. */
-  margin-right: auto;
+/* ⚠ A coluna vazia NÃO some — o traço é o lugar dela. Coluna que desaparece faz
+   a outra saltar para o meio da tela, e a parede inteira se reorganiza toda vez
+   que o último pedido sai. */
+.mural-vazio {
+  margin: auto;
+  font-family: var(--peso);
+  font-size: var(--mural-numero);
+  color: var(--muted);
+}
+
+/* Preparando: papel. É o que ainda não aconteceu. */
+.mural-coluna[data-bloco='aberto'] .mural-numeros {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ⚠ Pronto: INVERTIDO — âmbar sobre carvão, o mesmo gesto da capa da vitrine.
+   A referência que originou a tela usava verde para "pronto", e o design system
+   recusa: verde é `--ok`, que já significa FINALIZADO no selo, e duas cores para
+   dois sentidos diferentes apaga os dois (§5). Âmbar é a cor do que exige ação
+   agora — é o que CHAPA-02 já diz na barra do cabeçalho, aplicado à coluna. */
+.mural-coluna[data-bloco='pronto'] .mural-numeros {
+  background: var(--carvao);
+  color: var(--creme);
+}
+
+/* ⚠ O número de PRONTO é maior que o de preparando, e a diferença é hierarquia, não
+   enfeite: quem está de pé na frente do balcão procura UM número, e é o dele saindo.
+   "Preparando" é contexto — responde "ainda falta o meu?" —, e contexto não precisa
+   ser lido do outro lado do salão.
+
+   É o mesmo gesto da referência que originou a tela, onde o número chamado domina a
+   metade direita. Aqui ele vem por token multiplicado, e não por um valor novo solto:
+   os dois degraus continuam sendo os dois de `.monitor`. */
+.mural-coluna[data-bloco='pronto'] .mural-numeros {
+  --mural-celula: calc(var(--mural-numero) * 1.9);
+}
+
+.mural-coluna[data-bloco='pronto'] .mural-numero {
+  color: var(--ambar-chama);
+  font-size: calc(var(--mural-numero) * 1.35);
+}
+
+.mural-coluna[data-bloco='pronto'] .mural-dia {
+  color: var(--cinza-quente);
+}
+
+/* ⚠⚠ Os três degraus de LOTAÇÃO — postos por `data-lotacao`, que o componente calcula.
+   O CSS não conta filhos para dimensionar, e a alternativa seria rolagem: numa parede,
+   coluna que rola é número que ninguém lê, porque não há mão para rolar a parede.
+
+   Os valores são MULTIPLICADORES do degrau da tela, não tamanhos novos: assim o
+   patamar do modo mural continua sendo o único lugar onde o número base é decidido. */
+.mural-coluna[data-lotacao='media'] .mural-numeros {
+  --mural-numero: calc(var(--mural-base) * 0.7);
+  --mural-celula: calc(var(--mural-base) * 1.4);
+}
+
+.mural-coluna[data-lotacao='alta'] .mural-numeros {
+  --mural-numero: calc(var(--mural-base) * 0.5);
+  --mural-celula: calc(var(--mural-base) * 1);
+}
+
+/* ------------------------------------------- RN-VEN-056 · o modo mural */
+
+/* ⚠ CHAPA-11 outra vez, e aqui ela é obrigatória: em tela cheia o navegador pinta
+   o fundo de PRETO atrás do elemento. Sem `background` declarado, o painel
+   apareceria como ilhas flutuando no vazio. */
+.monitor.mural {
+  background: var(--ground);
+  color: var(--text);
+  height: 100vh;
+  padding: var(--esp-3);
+  overflow: hidden;
+
+  /* O mesmo degrau, um patamar acima: a parede é lida de longe. Só `--mural-base` muda —
+     os degraus de lotação derivam dele e sobem juntos. */
+  --mural-base: clamp(3rem, 7vw, 9rem);
+}
+
+/* Em tela cheia o painel é a tela inteira: a moldura da placa não tem contra o
+   que se destacar, e a sombra sólida vira uma faixa preta no canto. */
+.monitor.mural .mural-colunas {
+  box-shadow: none;
+}
+
+@media (max-width: 40rem) {
+  /* No celular a divisão vertical não cabe: duas colunas de 3 rem cada não são
+     um painel, são duas listas espremidas. Empilha — e aqui empilhar é certo,
+     porque a tela do celular não é a parede. */
+  .mural-colunas {
+    grid-template-columns: 1fr;
+  }
+
+  .mural-coluna + .mural-coluna {
+    border-left: none;
+    border-top: var(--traco);
+  }
+
+  .mural-topo {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ============================================================================
@@ -3371,4 +3590,185 @@ button.link-discreto {
 .grafico-barras[data-longa] .barra-rotulo {
   min-height: 0.9rem;
   font-size: 0.58rem;
+}
+
+/* ============================================================================
+   GRUPOS DA LISTA DE PEDIDOS — RN-VEN-057 ⚠, 19/08/2026
+
+   A queixa que originou a regra: às onze da noite o que ainda falta preparar
+   dividia espaço com dezenas de comandas inteiras que ninguém vai reler, e a
+   rolagem era toda delas.
+
+   Duas hierarquias, e as duas obrigatórias por motivos diferentes: o divisor de
+   DIA existe porque `numero` reinicia a cada virada (RN-GER-006); o divisor de
+   GRUPO existe porque o concluído não disputa espaço com o pendente.
+   ============================================================================ */
+
+.filtro-de-grupo {
+  /* Cola no topo da área de conteúdo: com três dias na tela, o filtro sai do campo
+     de visão justamente quando ele é mais útil — e quem rolou até o fim não sabe
+     mais qual grupo está vendo. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--esp-1) 0;
+  background: var(--ground);
+  color: var(--text);
+}
+
+/* A contagem dentro do chip é DADO: mono, tabular. E vem do período inteiro, não do
+   filtro ativo — quem olha o chip quer saber o que encontraria clicando nele. */
+.filtro-de-grupo .chip .dado {
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+}
+
+.filtro-de-grupo .chip[aria-pressed='true'] .dado {
+  color: var(--text);
+}
+
+.grupo-de-pedidos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+}
+
+.grupo-de-pedidos + .grupo-de-pedidos {
+  margin-top: var(--esp-2);
+}
+
+/* O subdivisor. Mais leve que o divisor de dia — ele é subordinado a ele, e dois
+   traços do mesmo peso na mesma tela empatam a hierarquia. */
+.divisor-grupo {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+  margin: 0;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.divisor-grupo .dado {
+  font-size: var(--texto-2xs);
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------- a comanda FECHADA */
+
+/* ⚠⚠ Colapsar não é esconder: o cartão continua na tela, continua contado, e o
+   clique devolve a comanda inteira. O que muda é quanto de cada pedido está aberto
+   ao mesmo tempo. */
+.comanda-fechada {
+  padding: 0;
+}
+
+/* ⚠ `<button>` de verdade, e não `div` com `onClick`: teclado e leitor de tela
+   ganham o mesmo caminho do mouse. Numa tela de operação isso não é detalhe — é o
+   operador com a mão ocupada perdendo o acesso. */
+.comanda-abre {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  /* CHAPA-04 — 48 px na operação. */
+  min-height: var(--toque);
+  padding: 0.5rem 0.8rem;
+  background: var(--surface);
+  color: var(--text);
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comanda-abre:hover {
+  background: var(--surface-2);
+}
+
+/* O foco precisa aparecer sobre a superfície clara E sobre a escura: contorno em
+   carvão com deslocamento, o mesmo vocabulário da sombra sólida. */
+.comanda-abre:focus-visible {
+  outline: var(--traco);
+  outline-offset: -4px;
+}
+
+/* Fechada, o número não domina: ele identifica. Três vezes menor que na comanda
+   aberta, e ainda o maior elemento da linha. */
+.comanda-fechada .numero-pedido {
+  font-size: var(--texto-md);
+  line-height: 1;
+}
+
+/* ⚠ Sem `flex-shrink: 0` o canal era a primeira coisa a ser espremida — e reticências
+   num rótulo de uma palavra não deixam nada legível: "Delivery próprio" virava "D.".
+   Quem encolhe é o número, que sobrevive a isso. */
+.comanda-fechada-canal {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* O selo é compacto na linha fechada: ali ele divide ~255 px com quatro outras coisas. */
+.comanda-fechada .selo {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.6rem;
+}
+
+/* A régua de 6 barras na linha fechada é o que menos informa — o selo já diz o estado, com
+   texto. Ela some abaixo de 26 rem, antes de o canal e o total começarem a brigar. */
+@media (max-width: 26rem) {
+  .comanda-fechada .grelha {
+    display: none;
+  }
+}
+
+.comanda-fechada-total {
+  margin-left: auto;
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* A comanda ABERTA: o cabeçalho virou alternador, e precisa parecer clicável sem
+   deixar de ser cabeçalho. */
+button.comanda-cab {
+  width: 100%;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* O cabeçalho da comanda já tem fundo e borda inferior próprios; o botão só
+     precisa não os desfazer. */
+  background: var(--surface-2);
+  color: var(--text);
+  border-bottom: 2px dashed var(--rule);
+}
+
+button.comanda-cab:hover {
+  background: var(--surface);
+}
+
+button.comanda-cab:focus-visible {
+  outline: var(--traco);
+  outline-offset: -4px;
+}
+
+/* ⚠⚠ Os grupos que chegam FECHADOS ganham coluna mais larga, e é aritmética, não gosto.
+   A linha fechada tem cinco elementos — régua, número, canal, selo e total — e em 255 px
+   eles somam ~300: o total transbordava para fora do cartão e a PÁGINA passava a rolar na
+   horizontal. Cartão fechado é baixo, então largura é o que ele tem de sobra.
+
+   ⚠ A regra é por GRUPO e não por estado do cartão: um pedido que o usuário abre continua
+   na coluna larga. Alternar a grade conforme o que está aberto faria a tela inteira se
+   reorganizar a cada clique — que é o oposto do que o colapso existe para dar. */
+.grupo-de-pedidos[data-grupo='concluido'] .grade,
+.grupo-de-pedidos[data-grupo='cancelado'] .grade {
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+}
+
+/* Cancelado fechado: o traço da moldura diz o estado antes de o selo ser lido, do
+   outro lado da mesa. Não é cor de fundo — fundo vermelho num cartão que o operador
+   só está conferindo comemora o erro (§5). */
+.grupo-de-pedidos[data-grupo='cancelado'] .comanda-fechada {
+  border-style: dashed;
 }

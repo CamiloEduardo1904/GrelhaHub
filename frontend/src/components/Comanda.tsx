@@ -13,26 +13,39 @@ import { Selo } from './Selo';
  * o usuário ler qualquer texto. O número domina porque precisa ser lido do
  * outro lado da cozinha.
  */
+/**
+ * ⚠ **A propriedade `diaOperacional` foi REMOVIDA em 19/08/2026, e a remoção é intencional.** Ela
+ * existiu por meia manhã, para a fila de monitoramento marcar a comanda de dia anterior. Com a
+ * revisão de `RN-VEN-054` a fila deixou de desenhar comanda — virou painel de senha —, e a marca
+ * de dia foi para lá (`.mural-dia`). Manter a propriedade sem chamador seria deixar uma porta
+ * aberta para alguém reabrir a discussão sem reabrir a regra.
+ *
+ * Na lista de pedidos quem resolve a ambiguidade de `numero` é o **divisor de dia**, que agrupa.
+ */
 export function Comanda({
   pedido,
   acoes,
-  diaOperacional,
+  colapsada = false,
+  aoAlternar,
 }: {
   pedido: PedidoResumo;
   acoes?: ReactNode;
 
   /**
-   * `RN-GER-006` ⚠⚠ — o dia operacional do pedido, quando a tela precisa distingui-lo.
+   * `RN-VEN-057` ⚠ — a comanda **fechada**: número, canal, estado e total, numa linha só.
    *
-   * **Só a fila de monitoramento passa isto, e só quando há mais de um dia nela** (`RN-VEN-054`):
-   * `numero` é único por (unidade, dia operacional) e REINICIA a cada virada, então a comanda nº 1
-   * de ontem é idêntica à nº 1 de hoje. Na lista de pedidos quem resolve isso é o divisor de dia,
-   * que agrupa; a fila é FIFO e não agrupa, então a marca vai na própria comanda.
+   * ⚠⚠ **Colapsar não é esconder, e a diferença é a regra.** O pedido continua na lista, contado no
+   * grupo dele, e um clique devolve a comanda inteira — inclusive a observação do cliente
+   * (`RN-VEN-052`), que nunca é truncada. Nada é removido da tela; o que muda é quanto de cada
+   * pedido está aberto ao mesmo tempo.
    *
-   * ⚠ `undefined` some com a marca. Exibi-la sempre seria ruído: com um dia só na tela não há duas
-   * comandas iguais para distinguir.
+   * Quem decide o estado inicial é `chegaColapsado`, pelo estado do pedido: concluído e cancelado
+   * chegam fechados, porque era a rolagem deles que enterrava o que ainda falta preparar.
    */
-  diaOperacional?: string;
+  colapsada?: boolean;
+
+  /** Sem isto o cartão não é clicável — é o caso de quem só exibe, como a plataforma. */
+  aoAlternar?: () => void;
 }) {
   const cancelado = pedido.status === 'Cancelado';
 
@@ -47,21 +60,70 @@ export function Comanda({
 
   const espera = tempoDecorrido(pedido.criadoEm);
 
+  /**
+   * `RN-VEN-057` — a linha fechada.
+   *
+   * ⚠ É um `<button>` de verdade, com `aria-expanded`: teclado e leitor de tela ganham o mesmo
+   * caminho do mouse. Uma `div` com `onClick` deixaria o pedido inalcançável por `Tab`, e numa tela
+   * de operação isso não é detalhe — é o operador com a mão ocupada perdendo o acesso.
+   *
+   * ⚠ O **total** entra aqui, e o cliente não. Fechada, a comanda responde "qual pedido é este e em
+   * que pé está"; nome e telefone são o detalhe que o clique abre. `RN-GER-039` — dado pessoal não
+   * fica à vista sem necessidade.
+   */
+  if (colapsada) {
+    return (
+      <article className="comanda comanda-fechada">
+        <button
+          type="button"
+          className="comanda-abre"
+          aria-expanded={false}
+          onClick={aoAlternar}
+        >
+          <Grelha etapa={etapaDe(pedido.status)} de={CICLO.length} morta={cancelado} />
+
+          <span className="numero-pedido">{pedido.numero}</span>
+
+          <span className="comanda-fechada-canal rotulo">{canalCurto(pedido.canal)}</span>
+
+          <Selo status={pedido.status} />
+
+          <span className="comanda-fechada-total dado">{moeda.format(pedido.total)}</span>
+        </button>
+      </article>
+    );
+  }
+
   return (
     <article className="comanda">
       <div className="comanda-picote" aria-hidden="true" />
 
-      <header className="comanda-cab">
-        <Grelha etapa={etapaDe(pedido.status)} de={CICLO.length} morta={cancelado} />
-        <span className="rotulo">{rotuloDoCanal(pedido.canal)}</span>
-      </header>
+      {/* ⚠ O mesmo alternador, no sentido inverso — e é o que impede o colapso de ser via de mão
+          única. Sem ele, quem abrisse um pedido concluído para conferir ficaria com ele aberto até
+          recarregar a página, e a tela voltaria ao problema que a regra resolveu.
+
+          Quando não há `aoAlternar` (a plataforma só exibe), o cabeçalho volta a ser cabeçalho: um
+          `<button>` que não faz nada é pior que texto. */}
+      {aoAlternar ? (
+        <button
+          type="button"
+          className="comanda-cab comanda-abre"
+          aria-expanded={true}
+          onClick={aoAlternar}
+        >
+          <Grelha etapa={etapaDe(pedido.status)} de={CICLO.length} morta={cancelado} />
+          <span className="rotulo">{rotuloDoCanal(pedido.canal)}</span>
+        </button>
+      ) : (
+        <header className="comanda-cab">
+          <Grelha etapa={etapaDe(pedido.status)} de={CICLO.length} morta={cancelado} />
+          <span className="rotulo">{rotuloDoCanal(pedido.canal)}</span>
+        </header>
+      )}
 
       <div className="comanda-corpo">
         <div className="comanda-id">
           <span className="numero-pedido">{pedido.numero}</span>
-
-          {/* RN-GER-006 — a data que desempata dois números iguais. Dado: mono, tabular. */}
-          {diaOperacional && <span className="comanda-dia dado">{diaOperacional}</span>}
 
           <span className="comanda-estado">
             <Selo status={pedido.status} />
@@ -128,6 +190,28 @@ export function Comanda({
       </div>
     </article>
   );
+}
+
+/**
+ * `RN-VEN-001` — o canal na linha FECHADA, curto.
+ *
+ * ⚠ **"Delivery próprio" não cabe, e cortado com reticências ele vira "D."** — que não é rótulo,
+ * é ruído ocupando o lugar de um. Na comanda fechada sobram ~60 px entre o número e o selo, e a
+ * escolha real é entre um nome curto e nenhum nome.
+ *
+ * **"Delivery" e não "Delivery próprio" porque o outro delivery é `Marketplace`**, que tem nome
+ * próprio na mesma lista: encurtar não cria ambiguidade nenhuma aqui. Na comanda aberta o nome
+ * inteiro continua, porque lá ele cabe.
+ */
+function canalCurto(canal: string): string {
+  const mapa: Record<string, string> = {
+    Salao: 'Salão',
+    Balcao: 'Balcão',
+    DeliveryProprio: 'Delivery',
+    Marketplace: 'Market',
+  };
+
+  return mapa[canal] ?? canal;
 }
 
 /** RN-VEN-001 — os quatro canais de venda, em português. */
