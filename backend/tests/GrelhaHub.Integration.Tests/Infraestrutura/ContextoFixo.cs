@@ -25,6 +25,9 @@ internal sealed class ContextoFixo : IContextoDeExecucao
 
     public bool Autenticado { get; set; }
 
+    /// <summary>ADR-0022 — o teste que precisar de política monta o principal; o resto não usa.</summary>
+    public System.Security.Claims.ClaimsPrincipal? Principal { get; set; }
+
     public bool PodeVerCusto { get; set; }
 
     /// <summary><c>RF-SEG-005</c> — o teste decide se ha senha pendente.</summary>

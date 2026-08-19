@@ -38,6 +38,15 @@ public sealed class GeradorDeTokenJwt(IConfiguration configuration) : IGeradorDe
     /// <summary><c>RN-GER-014</c> — ver ADR-0013. Precisa casar com ContextoDeExecucaoHttp.</summary>
     public const string ClaimPlataforma = "plataforma";
 
+    /// <summary>
+    /// <c>RN-GER-041</c> ⚠⚠ — o <c>SecurityStamp</c> do usuário no instante da emissão.
+    /// Conferido a cada requisição autenticada (evento <c>OnTokenValidated</c> na Api): trocar a
+    /// senha regenera o carimbo, e todo token com o carimbo antigo morre ali. É a emenda
+    /// declarada à ADR-0003 — o JWT deixa de ser puramente stateless, ao custo de uma consulta
+    /// por requisição.
+    /// </summary>
+    public const string ClaimCarimbo = "carimbo";
+
     public (string Token, DateTimeOffset ExpiraEm) Gerar(Usuario usuario, IEnumerable<string> permissoes)
     {
         var chave = configuration["Jwt:Chave"];
@@ -77,10 +86,16 @@ public sealed class GeradorDeTokenJwt(IConfiguration configuration) : IGeradorDe
             claims.Add(new Claim(ClaimPermissao, permissao));
         }
 
-        if (usuario.Perfil is { } perfil)
+        if (usuario.Perfil is { Name: { } nomeDoPerfil })
         {
-            claims.Add(new Claim(ClaimTypes.Role, perfil.Nome));
+            claims.Add(new Claim(ClaimTypes.Role, nomeDoPerfil));
         }
+
+        // RN-GER-041 — sem carimbo não há como invalidar a sessão na troca de senha, então a
+        // ausência é falha de emissão, não um caso a tolerar em silêncio.
+        claims.Add(new Claim(ClaimCarimbo, usuario.SecurityStamp
+            ?? throw new InvalidOperationException(
+                "RN-GER-041 — usuário sem SecurityStamp: o token emitido seria imortal.")));
 
         // RN-GER-009 — a unidade viaja no token; é ela que alimenta o filtro global.
         // O usuário de plataforma não tem unidade, e a AUSÊNCIA da claim é o que o mantém sem

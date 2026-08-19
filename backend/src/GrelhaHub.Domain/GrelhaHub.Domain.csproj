@@ -2,9 +2,21 @@
 
   <!--
     ADR-0002 — Clean Architecture.
-    Domain NÃO referencia nada. Nenhum pacote, nenhum projeto.
-    Se um dia precisar de EF Core, MediatR ou qualquer infraestrutura aqui,
-    a modelagem do domínio está errada, não o csproj.
+    A regra original era "Domain NÃO referencia nada", e ela CONTINUA valendo para
+    infraestrutura de persistência e mensageria: nem EF Core, nem MediatR, nem Npgsql.
+
+    ADR-0022 §1 — exceção ÚNICA e declarada: Microsoft.Extensions.Identity.Stores traz os
+    POCOs do Identity (IdentityUser, IdentityRole) de que Usuario e Perfil herdam, e nada de
+    runtime. A alternativa — Identity na Infraestrutura e Usuario de negócio aqui — seria
+    duas linhas para uma pessoa: CPF numa tabela, senha na outra, e toda leitura um JOIN.
+    Quem quiser reverter, reverte trocando a herança por campos próprios; nenhuma regra de
+    negócio muda de lugar.
+
+    Qualquer OUTRO pacote aqui continua sendo sinal de modelagem errada, não de csproj.
   -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
+  </ItemGroup>
 
 </Project>

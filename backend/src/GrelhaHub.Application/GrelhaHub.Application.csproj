@@ -9,6 +9,13 @@
       Nenhuma referência a Npgsql: o provider é detalhe da Infrastructure.
     -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!--
+      ADR-0022 §3 — a verificação de permissão passa a ser POLÍTICA do ASP.NET, e o
+      PermissaoBehavior a executa via IAuthorizationService. Este pacote traz só as
+      abstrações (vive no NuGet, fora do shared framework); quem registra as políticas —
+      uma por permissão do CatalogoDeAcesso — é a Api, na partida.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" />
   </ItemGroup>
 
   <ItemGroup>

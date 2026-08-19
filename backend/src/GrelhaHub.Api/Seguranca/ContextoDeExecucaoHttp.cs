@@ -19,6 +19,13 @@ public sealed class ContextoDeExecucaoHttp(IHttpContextAccessor acessor) : ICont
 
     public bool Autenticado => Usuario?.Identity?.IsAuthenticated == true;
 
+    /// <summary>
+    /// ADR-0022 §3 — o principal que o <c>PermissaoBehavior</c> entrega ao
+    /// <c>IAuthorizationService</c>. Nulo quando não há usuário autenticado: política nenhuma
+    /// avalia anônimo aqui, e o behavior falha fechado.
+    /// </summary>
+    public ClaimsPrincipal? Principal => Autenticado ? Usuario : null;
+
     public Guid? UsuarioId =>
         Guid.TryParse(Usuario?.FindFirstValue(ClaimTypes.NameIdentifier)
                       ?? Usuario?.FindFirstValue("sub"), out var id)

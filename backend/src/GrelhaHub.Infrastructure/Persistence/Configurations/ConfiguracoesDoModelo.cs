@@ -128,7 +128,40 @@ public sealed class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.Sobrenome);
 
         builder.Property(u => u.Email).IsRequired();
-        builder.Property(u => u.SenhaHash).IsRequired().HasMaxLength(500);
+
+        // ── ADR-0022 — as colunas herdadas do Identity, com nome do projeto ─────────────
+        //
+        // ⚠ O hash mora na coluna que sempre se chamou `senha_hash`: a propriedade mudou de
+        // nome (PasswordHash), o dado não. 500 acomoda qualquer versão do PBKDF2 do Identity.
+        builder.Property(u => u.PasswordHash)
+            .HasColumnName("senha_hash").IsRequired().HasMaxLength(500);
+
+        // O Identity exige um "nome de usuário"; aqui ele espelha o e-mail (o login é por
+        // e-mail — SPEC-VEN-001), e o construtor de Usuario mantém os dois juntos.
+        builder.Property(u => u.UserName)
+            .HasColumnName("nome_de_usuario").IsRequired().HasMaxLength(256);
+        builder.Property(u => u.NormalizedUserName)
+            .HasColumnName("nome_de_usuario_normalizado").IsRequired().HasMaxLength(256);
+        builder.Property(u => u.NormalizedEmail)
+            .HasColumnName("email_normalizado").IsRequired().HasMaxLength(256);
+        builder.Property(u => u.EmailConfirmed).HasColumnName("email_confirmado");
+
+        // RN-GER-041 — o carimbo que viaja no JWT e é conferido a cada requisição. NOT NULL:
+        // todo usuário nasce com um (construtor), e um usuário sem carimbo seria um usuário
+        // cujas sessões nunca morrem.
+        builder.Property(u => u.SecurityStamp)
+            .HasColumnName("carimbo_de_seguranca").IsRequired().HasMaxLength(64);
+        builder.Property(u => u.ConcurrencyStamp).HasColumnName("carimbo_de_concorrencia");
+
+        builder.Property(u => u.PhoneNumber).HasColumnName("telefone").HasMaxLength(20);
+        builder.Property(u => u.PhoneNumberConfirmed).HasColumnName("telefone_confirmado");
+        builder.Property(u => u.TwoFactorEnabled).HasColumnName("dois_fatores_habilitado");
+
+        // RN-GER-040 — o trio do lockout. `bloqueado_ate` nulo ou no passado = conta livre;
+        // o bloqueio expira sozinho, nunca vira fila administrativa.
+        builder.Property(u => u.LockoutEnd).HasColumnName("bloqueado_ate");
+        builder.Property(u => u.LockoutEnabled).HasColumnName("bloqueio_habilitado");
+        builder.Property(u => u.AccessFailedCount).HasColumnName("falhas_de_acesso");
 
         // RN-GER-023 — o CPF. O tipo `char(11)` e o conversor vêm da convenção
         // (ConvencoesDeTipo); aqui fica só a nulidade e a unicidade.
@@ -173,6 +206,15 @@ public sealed class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         // (RN-GER-014) e os usuários anteriores a esta regra convivem com a restrição sem
         // precisar de índice parcial.
         builder.HasIndex(u => u.Cpf).IsUnique().HasDatabaseName("uq_usuario_cpf");
+
+        // ADR-0022 — os índices que o Identity criou ("UserNameIndex", "EmailIndex") ganham
+        // nome do projeto. `HasIndex` sobre as mesmas colunas REAPROVEITA o índice da base — é
+        // renomeio, não duplicata. O único do nome de usuário normalizado é redundante com
+        // `uq_usuario_email` (o nome espelha o e-mail), e fica: é o índice pelo qual o
+        // UserManager procura, e removê-lo faria o FindByName varrer a tabela.
+        builder.HasIndex(u => u.NormalizedUserName)
+            .IsUnique().HasDatabaseName("uq_usuario_nome_de_usuario");
+        builder.HasIndex(u => u.NormalizedEmail).HasDatabaseName("ix_usuario_email_normalizado");
 
         builder.HasOne(u => u.Unidade)
             .WithMany()

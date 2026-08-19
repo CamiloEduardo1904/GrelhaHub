@@ -158,8 +158,8 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
 
         var usuario = await db.Usuarios.AsNoTracking().SingleAsync(u => u.Id == criado.Id);
 
-        usuario.SenhaHash.Should().NotContain(SenhaInicial, "a senha não pode aparecer no hash");
-        usuario.SenhaHash.Length.Should().BeGreaterThan(40, "PBKDF2 com salt produz hash longo");
+        usuario.PasswordHash.Should().NotContain(SenhaInicial, "a senha não pode aparecer no hash");
+        usuario.PasswordHash.Length.Should().BeGreaterThan(40, "PBKDF2 com salt produz hash longo");
 
         // Salt por senha: dois usuários com a MESMA senha têm hashes diferentes. Sem isso, uma
         // tabela de hashes conhecidos quebraria as duas contas de uma vez.
@@ -169,7 +169,7 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
 
         var outro = await conferencia.Usuarios.AsNoTracking().SingleAsync(u => u.Id == segundo.Id);
 
-        outro.SenhaHash.Should().NotBe(usuario.SenhaHash, "o salt é por senha, não global");
+        outro.PasswordHash.Should().NotBe(usuario.PasswordHash, "o salt é por senha, não global");
 
         // E a senha não volta em resposta alguma — nem o valor, nem uma chave que a carregue.
         //
@@ -351,7 +351,7 @@ public sealed class UsuariosESuporteTests(AmbienteDeIntegracao ambiente) : Teste
 
         await using (var db = Contexto(restaurante))
         {
-            perfilId = await db.Perfis.Where(p => p.Nome == perfil).Select(p => p.Id).SingleAsync();
+            perfilId = await db.Perfis.Where(p => p.Name == perfil).Select(p => p.Id).SingleAsync();
         }
 
         var resposta = await gestao.PostAsJsonAsync(

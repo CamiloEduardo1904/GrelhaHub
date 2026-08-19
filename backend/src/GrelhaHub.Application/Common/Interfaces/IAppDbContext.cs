@@ -2,6 +2,7 @@ using GrelhaHub.Domain.Cardapio;
 using GrelhaHub.Domain.Crm;
 using GrelhaHub.Domain.Gerais;
 using GrelhaHub.Domain.Vendas;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace GrelhaHub.Application.Common.Interfaces;
@@ -50,7 +51,19 @@ public interface IAppDbContext
     /// </para>
     /// </summary>
     DbSet<Arquivo> Arquivos { get; }
-    DbSet<Permissao> Permissoes { get; }
+
+    /// <summary>
+    /// ADR-0022 §3 / <c>RN-GER-010</c> — as permissões concedidas a cada perfil, como claims de
+    /// papel do Identity: linha em <c>perfil_permissao</c>, tipo
+    /// <see cref="CatalogoDeAcesso.TipoDeClaimDePermissao"/>, valor <c>recurso.acao</c>.
+    /// <para>
+    /// ⚠ Não existe mais a tabela <c>permissao</c>: o <see cref="CatalogoDeAcesso"/> (código) é
+    /// a lista do que existe; o banco guarda só o que foi concedido. Descrição de permissão vem
+    /// do catálogo, nunca de coluna.
+    /// </para>
+    /// </summary>
+    DbSet<IdentityRoleClaim<Guid>> PermissoesDePerfil { get; }
+
     DbSet<Modulo> Modulos { get; }
     DbSet<ModuloDependencia> DependenciasDeModulo { get; }
     DbSet<UnidadeModulo> ModulosDaUnidade { get; }

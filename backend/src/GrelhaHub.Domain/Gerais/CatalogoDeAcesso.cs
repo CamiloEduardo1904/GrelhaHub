@@ -17,6 +17,14 @@ namespace GrelhaHub.Domain.Gerais;
 /// </summary>
 public static class CatalogoDeAcesso
 {
+    /// <summary>
+    /// ADR-0022 §3 — o tipo da claim de papel que carrega uma permissão concedida
+    /// (<c>perfil_permissao.tipo</c>). O valor é sempre um código <c>recurso.acao</c> desta
+    /// lista. Constante única para emissor, semeador, política e visão não divergirem por
+    /// literal repetido.
+    /// </summary>
+    public const string TipoDeClaimDePermissao = "permissao";
+
     public sealed record Permitir(string Codigo, string Descricao, CodigoDeModulo Modulo);
 
     /// <summary>

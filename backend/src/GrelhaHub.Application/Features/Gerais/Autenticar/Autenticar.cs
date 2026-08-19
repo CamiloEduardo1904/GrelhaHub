@@ -55,7 +55,8 @@ public sealed class AutenticarValidator : AbstractValidator<AutenticarCommand>
     }
 }
 
-public sealed class AutenticarHandler(IAppDbContext db, IHashDeSenha hash, IGeradorDeToken tokens)
+public sealed class AutenticarHandler(
+    IAppDbContext db, IVerificadorDeCredenciais credenciais, IGeradorDeToken tokens)
     : IRequestHandler<AutenticarCommand, AutenticarResponse>
 {
     public async Task<AutenticarResponse> Handle(AutenticarCommand request, CancellationToken cancellationToken)
@@ -68,18 +69,34 @@ public sealed class AutenticarHandler(IAppDbContext db, IHashDeSenha hash, IGera
         var usuario = await db.Usuarios
             .IgnoreQueryFilters()
             .Include(u => u.Unidade)
-            .Include(u => u.Perfil!)
-                .ThenInclude(p => p.Permissoes)
-                    .ThenInclude(pp => pp.Permissao!)
+            .Include(u => u.Perfil)
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-        // RN-GER-027 — a MENSAGEM é a mesma nos três casos, e só o CÓDIGO muda.
+        // RN-GER-027 — a MENSAGEM é a mesma nos três casos abaixo, e só o CÓDIGO muda.
         //
         // Diferenciar o texto confirmaria a existência da conta para quem tenta adivinhar, e
         // "a sua loja está desativada" contaria a situação comercial de um cliente a quem só tem
         // o e-mail dele. O código serve a quem ATENDE: sem ele, o cliente liga dizendo "não
         // consigo entrar" e o suporte adivinha entre três causas.
-        if (usuario is null || !hash.Confere(request.Senha, usuario.SenhaHash))
+        if (usuario is null)
+        {
+            throw new LoginRecusadoException(LoginRecusadoException.MotivoCredencial);
+        }
+
+        // RN-GER-040 ⚠⚠ — a conferência CONTA as falhas e bloqueia na quinta (PAR-GER-004), pelo
+        // SignInManager do Identity. Substituiu o `hash.Confere` daqui: conferir sem contar era a
+        // lacuna que a ADR-0021 encontrou — força bruta de graça.
+        var verificacao = await credenciais.VerificarAsync(usuario, request.Senha);
+
+        if (verificacao.Bloqueada)
+        {
+            // A ÚNICA recusa de login com mensagem própria — a fresta em RN-GER-027 é aceita e
+            // declarada (ADR-0022 §4): o silêncio cobraria o preço do operador legítimo.
+            throw new ContaBloqueadaException(
+                verificacao.BloqueadaPor ?? Domain.Gerais.PoliticaDeBloqueio.DuracaoDoBloqueio);
+        }
+
+        if (!verificacao.Valida)
         {
             throw new LoginRecusadoException(LoginRecusadoException.MotivoCredencial);
         }
@@ -97,12 +114,24 @@ public sealed class AutenticarHandler(IAppDbContext db, IHashDeSenha hash, IGera
             throw new LoginRecusadoException(LoginRecusadoException.MotivoUnidadeInativa);
         }
 
-        // RN-GER-010 — as permissoes vem do PERFIL, e viajam no token. O usuario de plataforma
-        // nao tem perfil de unidade: as permissoes dele nao sao de unidade (RN-GER-014).
-        var permissoes = usuario.Perfil?.Permissoes
-            .Select(concedida => concedida.Permissao!.Codigo)
-            .OrderBy(codigo => codigo, StringComparer.Ordinal)
-            .ToList() ?? [];
+        // RN-GER-010 / ADR-0022 §3 — as permissoes vem do PAPEL, como claims de perfil
+        // (perfil_permissao), e viajam no token. O usuario de plataforma nao tem perfil de
+        // unidade: as permissoes dele nao sao de unidade (RN-GER-014).
+        //
+        // ⚠ `PerfilId` extraido para um Guid LOCAL antes do Where: Guid? dentro da arvore de
+        // expressao compila `perfil_id <> NULL` na consulta cacheada — SPEC-VEN-003 §11.7.
+        List<string> permissoes = [];
+
+        if (usuario.PerfilId is Guid perfilId)
+        {
+            permissoes = await db.PermissoesDePerfil
+                .Where(claim => claim.RoleId == perfilId
+                             && claim.ClaimType == Domain.Gerais.CatalogoDeAcesso.TipoDeClaimDePermissao
+                             && claim.ClaimValue != null)
+                .Select(claim => claim.ClaimValue!)
+                .OrderBy(codigo => codigo)
+                .ToListAsync(cancellationToken);
+        }
 
         var (token, expiraEm) = tokens.Gerar(usuario, permissoes);
 
@@ -112,7 +141,7 @@ public sealed class AutenticarHandler(IAppDbContext db, IHashDeSenha hash, IGera
             usuario.Id,
             usuario.Nome,
             usuario.Email,
-            usuario.EhPlataforma ? "Plataforma" : usuario.Perfil?.Nome ?? "Sem perfil",
+            usuario.EhPlataforma ? "Plataforma" : usuario.Perfil?.Name ?? "Sem perfil",
             usuario.UnidadeId,
             usuario.Unidade?.NomeFantasia ?? "GrelhaHub — suporte",
             usuario.Unidade?.Slug ?? string.Empty,

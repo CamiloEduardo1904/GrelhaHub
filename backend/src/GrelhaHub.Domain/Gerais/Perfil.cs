@@ -1,77 +1,63 @@
-using GrelhaHub.Domain.Common;
+using Microsoft.AspNetCore.Identity;
 
 namespace GrelhaHub.Domain.Gerais;
 
 /// <summary>
-/// Permissão granular — <c>RN-GER-010</c>. Catálogo **global**, como <see cref="Modulo"/>: o que
-/// pertence à unidade é o perfil que a concede.
-/// </summary>
-public sealed class Permissao : Entidade
-{
-    private Permissao() { }
-
-    public Permissao(string codigo, string descricao, CodigoDeModulo modulo)
-    {
-        Codigo = ValidarCodigo(codigo);
-        Descricao = string.IsNullOrWhiteSpace(descricao)
-            ? throw new ArgumentException("A descrição da permissão é obrigatória.", nameof(descricao))
-            : descricao.Trim();
-        Modulo = modulo;
-    }
-
-    /// <summary>Formato <c>recurso.acao</c> — `pedido.cancelar`, `custo.visualizar`.</summary>
-    public string Codigo { get; private set; } = null!;
-
-    public string Descricao { get; private set; } = null!;
-
-    /// <summary>
-    /// Módulo a que a permissão pertence.
-    /// <para>
-    /// Permissão e módulo respondem perguntas diferentes (<c>RN-GER-010</c> e
-    /// <c>RN-GER-017</c>): "você pode?" e "o restaurante contratou?". Saber o módulo de cada
-    /// permissão permite não conceder o que o cliente não comprou.
-    /// </para>
-    /// </summary>
-    public CodigoDeModulo Modulo { get; private set; }
-
-    private static string ValidarCodigo(string codigo)
-    {
-        var limpo = (codigo ?? string.Empty).Trim().ToLowerInvariant();
-
-        return System.Text.RegularExpressions.Regex.IsMatch(limpo, "^[a-z_]+\\.[a-z_]+$")
-            ? limpo
-            : throw new ArgumentException(
-                "A permissão segue o formato recurso.acao, em minúsculas.", nameof(codigo));
-    }
-}
-
-/// <summary>
-/// Perfil de acesso da unidade — <c>RN-GER-010</c>.
+/// Perfil de acesso da unidade — <c>RN-GER-010</c>, agora como papel do Identity (ADR-0022 §2).
 /// <para>
 /// <b>O perfil agrupa permissões; ele não É a permissão.</b> Nenhum ponto do sistema pergunta
 /// "o perfil é Gerente?" — pergunta "tem `pedido.cancelar`?". É o que permite `RN-GER-022`
 /// acrescentar o perfil Operador sem caçar condicional nenhuma.
 /// </para>
+/// <para>
+/// <b>As permissões viraram claims de papel</b> (<c>perfil_permissao</c>, tipo
+/// <c>permissao</c>, valor <c>recurso.acao</c>): não há mais entidade <c>Permissao</c> nem
+/// coleção aqui. O <see cref="CatalogoDeAcesso"/> continua sendo a lista do que existe; o banco
+/// guarda o que foi concedido.
+/// </para>
+/// <para>
+/// ⚠ O nome vive em <c>Name</c>/<c>NormalizedName</c>, que são do framework — e é por isso que
+/// não há uma propriedade <c>Nome</c> em paralelo: duas propriedades para a mesma coluna é o
+/// tipo de espelho que diverge em silêncio, e <c>Name</c> em consulta LINQ traduz para a coluna
+/// <c>nome</c> do banco.
+/// </para>
+/// <para>
+/// ⚠⚠ O papel do Identity é global por desenho (índice único em <c>NormalizedName</c>); aqui o
+/// índice único é <b><c>(unidade_id, normalized_name)</c></b> — exatamente o que
+/// <c>RN-GER-009</c> exige de toda chave única. Era o conflito nº 1 da ADR-0021, resolvido na
+/// configuração do modelo.
+/// </para>
 /// </summary>
-public sealed class Perfil : Entidade, IPertenceAUnidade
+public sealed class Perfil : IdentityRole<Guid>
 {
-    private readonly List<PerfilPermissao> _permissoes = [];
-
     private Perfil() { }
 
-    public Perfil(Guid unidadeId, string nome, string descricao, bool sistema)
+    public Perfil(Guid? unidadeId, string nome, string descricao, bool sistema)
     {
-        UnidadeId = unidadeId;
-        Nome = string.IsNullOrWhiteSpace(nome)
+        // Chave gerada pela aplicação, como toda Entidade (ADR-0004) — ver
+        // AplicarChaveGeradaPelaAplicacao no DbContext.
+        Id = Guid.CreateVersion7();
+
+        Name = string.IsNullOrWhiteSpace(nome)
             ? throw new ArgumentException("O nome do perfil é obrigatório.", nameof(nome))
             : nome.Trim();
+
+        // O RoleStore procura pelo normalizado; como a criação não passa por
+        // RoleManager.CreateAsync, ninguém o preencheria por nós.
+        NormalizedName = Name.ToUpperInvariant();
+
+        UnidadeId = unidadeId;
         Descricao = descricao?.Trim() ?? string.Empty;
         Sistema = sistema;
     }
 
-    public Guid UnidadeId { get; private set; }
-
-    public string Nome { get; private set; } = null!;
+    /// <summary>
+    /// <c>RN-GER-009</c> — a unidade dona do perfil. <b>Anulável</b> pela mesma exceção
+    /// declarada de <c>usuario.unidade_id</c>: um eventual perfil da própria plataforma
+    /// (<c>RN-GER-014</c>) não pertence a restaurante nenhum. Hoje todo perfil semeado tem
+    /// unidade; a nulidade é a porta que a ADR-0022 deixou aberta, não um caso em uso.
+    /// </summary>
+    public Guid? UnidadeId { get; private set; }
 
     public string Descricao { get; private set; } = null!;
 
@@ -80,35 +66,4 @@ public sealed class Perfil : Entidade, IPertenceAUnidade
     /// sistema, também não se renomeia: relatórios e suporte referenciam o nome.
     /// </summary>
     public bool Sistema { get; private set; }
-
-    public IReadOnlyCollection<PerfilPermissao> Permissoes => _permissoes;
-
-    public void Conceder(Guid permissaoId)
-    {
-        if (_permissoes.All(concedida => concedida.PermissaoId != permissaoId))
-        {
-            _permissoes.Add(new PerfilPermissao(Id, permissaoId));
-        }
-    }
-
-    public void Revogar(Guid permissaoId) =>
-        _permissoes.RemoveAll(concedida => concedida.PermissaoId == permissaoId);
-}
-
-/// <summary>Concessão de uma permissão a um perfil — chave composta.</summary>
-public sealed class PerfilPermissao
-{
-    private PerfilPermissao() { }
-
-    internal PerfilPermissao(Guid perfilId, Guid permissaoId)
-    {
-        PerfilId = perfilId;
-        PermissaoId = permissaoId;
-    }
-
-    public Guid PerfilId { get; private set; }
-
-    public Guid PermissaoId { get; private set; }
-
-    public Permissao? Permissao { get; private set; }
 }

@@ -33,8 +33,26 @@
   <ItemGroup Label="API">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.3.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Identidade e acesso — ADR-0022">
+    <!--
+      ADR-0022 §1 — a ÚNICA dependência que o Domínio pode referenciar: POCOs (IdentityUser,
+      IdentityRole) e abstrações de store. Não traz EF Core, não traz ASP.NET runtime.
+      O antigo Microsoft.AspNetCore.Identity 2.3.1 (pacote do ASP.NET clássico) saiu daqui:
+      o PasswordHasher que a Infrastructure usava vem transitivamente destes dois.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
+
+    <!--
+      Pacote de ABSTRAÇÕES de autorização (existe no NuGet, fora do shared framework): é o que
+      permite ao PermissaoBehavior chamar IAuthorizationService sem a Application referenciar o
+      runtime do ASP.NET. As políticas em si são registradas na partida da Api (uma por permissão
+      do CatalogoDeAcesso).
+    -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Observabilidade — RNF-019">

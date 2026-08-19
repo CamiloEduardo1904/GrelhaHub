@@ -81,6 +81,42 @@ public sealed class LoginRecusadoException : Exception
 }
 
 /// <summary>
+/// <c>RN-GER-040</c> ⚠⚠ — a conta está bloqueada por excesso de tentativas de login.
+/// <para>
+/// <b>Aqui a mensagem NÃO é a genérica de <see cref="LoginRecusadoException"/>, e a diferença é
+/// decisão registrada</b> (ADR-0022 §4): dizer "bloqueada, e por quanto tempo" abre uma fresta em
+/// <c>RN-GER-027</c> — quem sonda descobre que o endereço existe —, e a fresta é <b>aceita e
+/// declarada</b>. Ela encarece a enumeração na mesma proporção em que encarece a força bruta
+/// (<c>PAR-GER-004</c> tentativas por endereço), e o custo do silêncio recairia sobre a pessoa
+/// errada: o operador legítimo, no meio do serviço, com a senha certa e uma tela dizendo
+/// "credenciais inválidas" sem explicar por quê.
+/// </para>
+/// </summary>
+public sealed class ContaBloqueadaException : Exception
+{
+    public ContaBloqueadaException(TimeSpan restante)
+        : base("Esta conta está temporariamente bloqueada por excesso de tentativas de login. " +
+               $"Tente novamente em {MinutosLegiveis(restante)}.")
+    {
+        Restante = restante;
+    }
+
+    /// <summary>Quanto falta para o bloqueio expirar sozinho — ele nunca é administrativo.</summary>
+    public TimeSpan Restante { get; }
+
+    /// <summary>
+    /// Arredonda <b>para cima</b>: "tente em 15 minutos" com 14m59s restantes erra a favor do
+    /// usuário — tentar depois do prazo dito sempre funciona. "14 minutos" faltando 14m59s
+    /// convidaria a uma tentativa ainda bloqueada.
+    /// </summary>
+    private static string MinutosLegiveis(TimeSpan restante)
+    {
+        var minutos = Math.Max(1, (int)Math.Ceiling(restante.TotalMinutes));
+        return minutos == 1 ? "1 minuto" : $"{minutos} minutos";
+    }
+}
+
+/// <summary>
 /// <c>RN-GER-017</c> — a unidade não tem o módulo habilitado. ADR-0014.
 /// <para>
 /// Distinta de <see cref="NaoAutorizadoException"/> de propósito: "você não pode" e "o

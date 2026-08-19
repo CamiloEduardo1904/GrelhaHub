@@ -369,7 +369,7 @@ public sealed class DelegacaoTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
 
         await using (var db = Contexto(restaurante))
         {
-            perfilId = await db.Perfis.Where(p => p.Nome == perfil).Select(p => p.Id).SingleAsync();
+            perfilId = await db.Perfis.Where(p => p.Name == perfil).Select(p => p.Id).SingleAsync();
         }
 
         return await cliente.PostAsJsonAsync(

@@ -473,17 +473,29 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("carimbo_de_concorrencia");
+
                     b.Property<string>("Descricao")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("descricao");
 
-                    b.Property<string>("Nome")
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("nome");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("nome_normalizado");
 
                     b.Property<bool>("Sistema")
                         .ValueGeneratedOnAdd()
@@ -491,71 +503,18 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("sistema");
 
-                    b.Property<Guid>("UnidadeId")
+                    b.Property<Guid?>("UnidadeId")
                         .HasColumnType("uuid")
                         .HasColumnName("unidade_id");
 
                     b.HasKey("Id")
                         .HasName("pk_perfil");
 
-                    b.HasIndex("UnidadeId", "Nome")
+                    b.HasIndex("UnidadeId", "NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("uq_perfil_nome");
 
                     b.ToTable("perfil", (string)null);
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.PerfilPermissao", b =>
-                {
-                    b.Property<Guid>("PerfilId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("perfil_id");
-
-                    b.Property<Guid>("PermissaoId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("permissao_id");
-
-                    b.HasKey("PerfilId", "PermissaoId")
-                        .HasName("pk_perfil_permissao");
-
-                    b.HasIndex("PermissaoId")
-                        .HasDatabaseName("ix_perfil_permissao_permissao_id");
-
-                    b.ToTable("perfil_permissao", (string)null);
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Permissao", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Codigo")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("codigo");
-
-                    b.Property<string>("Descricao")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("descricao");
-
-                    b.Property<string>("Modulo")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("modulo");
-
-                    b.HasKey("Id")
-                        .HasName("pk_permissao");
-
-                    b.HasIndex("Codigo")
-                        .IsUnique()
-                        .HasDatabaseName("uq_permissao_codigo");
-
-                    b.ToTable("permissao", (string)null);
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>
@@ -788,9 +747,19 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("falhas_de_acesso");
+
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean")
                         .HasColumnName("ativo");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("carimbo_de_concorrencia");
 
                     b.Property<string>("Cpf")
                         .HasColumnType("char(11)")
@@ -818,9 +787,21 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
                         .HasColumnName("email");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_confirmado");
+
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("bloqueio_habilitado");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("bloqueado_ate");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -828,24 +809,61 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("nome");
 
-                    b.Property<Guid?>("PerfilId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("perfil_id");
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email_normalizado");
 
-                    b.Property<string>("SenhaHash")
+                    b.Property<string>("NormalizedUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("nome_de_usuario_normalizado");
+
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("senha_hash");
+
+                    b.Property<Guid?>("PerfilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("perfil_id");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("telefone");
+
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("telefone_confirmado");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("carimbo_de_seguranca");
 
                     b.Property<string>("Sobrenome")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("sobrenome");
 
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dois_fatores_habilitado");
+
                     b.Property<Guid?>("UnidadeId")
                         .HasColumnType("uuid")
                         .HasColumnName("unidade_id");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("nome_de_usuario");
 
                     b.HasKey("Id")
                         .HasName("pk_usuario");
@@ -857,6 +875,13 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("uq_usuario_email");
+
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("ix_usuario_email_normalizado");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_usuario_nome_de_usuario");
 
                     b.HasIndex("PerfilId")
                         .HasDatabaseName("ix_usuario_perfil_id");
@@ -1046,6 +1071,146 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                     b.ToTable("pedido", (string)null);
                 });
 
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("tipo");
+
+                    b.Property<string>("ClaimValue")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valor");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("perfil_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_perfil_permissao");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_perfil_permissao_perfil");
+
+                    b.ToTable("perfil_permissao", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("tipo");
+
+                    b.Property<string>("ClaimValue")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valor");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usuario_claim");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_usuario_claim_usuario");
+
+                    b.ToTable("usuario_claim", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
+                {
+                    b.Property<string>("LoginProvider")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("provedor");
+
+                    b.Property<string>("ProviderKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("chave_no_provedor");
+
+                    b.Property<string>("ProviderDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nome_do_provedor");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("LoginProvider", "ProviderKey")
+                        .HasName("pk_usuario_login");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_usuario_login_usuario");
+
+                    b.ToTable("usuario_login", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("perfil_id");
+
+                    b.HasKey("UserId", "RoleId")
+                        .HasName("pk_usuario_perfil");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_usuario_perfil_perfil");
+
+                    b.ToTable("usuario_perfil", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.Property<string>("LoginProvider")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("provedor");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("UserId", "LoginProvider", "Name")
+                        .HasName("pk_usuario_token");
+
+                    b.ToTable("usuario_token", (string)null);
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Cardapio.Categoria", b =>
                 {
                     b.HasOne("GrelhaHub.Domain.Gerais.Unidade", null)
@@ -1141,27 +1306,7 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UnidadeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_perfil_unidades_unidade_id");
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.PerfilPermissao", b =>
-                {
-                    b.HasOne("GrelhaHub.Domain.Gerais.Perfil", null)
-                        .WithMany("Permissoes")
-                        .HasForeignKey("PerfilId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_perfil_permissao_perfis_perfil_id");
-
-                    b.HasOne("GrelhaHub.Domain.Gerais.Permissao", "Permissao")
-                        .WithMany()
-                        .HasForeignKey("PermissaoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_perfil_permissao_permissoes_permissao_id");
-
-                    b.Navigation("Permissao");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.TokenDeAcesso", b =>
@@ -1171,7 +1316,7 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_token_acesso_usuarios_usuario_id");
+                        .HasConstraintName("fk_token_acesso_usuario");
 
                     b.Navigation("Usuario");
                 });
@@ -1267,14 +1412,66 @@ namespace GrelhaHub.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pedido_unidades_unidade_id");
                 });
 
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Perfil", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_perfil_permissao_perfil");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usuario_claim_usuario");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usuario_login_usuario");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Perfil", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usuario_perfil_perfil");
+
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usuario_perfil_usuario");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
+                {
+                    b.HasOne("GrelhaHub.Domain.Gerais.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_usuario_token_usuario");
+                });
+
             modelBuilder.Entity("GrelhaHub.Domain.Cardapio.Categoria", b =>
                 {
                     b.Navigation("Produtos");
-                });
-
-            modelBuilder.Entity("GrelhaHub.Domain.Gerais.Perfil", b =>
-                {
-                    b.Navigation("Permissoes");
                 });
 
             modelBuilder.Entity("GrelhaHub.Domain.Gerais.Unidade", b =>

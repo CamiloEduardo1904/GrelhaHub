@@ -6,6 +6,8 @@ using GrelhaHub.Domain.Common;
 using GrelhaHub.Domain.Crm;
 using GrelhaHub.Domain.Gerais;
 using GrelhaHub.Domain.Vendas;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace GrelhaHub.Infrastructure.Persistence;
@@ -17,11 +19,18 @@ namespace GrelhaHub.Infrastructure.Persistence;
 /// <c>timestamptz</c> em UTC, <c>numeric(12,2)</c> para moeda (<c>RN-GER-003</c>) e
 /// <c>numeric(14,4)</c> para quantidade de insumo (<c>RN-GER-004</c>).
 /// </para>
+/// <para>
+/// ADR-0022 — herda de <c>IdentityDbContext</c>: identidade e acesso são do ASP.NET Identity,
+/// no MESMO contexto e nas MESMAS tabelas de negócio (<c>usuario</c>, <c>perfil</c>) — uma
+/// pessoa, uma linha. ⚠ <b>Nenhum nome <c>AspNet*</c> chega ao banco</b>: as configurações em
+/// <c>ConfiguracoesDeAcesso</c> renomeiam tudo para português/snake_case, e vêm DEPOIS do
+/// <c>base.OnModelCreating</c> justamente para sobrescrever o que a base decide.
+/// </para>
 /// </summary>
 public sealed class GrelhaHubDbContext(
     DbContextOptions<GrelhaHubDbContext> options,
     IContextoDeExecucao contexto)
-    : DbContext(options), IAppDbContext
+    : IdentityDbContext<Usuario, Perfil, Guid>(options), IAppDbContext
 {
     public DbSet<Unidade> Unidades => Set<Unidade>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
@@ -31,7 +40,10 @@ public sealed class GrelhaHubDbContext(
     public DbSet<HorarioDeFuncionamento> HorariosDeFuncionamento => Set<HorarioDeFuncionamento>();
     public DbSet<OutboxDeAuditoria> OutboxDeAuditoria => Set<OutboxDeAuditoria>();
     public DbSet<Arquivo> Arquivos => Set<Arquivo>();
-    public DbSet<Permissao> Permissoes => Set<Permissao>();
+
+    /// <summary>ADR-0022 §3 — a permissão concedida é claim de papel (<c>perfil_permissao</c>).</summary>
+    public DbSet<IdentityRoleClaim<Guid>> PermissoesDePerfil => Set<IdentityRoleClaim<Guid>>();
+
     public DbSet<Modulo> Modulos => Set<Modulo>();
     public DbSet<ModuloDependencia> DependenciasDeModulo => Set<ModuloDependencia>();
     public DbSet<UnidadeModulo> ModulosDaUnidade => Set<UnidadeModulo>();
@@ -50,15 +62,53 @@ public sealed class GrelhaHubDbContext(
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
         ConvencoesDeTipo.Aplicar(configurationBuilder);
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
+        // ADR-0022 — configura as entidades do Identity (chaves compostas de usuario_login e
+        // usuario_token, o N:N usuario_perfil, os índices normalizados). As configurações do
+        // projeto vêm DEPOIS e sobrescrevem nomes de tabela, coluna e índice.
+        base.OnModelCreating(builder);
 
-        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        // ⚠ Passkey (WebAuthn) FORA do modelo, de propósito. O .NET 10 acrescentou
+        // IdentityUserPasskey ao IdentityDbContext, mas (1) o produto não tem passkey, e tabela
+        // de funcionalidade que não existe é a vitrine anunciando o que não há; (2) a coluna
+        // `Data` é um agregado que o provider Npgsql não mapeia sem conversor próprio — código
+        // a manter por nada. Quando passkey virar requisito, remove-se esta linha e nasce a
+        // migration com o conversor junto.
+        builder.Ignore<IdentityUserPasskey<Guid>>();
 
-        AplicarChaveGeradaPelaAplicacao(modelBuilder);
-        AplicarFiltroDeUnidade(modelBuilder);
-        GarantirAusenciaDeDecimalCru(modelBuilder);
+        builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+
+        AplicarChaveGeradaPelaAplicacao(builder);
+        AplicarFiltroDeUnidade(builder);
+        AplicarFiltroDePerfil(builder);
+        AjustarNomesDeFkDoIdentity(builder);
+        GarantirAusenciaDeDecimalCru(builder);
+    }
+
+    /// <summary>
+    /// ADR-0022 — os nomes de FK das tabelas de vínculo do Identity. Ver
+    /// <see cref="Configurations.RenomearFks"/>: precisa rodar DEPOIS de todas as
+    /// configurações, quando as tabelas principais já têm o nome final.
+    /// </summary>
+    private static void AjustarNomesDeFkDoIdentity(ModelBuilder builder)
+    {
+        Type[] tiposDoIdentity =
+        [
+            typeof(IdentityUserRole<Guid>),
+            typeof(IdentityRoleClaim<Guid>),
+            typeof(IdentityUserClaim<Guid>),
+            typeof(IdentityUserLogin<Guid>),
+            typeof(IdentityUserToken<Guid>),
+        ];
+
+        foreach (var tipo in tiposDoIdentity)
+        {
+            if (builder.Model.FindEntityType(tipo) is { } entidade)
+            {
+                Configurations.RenomearFks.Aplicar(entidade);
+            }
+        }
     }
 
     /// <summary>
@@ -122,7 +172,16 @@ public sealed class GrelhaHubDbContext(
     {
         foreach (var tipo in modelBuilder.Model.GetEntityTypes())
         {
-            if (!typeof(Entidade).IsAssignableFrom(tipo.ClrType))
+            // ADR-0022 — Usuario e Perfil deixaram de herdar de Entidade (herdam do Identity),
+            // e a chave deles continua nascendo na aplicação (Guid.CreateVersion7 no
+            // construtor): sem esta linha, a convenção ValueGeneratedOnAdd do EF para Guid
+            // voltaria a valer para os dois — e com ela o defeito de Added/Modified descrito
+            // acima.
+            var chavePelaAplicacao = typeof(Entidade).IsAssignableFrom(tipo.ClrType)
+                || tipo.ClrType == typeof(Usuario)
+                || tipo.ClrType == typeof(Perfil);
+
+            if (!chavePelaAplicacao)
             {
                 continue;
             }
@@ -132,6 +191,25 @@ public sealed class GrelhaHubDbContext(
                 .ValueGeneratedNever();
         }
     }
+
+    /// <summary>
+    /// <c>RN-GER-009</c> / ADR-0022 §2 — o recorte de <c>perfil</c>, escrito à mão.
+    /// <para>
+    /// <c>Perfil</c> não pode mais implementar <c>IPertenceAUnidade</c>: a interface exige
+    /// <c>Guid</c> não nulo, e <c>perfil.unidade_id</c> passou a admitir nulo (perfil da própria
+    /// plataforma, a porta que a ADR-0022 deixou aberta). O filtro automático de
+    /// <see cref="AplicarFiltroDeUnidade"/> não o alcança, então o recorte — que o <c>RoleStore</c>
+    /// do Identity e a checagem "o perfil é DESTA unidade" de <c>CriarUsuario</c> pressupõem —
+    /// é declarado aqui.
+    /// </para>
+    /// <para>
+    /// ⚠ Perfil com <c>unidade_id</c> nulo é visível SÓ à plataforma — o mesmo desenho de
+    /// <c>RN-GER-016</c> para o usuário de plataforma.
+    /// </para>
+    /// </summary>
+    private void AplicarFiltroDePerfil(ModelBuilder modelBuilder) =>
+        modelBuilder.Entity<Perfil>()
+            .HasQueryFilter(perfil => perfil.UnidadeId == UnidadeAtual || PlataformaAtual);
 
     /// <summary>
     /// <c>RN-GER-009</c> / ADR-0005 — recorte por unidade aplicado automaticamente a toda

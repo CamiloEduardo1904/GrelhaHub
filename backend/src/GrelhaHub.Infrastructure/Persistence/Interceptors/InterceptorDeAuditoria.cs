@@ -100,7 +100,14 @@ public sealed class InterceptorDeAuditoria(IContextoDeExecucao contexto, IRelogi
     {
         var exclusoes = db.ChangeTracker.Entries()
             .Where(entrada => entrada.State == EntityState.Deleted)
-            .Where(entrada => entrada.Entity is Entidade)
+
+            // ADR-0022 — Usuario e Perfil deixaram de herdar de Entidade (herdam do Identity) e
+            // CONTINUAM protegidos: são exatamente as entidades que UserManager.DeleteAsync
+            // apagaria, e a ADR os declara "existe e nunca pode ser chamado".
+            .Where(entrada => entrada.Entity
+                is Entidade
+                or Microsoft.AspNetCore.Identity.IdentityUser<Guid>
+                or Microsoft.AspNetCore.Identity.IdentityRole<Guid>)
             .Select(entrada => entrada.Entity.GetType().Name)
             .Distinct(StringComparer.Ordinal)
             .ToList();
@@ -179,10 +186,17 @@ public sealed class InterceptorDeAuditoria(IContextoDeExecucao contexto, IRelogi
         var entidade = (IAuditavelDetalhado)entrada.Entity;
         var novo = entrada.State == EntityState.Added;
 
+        // ⚠ ADR-0022 — `IsModified` sozinho deixou de bastar: o UserStore do Identity grava por
+        // `Context.Update(user)`, que marca a ENTIDADE INTEIRA como alterada — uma falha de
+        // login (que só incrementa `falhas_de_acesso`) apareceria na trilha como se nome, CPF e
+        // e-mail tivessem mudado. A comparação com o valor original tira o ruído; o que mudou de
+        // fato continua entrando. Para tipo sem igualdade por valor a comparação erra para o
+        // lado antigo (lista a mais, nunca a menos) — os value objects do domínio têm igualdade.
         var alteradas = entrada.Properties
             .Where(propriedade => novo
                 ? propriedade.CurrentValue is not null
-                : propriedade.IsModified)
+                : propriedade.IsModified
+                  && !Equals(propriedade.OriginalValue, propriedade.CurrentValue))
             .Where(propriedade => !propriedade.Metadata.IsPrimaryKey())
             .ToList();
 
@@ -205,7 +219,16 @@ public sealed class InterceptorDeAuditoria(IContextoDeExecucao contexto, IRelogi
         return new LogAuditoria(
             unidadeId: UnidadeDe(entrada.Entity),
             entidade: entrada.Metadata.GetTableName() ?? tipoClr.Name,
-            registroId: entrada.Entity is Entidade comId ? comId.Id : Guid.Empty,
+
+            // ADR-0022 — Usuario não é mais Entidade; sem o segundo braço, a trilha dele
+            // gravaria Guid.Empty como registro e ninguém acharia a linha depois.
+            registroId: entrada.Entity switch
+            {
+                Entidade comId => comId.Id,
+                Microsoft.AspNetCore.Identity.IdentityUser<Guid> usuario => usuario.Id,
+                Microsoft.AspNetCore.Identity.IdentityRole<Guid> papel => papel.Id,
+                _ => Guid.Empty,
+            },
             operacao: entidade.ClassificarAuditoria(
                 novo ? TipoDeMudanca.Insercao : TipoDeMudanca.Atualizacao, nomes),
             valoresAnteriores: anteriores,

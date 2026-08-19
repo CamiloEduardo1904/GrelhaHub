@@ -10,7 +10,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- ADR-0004: identificadores em snake_case no banco, PascalCase no C#. -->
     <PackageReference Include="EFCore.NamingConventions" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity" />
+    <!-- ADR-0022 — o store do Identity sobre o GrelhaHubDbContext. Substitui o antigo
+         Microsoft.AspNetCore.Identity 2.3.1: o PasswordHasher vem transitivamente daqui. -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
 
     <!-- ADR-0016 — SMTP pelo MailKit; Hosting.Abstractions é o BackgroundService que consome a

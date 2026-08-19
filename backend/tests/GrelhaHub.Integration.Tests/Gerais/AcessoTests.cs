@@ -24,10 +24,12 @@ public sealed class AcessoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         await using var db = Contexto(restaurante);
 
-        var perfis = await db.Perfis
+        var perfis = await db.Perfis.AsNoTracking().ToListAsync();
+
+        // ADR-0022 §3 — a concessão agora é claim de papel (perfil_permissao, tipo `permissao`).
+        var concessoes = await db.PermissoesDePerfil
             .AsNoTracking()
-            .Include(p => p.Permissoes)
-                .ThenInclude(pp => pp.Permissao!)
+            .Where(claim => claim.ClaimType == CatalogoDeAcesso.TipoDeClaimDePermissao)
             .ToListAsync();
 
         perfis.Should().HaveCount(CatalogoDeAcesso.Perfis.Count);
@@ -35,9 +37,10 @@ public sealed class AcessoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         foreach (var esperado in CatalogoDeAcesso.Perfis)
         {
-            var perfil = perfis.Single(p => p.Nome == esperado.Nome);
+            var perfil = perfis.Single(p => p.Name == esperado.Nome);
 
-            perfil.Permissoes.Select(pp => pp.Permissao!.Codigo)
+            concessoes.Where(claim => claim.RoleId == perfil.Id)
+                .Select(claim => claim.ClaimValue)
                 .Should().BeEquivalentTo(
                     esperado.Permissoes,
                     $"o perfil {esperado.Nome} recebe exatamente o que CatalogoDeAcesso declara");
@@ -45,7 +48,8 @@ public sealed class AcessoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
 
         // O Entregador nasce vazio de propósito: as permissões dele são `entrega.*`, do módulo
         // LOG, que não existe. Perfil com permissão inventada seria pior que perfil vazio.
-        perfis.Single(p => p.Nome == "Entregador").Permissoes.Should().BeEmpty();
+        var entregador = perfis.Single(p => p.Name == "Entregador");
+        concessoes.Where(claim => claim.RoleId == entregador.Id).Should().BeEmpty();
     }
 
     [Fact(DisplayName = "RN-GER-010 — o token do administrador carrega as permissões, não o nome do perfil")]
@@ -239,6 +243,158 @@ public sealed class AcessoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         cancelamento.StatusCode.Should().Be(HttpStatusCode.OK, "cancelar o gerente pode");
     }
 
+    [Fact(DisplayName = "RN-GER-040 — força bruta é bloqueada na quinta falha, com mensagem que diz por quanto tempo")]
+    public async Task ForcaBrutaEhBloqueada()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Acesso Burger", "11111111000191");
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        // As quatro primeiras falhas respondem a MESMA mensagem genérica de RN-GER-027: até o
+        // teto, quem sonda não descobre nem que a conta existe.
+        for (var tentativa = 1; tentativa < PoliticaDeBloqueio.TentativasAntesDoBloqueio; tentativa++)
+        {
+            var recusa = await anonimo.PostAsJsonAsync(
+                new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+                new AutenticarCommand(restaurante.Email, $"senha-errada-{tentativa}"));
+
+            recusa.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            (await recusa.Content.ReadAsStringAsync()).Should().NotContainEquivalentOf(
+                "bloquead", $"na tentativa {tentativa} a resposta ainda é a genérica de RN-GER-027");
+        }
+
+        // A quinta (PAR-GER-004) bloqueia — e a mensagem MUDA: diz que está bloqueada e por
+        // quanto tempo. É a fresta em RN-GER-027 aceita e declarada pela ADR-0022 §4.
+        var quinta = await anonimo.PostAsJsonAsync(
+            new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+            new AutenticarCommand(restaurante.Email, "senha-errada-final"));
+
+        quinta.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var corpo = await quinta.Content.ReadAsStringAsync();
+        corpo.Should().ContainEquivalentOf("bloqueada", "RN-GER-040 manda DIZER que bloqueou");
+        corpo.Should().ContainEquivalentOf("minuto", "e por quanto tempo (PAR-GER-005)");
+        corpo.Should().Contain("RN-GER-040");
+
+        // ⚠ A metade que faz o bloqueio valer: a senha CERTA também é recusada enquanto ele
+        // dura. Sem isto, o lockout só atrasaria quem já errou — não quem acerta na sexta.
+        var comSenhaCerta = await anonimo.PostAsJsonAsync(
+            new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+            new AutenticarCommand(restaurante.Email, restaurante.Senha));
+
+        comSenhaCerta.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await comSenhaCerta.Content.ReadAsStringAsync()).Should().ContainEquivalentOf("bloqueada");
+    }
+
+    [Fact(DisplayName = "RN-GER-040 — o contador de falhas zera no primeiro acerto")]
+    public async Task ContadorDeFalhasZeraNoAcerto()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Acesso Burger", "11111111000191");
+
+        using var anonimo = Ambiente.CriarCliente();
+
+        var quaseBloquear = PoliticaDeBloqueio.TentativasAntesDoBloqueio - 1;
+
+        // Erra até UMA falha antes do teto…
+        for (var tentativa = 0; tentativa < quaseBloquear; tentativa++)
+        {
+            (await anonimo.PostAsJsonAsync(
+                new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+                new AutenticarCommand(restaurante.Email, "senha-errada")))
+                .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        // …acerta — o SignInManager zera o contador…
+        (await anonimo.PostAsJsonAsync(
+            new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+            new AutenticarCommand(restaurante.Email, restaurante.Senha)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // …e o mesmo tanto de falhas de novo NÃO bloqueia: sem o zeramento, o operador que
+        // tropeça na senha duas manhãs seguidas acumularia rumo ao bloqueio para sempre.
+        for (var tentativa = 0; tentativa < quaseBloquear; tentativa++)
+        {
+            var recusa = await anonimo.PostAsJsonAsync(
+                new Uri("/api/v1/autenticacao/login", UriKind.Relative),
+                new AutenticarCommand(restaurante.Email, "senha-errada"));
+
+            recusa.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            (await recusa.Content.ReadAsStringAsync()).Should().NotContainEquivalentOf("bloquead");
+        }
+    }
+
+    [Fact(DisplayName = "RN-GER-041 — trocar a senha derruba o token antigo na requisição seguinte")]
+    public async Task TrocarSenhaInvalidaSessoesAnteriores()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Acesso Burger", "11111111000191");
+
+        const string senhaNova = "senha-nova-que-derruba-1";
+
+        // A sessão antiga funciona…
+        using var sessaoAntiga = Ambiente.CriarCliente(restaurante.Token);
+
+        (await sessaoAntiga.GetAsync(new Uri("/api/v1/cardapio", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // …a senha é trocada…
+        var troca = await sessaoAntiga.PostAsJsonAsync(
+            new Uri("/api/v1/usuarios/minha-senha", UriKind.Relative),
+            new { SenhaAtual = restaurante.Senha, NovaSenha = senhaNova });
+
+        troca.StatusCode.Should().Be(
+            HttpStatusCode.NoContent, await troca.Content.ReadAsStringAsync());
+
+        // …e o MESMO token morre na requisição seguinte: o SecurityStamp girou na troca, o
+        // carimbo do token não casa mais, e a conferência por requisição responde 401. Antes
+        // desta regra o token antigo seguia vivo até expirar — senha vazada trocada deixava o
+        // atacante dentro por até oito horas (a lacuna que a ADR-0021 encontrou).
+        (await sessaoAntiga.GetAsync(new Uri("/api/v1/cardapio", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Quem entra com a senha nova recebe token com o carimbo novo, e opera normalmente.
+        var tokenNovo = await AutenticarAsync(restaurante.Email, senhaNova);
+
+        using var sessaoNova = Ambiente.CriarCliente(tokenNovo);
+
+        (await sessaoNova.GetAsync(new Uri("/api/v1/cardapio", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact(DisplayName = "RN-GER-041 / RN-GER-028 — senha redefinida por terceiro derruba a sessão do usuário")]
+    public async Task SenhaRedefinidaPorTerceiroDerrubaASessao()
+    {
+        var restaurante = await CadastrarRestauranteAsync("Acesso Burger", "11111111000191");
+
+        var tokenDaCozinha = await CriarUsuarioAsync(restaurante, "Cozinha", "cozinha@acesso.teste");
+
+        using var cozinha = Ambiente.CriarCliente(tokenDaCozinha);
+
+        (await cozinha.GetAsync(new Uri("/api/v1/pedidos/fila", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // O administrador redefine a senha do usuário — o caso em que a invalidação mais
+        // importa: se a redefinição foi porque a conta caiu em mão errada, é ESSA sessão que
+        // precisa morrer agora, não daqui a oito horas.
+        await using var db = Contexto(restaurante);
+
+        var usuarioId = await db.Usuarios.AsNoTracking()
+            .Where(u => u.Email == "cozinha@acesso.teste")
+            .Select(u => u.Id)
+            .SingleAsync();
+
+        using var admin = Ambiente.CriarCliente(restaurante.Token);
+
+        var redefinicao = await admin.PostAsJsonAsync(
+            new Uri($"/api/v1/usuarios/{usuarioId}/senha", UriKind.Relative),
+            new { NovaSenha = "senha-redefinida-pelo-admin" });
+
+        redefinicao.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await cozinha.GetAsync(new Uri("/api/v1/pedidos/fila", UriKind.Relative)))
+            .StatusCode.Should().Be(
+                HttpStatusCode.Unauthorized, "RN-GER-041 — a sessão anterior morre com a senha");
+    }
+
     /// <summary>
     /// Cria um usuário com um dos perfis semeados e devolve o token dele.
     /// <para>
@@ -257,7 +413,7 @@ public sealed class AcessoTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         await using (var db = Contexto(restaurante))
         {
             var perfilId = await db.Perfis
-                .Where(p => p.Nome == perfil)
+                .Where(p => p.Name == perfil)
                 .Select(p => p.Id)
                 .SingleAsync();
 

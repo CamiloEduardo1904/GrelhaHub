@@ -317,9 +317,9 @@ public sealed class AmbienteDeIntegracao : IAsyncLifetime
             "modulo",
             "modulo_dependencia",
 
-            // SPEC-GER-004 — catálogo global das permissões. `perfil` e `perfil_permissao` NÃO
-            // entram: o perfil é por unidade e é dado de teste.
-            "permissao",
+            // ADR-0022 — a tabela `permissao` saiu da lista porque saiu do BANCO: o catálogo do
+            // que existe é código (CatalogoDeAcesso), e a concessão (`perfil_permissao`, claim
+            // de papel) é por unidade — dado de teste, truncado como `perfil`.
         ];
 
         // ⚠ `usuario` NÃO entra na lista acima, e a tentativa de colocá-lo lá foi um erro

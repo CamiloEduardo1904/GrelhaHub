@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using GrelhaHub.Domain.Common;
+using Microsoft.AspNetCore.Identity;
 
 namespace GrelhaHub.Domain.Gerais;
 
@@ -6,9 +8,9 @@ namespace GrelhaHub.Domain.Gerais;
 /// Nomes dos perfis semeados em toda unidade — <c>SPEC-GER-004</c>, <c>RN-GER-022</c>.
 /// <para>
 /// <b>É rótulo, não autorização.</b> A simplificação de SPEC-VEN-001 §8 — perfil como
-/// <c>enum</c> verificado no código — foi substituída por <c>perfil</c> e <c>permissao</c> em
-/// tabela. Este enum sobrevive apenas para nomear o que a carga inicial cria e evitar literal
-/// solto em seed e em teste.
+/// <c>enum</c> verificado no código — foi substituída por <c>perfil</c> e permissão em claim
+/// de papel (ADR-0022). Este enum sobrevive apenas para nomear o que a carga inicial cria e
+/// evitar literal solto em seed e em teste.
 /// </para>
 /// <para>
 /// <b>Nunca decida autorização a partir dele.</b> A pergunta é sobre permissão
@@ -26,7 +28,13 @@ public enum PerfilUsuario
 }
 
 /// <summary>
-/// Quem acessa o sistema.
+/// Quem acessa o sistema — <b>uma pessoa, uma linha</b> (ADR-0022 §1).
+/// <para>
+/// Herda de <c>IdentityUser&lt;Guid&gt;</c>: e-mail, hash de senha, contadores de lockout
+/// (<c>RN-GER-040</c>) e o <c>SecurityStamp</c> (<c>RN-GER-041</c>) passam a vir do Identity;
+/// CPF, unidade, perfil e as regras continuam aqui. É a exceção declarada à regra "Domínio sem
+/// dependências": o pacote referenciado traz só POCOs, nunca EF Core nem runtime.
+/// </para>
 /// <para>
 /// <b>Não implementa <c>IPertenceAUnidade</c>, e isso é deliberado</b> (<c>RN-GER-014</c>,
 /// ADR-0013): o usuário de plataforma não tem unidade, e a interface exige <c>Guid</c> não
@@ -35,7 +43,7 @@ public enum PerfilUsuario
 /// <c>RN-GER-016</c> exigindo, além disso, esconder o usuário de plataforma do restaurante.
 /// </para>
 /// </summary>
-public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
+public sealed class Usuario : IdentityUser<Guid>, IAuditavel, IAuditavelDetalhado
 {
     private Usuario() { }
 
@@ -79,10 +87,33 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
         Nome = string.IsNullOrWhiteSpace(nome)
             ? throw new ArgumentException("O nome é obrigatório.", nameof(nome))
             : nome.Trim();
+
         Email = string.IsNullOrWhiteSpace(email)
             ? throw new ArgumentException("O e-mail é obrigatório.", nameof(email))
             : email.Trim().ToLowerInvariant();
-        SenhaHash = senhaHash;
+
+        PasswordHash = senhaHash;
+
+        // O Guid do próprio projeto (ADR-0004, uuid v7 ordenável), e não o que o Identity
+        // geraria: a chave continua nascendo na aplicação — ver AplicarChaveGeradaPelaAplicacao.
+        Id = Guid.CreateVersion7();
+
+        // O Identity exige um "nome de usuário"; aqui a credencial de entrada É o e-mail
+        // (SPEC-VEN-001), então os dois andam juntos. Os normalizados existem porque o
+        // UserManager procura por eles — e como a criação não passa por UserManager.CreateAsync,
+        // ninguém os preencheria por nós.
+        UserName = Email;
+        NormalizedUserName = Email.ToUpperInvariant();
+        NormalizedEmail = NormalizedUserName;
+
+        // RN-GER-041 — o carimbo nasce com o usuário e VIAJA NO JWT. Trocar a senha o regenera,
+        // e é essa troca que derruba as sessões anteriores.
+        SecurityStamp = Guid.NewGuid().ToString("N");
+
+        // RN-GER-040 — o lockout vale para TODO usuário, inclusive o de plataforma. Sem esta
+        // marca o SignInManager nem conta as falhas.
+        LockoutEnabled = true;
+
         CriadoEm = DateTimeOffset.UtcNow;
     }
 
@@ -101,6 +132,7 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     /// </para>
     /// </summary>
     public bool EhPlataforma { get; private set; }
+
     public string Nome { get; private set; } = null!;
 
     /// <summary>
@@ -128,10 +160,25 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     public string NomeCompleto =>
         string.IsNullOrWhiteSpace(Sobrenome) ? Nome : $"{Nome} {Sobrenome}";
 
-    public string Email { get; private set; } = null!;
+    /// <summary>
+    /// O e-mail — coluna do Identity, contrato do domínio.
+    /// <para>
+    /// ⚠ A base declara <c>string?</c>; aqui todo usuário nasce com e-mail (o construtor exige),
+    /// então o override devolve não-nulo e poupa cada chamador de um <c>!</c> que nada
+    /// significaria. <c>[AllowNull]</c> silencia a variância do setter, que o Identity ainda
+    /// chama com o tipo da base.
+    /// </para>
+    /// </summary>
+    [AllowNull]
+    public override string Email
+    {
+        get => base.Email ?? string.Empty;
+        set => base.Email = value;
+    }
 
     /// <summary>
-    /// <c>RNF-005</c> — hash com salt. Nunca a senha em texto claro.
+    /// <c>RNF-005</c> — hash com salt, agora na coluna do Identity (<c>senha_hash</c> no banco).
+    /// Nunca a senha em texto claro.
     /// <para>
     /// <c>[NaoAuditar]</c> — <c>SPEC-GER-005</c> CA-6: o hash não entra na trilha nem como valor
     /// anterior. A trilha é lida pela gerência, e um hash antigo nela é um hash a mais em
@@ -139,12 +186,46 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     /// </para>
     /// </summary>
     [NaoAuditar]
-    public string SenhaHash { get; private set; } = null!;
+    [AllowNull]
+    public override string PasswordHash
+    {
+        get => base.PasswordHash ?? string.Empty;
+        set => base.PasswordHash = value;
+    }
+
+    /// <summary>
+    /// <c>RN-GER-041</c> — o carimbo de segurança. Vai no JWT e é conferido a cada requisição:
+    /// carimbo divergente é sessão emitida antes da última troca de senha, e morre ali.
+    /// <para>
+    /// <c>[NaoAuditar]</c> — não é segredo como o hash, mas é credencial de sessão: um carimbo
+    /// antigo legível na trilha não serve a auditoria nenhuma e ainda documenta o que valia.
+    /// </para>
+    /// </summary>
+    [NaoAuditar]
+    public override string? SecurityStamp
+    {
+        get => base.SecurityStamp;
+        set => base.SecurityStamp = value;
+    }
+
+    /// <summary>Controle de concorrência do Identity — ruído para a trilha, nunca negócio.</summary>
+    [NaoAuditar]
+    public override string? ConcurrencyStamp
+    {
+        get => base.ConcurrencyStamp;
+        set => base.ConcurrencyStamp = value;
+    }
 
     /// <summary>
     /// <c>RN-GER-010</c> — o perfil determina as operações permitidas.
     /// <b>Nulo apenas para o usuário de plataforma</b>, que não pertence a unidade e portanto
     /// não pode pertencer a um perfil dela (<c>RN-GER-014</c>).
+    /// <para>
+    /// ⚠ Continua sendo <b>a</b> fonte do vínculo usuário → perfil. A tabela
+    /// <c>usuario_perfil</c> (o N:N que o Identity traz) existe no esquema e fica <b>vazia</b>:
+    /// <c>RN-GER-010</c> fixa UM perfil por usuário, e duas fontes do mesmo vínculo divergem em
+    /// silêncio.
+    /// </para>
     /// </summary>
     public Guid? PerfilId { get; private set; }
 
@@ -155,7 +236,9 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     /// a de troca de senha: senha inicial conhecida por quem criou o usuário não é senha.
     /// </summary>
     public bool DeveTrocarSenha { get; private set; } = true;
+
     public bool Ativo { get; private set; } = true;
+
     public DateTimeOffset CriadoEm { get; private set; }
 
     /// <summary><c>RN-GER-001</c> — quem criou este usuário. Nulo no administrador fundador,
@@ -235,17 +318,30 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
             ? throw new ArgumentException("O e-mail é obrigatório.", nameof(email))
             : email.Trim().ToLowerInvariant();
 
+        // O Identity procura pelo normalizado; e-mail que muda sem o normalizado acompanhar é
+        // usuário que some do FindByEmail sem sair do banco.
+        UserName = Email;
+        NormalizedUserName = Email.ToUpperInvariant();
+        NormalizedEmail = NormalizedUserName;
+
         Cpf = cpf;
     }
 
     /// <summary>
-    /// A própria pessoa trocando a sua senha. <b>Encerra</b> a pendência de
-    /// <c>RF-SEG-005</c>.
+    /// A própria pessoa trocando a sua senha. <b>Encerra</b> a pendência de <c>RF-SEG-005</c>.
+    /// <para>
+    /// <c>RN-GER-041</c> ⚠⚠ — regenera o <c>SecurityStamp</c>, e é isso que derruba as sessões
+    /// anteriores: o carimbo antigo continua nos tokens já emitidos, e a conferência por
+    /// requisição os recusa. O carimbo gira <b>aqui, no domínio</b>, e não num
+    /// <c>UserManager</c> que o handler poderia esquecer de chamar — mesmo argumento do
+    /// interceptor de auditoria.
+    /// </para>
     /// </summary>
     public void TrocarSenha(string novoHash)
     {
-        SenhaHash = novoHash;
+        PasswordHash = novoHash;
         DeveTrocarSenha = false;
+        SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
     /// <summary>
@@ -255,11 +351,16 @@ public sealed class Usuario : Entidade, IAuditavel, IAuditavelDetalhado
     /// <see cref="TrocarSenha"/>: a senha que um terceiro conhece não é senha. O mesmo argumento
     /// que faz o usuário criado por alguém nascer com a pendência vale quando alguém a redefine.
     /// </para>
+    /// <para>
+    /// <c>RN-GER-041</c> — o carimbo gira aqui também: quem estava dentro com a senha antiga —
+    /// inclusive quem motivou a redefinição — sai na requisição seguinte.
+    /// </para>
     /// </summary>
     public void RedefinirSenha(string novoHash)
     {
-        SenhaHash = novoHash;
+        PasswordHash = novoHash;
         DeveTrocarSenha = true;
+        SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
     /// <summary><c>RN-GER-010</c> — muda o perfil, e com ele as permissões.</summary>

@@ -63,6 +63,31 @@ internal sealed class ApiDeTestes(
         {
             servicos.RemoveAll<Application.Common.Interfaces.IEnviadorDeEmail>();
             servicos.AddSingleton<Application.Common.Interfaces.IEnviadorDeEmail>(CaixaDeSaida);
+
+            // ⚠⚠ O WORKER DE DRENAGEM NÃO RODA NO HOST DE TESTE — e não é dublê, é remoção.
+            //
+            // Em produção ele é exatamente o que a ADR-0017 quer: varre a outbox a cada 5 s e
+            // copia a trilha para o banco de log. O que estava errado era ele existir num host
+            // cujos testes afirmam o estado ANTES e DEPOIS da drenagem: a suíte leva ~2 min, o
+            // worker tica ~24 vezes, e quando um tique caía entre a operação e a asserção,
+            // `Outbox_GravaNaMesmaTransacao` encontrava a outbox vazia — verde local, vermelho
+            // no agente carregado de CI. Com ele ligado, TODA asserção sobre trilha/outbox é uma
+            // corrida, não só essa.
+            //
+            // A drenagem no teste é EXPLÍCITA, por `Ambiente.DrenarOutboxAsync()` — que chama o
+            // MESMO código do worker (`ServicoDeDrenagemDaOutbox.CopiarAsync`), então desligar o
+            // relógio não reduz o que a suíte cobre; reduz o acaso.
+            //
+            // Removido pelo DESCRIPTOR, e não `RemoveAll<IHostedService>()`: o serviço de envio
+            // de e-mail também é hosted, e é ele que consome a fila até a caixa de saída dublê.
+            var drenagem = servicos.SingleOrDefault(descriptor =>
+                descriptor.ImplementationType ==
+                    typeof(Infrastructure.Persistence.ServicoDeDrenagemDaOutbox));
+
+            if (drenagem is not null)
+            {
+                servicos.Remove(drenagem);
+            }
         });
     }
 

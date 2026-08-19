@@ -121,7 +121,7 @@ public sealed class CadastrarRestauranteHandler(IAppDbContext db, IHashDeSenha h
 
         // RN-GER-010 — os perfis da unidade e as suas permissoes, ANTES do usuario: nao existe
         // usuario sem perfil, e o administrador precisa do dele para ser criado.
-        var perfis = await SemearPerfisAsync(db, unidade.Id, cancellationToken);
+        var perfis = SemearPerfis(db, unidade.Id);
 
         var admin = new Usuario(
             unidade.Id,
@@ -234,52 +234,45 @@ public sealed class CadastrarRestauranteHandler(IAppDbContext db, IHashDeSenha h
     }
 
     /// <summary>
-    /// <summary>
-    /// Perfis da unidade e as suas permissoes — <c>RN-GER-010</c>, <c>RN-GER-022</c>.
+    /// Perfis da unidade e as suas permissoes — <c>RN-GER-010</c>, <c>RN-GER-022</c>, ADR-0022.
     /// <para>
     /// Os perfis sao <b>por unidade</b>: cada restaurante tem os seus, e um dia pode criar mais.
-    /// As permissoes sao <b>globais</b> — o catalogo do que existe no sistema, semeado por
-    /// migration.
+    /// Cada permissao concedida vira uma <b>claim de papel</b> (linha em
+    /// <c>perfil_permissao</c>, tipo <c>permissao</c>, valor <c>recurso.acao</c>).
+    /// </para>
+    /// <para>
+    /// ⚠ A fonte é o <see cref="CatalogoDeAcesso"/> em codigo, DIRETO: nao existe mais tabela
+    /// <c>permissao</c> a consultar nem a divergir. A validacao que antes comparava catalogo e
+    /// tabela perdeu o objeto — o que resta conferivel e o proprio catalogo, e
+    /// <c>ValidadorDeDelegacao</c> ja o confere na partida.
     /// </para>
     /// <para>
     /// Devolve o mapa nome -> id, porque quem chama precisa do id do Administrador para criar o
     /// usuario fundador.
     /// </para>
     /// </summary>
-    private static async Task<Dictionary<string, Guid>> SemearPerfisAsync(
-        IAppDbContext db, Guid unidadeId, CancellationToken cancellationToken)
+    private static Dictionary<string, Guid> SemearPerfis(IAppDbContext db, Guid unidadeId)
     {
-        var permissoes = await db.Permissoes
-            .AsNoTracking()
-            .ToDictionaryAsync(permissao => permissao.Codigo, permissao => permissao.Id, cancellationToken);
-
-        if (permissoes.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "SPEC-GER-004 — a tabela permissao esta vazia. Falta a migration que a semeia.");
-        }
-
         var criados = new Dictionary<string, Guid>(StringComparer.Ordinal);
 
         foreach (var padrao in CatalogoDeAcesso.Perfis)
         {
             var perfil = new Perfil(unidadeId, padrao.Nome, padrao.Descricao, sistema: true);
 
+            db.Perfis.Add(perfil);
+
             foreach (var codigo in padrao.Permissoes)
             {
-                if (!permissoes.TryGetValue(codigo, out var permissaoId))
+                // O RoleClaim do Identity tem chave int gerada pelo banco — a unica exceção à
+                // regra "chave nasce na aplicacao" (ADR-0004), porque o tipo e do framework.
+                db.PermissoesDePerfil.Add(new Microsoft.AspNetCore.Identity.IdentityRoleClaim<Guid>
                 {
-                    // Catalogo do C# e tabela do banco divergiram. Falhar aqui e melhor que criar
-                    // um perfil silenciosamente sem uma das permissoes que ele deveria ter.
-                    throw new InvalidOperationException(
-                        $"SPEC-GER-004 — a permissao {codigo}, exigida pelo perfil {padrao.Nome}, " +
-                        "nao existe na tabela permissao. Falta a migration que a semeia.");
-                }
-
-                perfil.Conceder(permissaoId);
+                    RoleId = perfil.Id,
+                    ClaimType = CatalogoDeAcesso.TipoDeClaimDePermissao,
+                    ClaimValue = codigo,
+                });
             }
 
-            db.Perfis.Add(perfil);
             criados[padrao.Nome] = perfil.Id;
         }
 

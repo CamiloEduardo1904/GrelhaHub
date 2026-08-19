@@ -1,11 +1,15 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using GrelhaHub.Api.Seguranca;
 using GrelhaHub.Application;
 using GrelhaHub.Application.Common.Interfaces;
+using GrelhaHub.Domain.Gerais;
 using GrelhaHub.Infrastructure;
+using GrelhaHub.Infrastructure.Identity;
 using GrelhaHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -27,6 +31,30 @@ builder.Services.AddScoped<IContextoDeExecucao, ContextoDeExecucaoHttp>();
 builder.Services.AddExceptionHandler<TratadorDeExcecoes>();
 builder.Services.AddProblemDetails();
 
+// ADR-0022 — o ASP.NET Identity como modelo de acesso: Usuario e Perfil são os POCOs do
+// domínio, o store é o GrelhaHubDbContext, e o SignInManager é quem conta as falhas de login.
+//
+// AddIdentityCore, e NÃO AddIdentity: o pacote completo registraria autenticação por cookie e
+// redirecionamento para /Account/Login — a autenticação daqui é JWT (ADR-0003), e o Identity
+// entra só como gestão de credencial e papel.
+builder.Services
+    .AddIdentityCore<Usuario>(options =>
+    {
+        // RN-GER-040 ⚠⚠ — o lockout. As constantes NOMEIAM os parâmetros que copiam
+        // (PAR-GER-004, PAR-GER-005): escopo global, porque quem tenta entrar ainda não tem
+        // unidade — ver docs/04-parametros-do-sistema.md §1.1.
+        options.Lockout.MaxFailedAccessAttempts = PoliticaDeBloqueio.TentativasAntesDoBloqueio;
+        options.Lockout.DefaultLockoutTimeSpan = PoliticaDeBloqueio.DuracaoDoBloqueio;
+        options.Lockout.AllowedForNewUsers = true;
+    })
+    .AddRoles<Perfil>()
+    .AddEntityFrameworkStores<GrelhaHubDbContext>()
+    .AddSignInManager();
+
+// RN-GER-040 — a ponte que o AutenticarHandler usa: a Application não referencia o runtime do
+// ASP.NET, então o SignInManager fica atrás desta interface.
+builder.Services.AddScoped<IVerificadorDeCredenciais, VerificadorDeCredenciais>();
+
 // ADR-0003 — autenticação stateless por JWT.
 var chaveJwt = builder.Configuration["Jwt:Chave"] ?? string.Empty;
 
@@ -46,9 +74,70 @@ builder.Services
                 Encoding.UTF8.GetBytes(chaveJwt.PadRight(32, '_'))),
             ClockSkew = TimeSpan.FromMinutes(1),
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            // RN-GER-041 ⚠⚠ — trocar a senha invalida as sessões anteriores.
+            //
+            // O SecurityStamp viaja no token (claim `carimbo`) e é conferido AQUI, a cada
+            // requisição autenticada, contra o que está gravado: trocar a senha regenera o
+            // carimbo, e todo token emitido antes falha nesta comparação — 401 na requisição
+            // seguinte, que é o enunciado da regra.
+            //
+            // ⚠ O custo é assumido e registrado (ADR-0022 §5, emenda à ADR-0003): uma consulta
+            // por requisição, e o JWT deixa de ser puramente stateless. A alternativa era o
+            // buraco que a ADR-0021 encontrou — senha vazada, senha trocada, e o atacante
+            // dentro por mais oito horas. Sessão que não morre com a senha não é sessão, é
+            // chave copiada.
+            OnTokenValidated = async contexto =>
+            {
+                var principal = contexto.Principal;
+
+                var sub = principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? principal?.FindFirstValue("sub");
+
+                var carimboDoToken = principal?.FindFirstValue(GeradorDeTokenJwt.ClaimCarimbo);
+
+                // Token sem carimbo é token de antes desta regra — e aceitar seria manter viva
+                // exatamente a sessão que a regra existe para matar. Falha fechado.
+                if (!Guid.TryParse(sub, out var usuarioId) || string.IsNullOrEmpty(carimboDoToken))
+                {
+                    contexto.Fail("RN-GER-041 — token sem carimbo de seguranca.");
+                    return;
+                }
+
+                // `usuario` está fora do filtro global (não implementa IPertenceAUnidade), e a
+                // consulta lê UMA coluna pela chave primária: é o preço por requisição, inteiro.
+                var db = contexto.HttpContext.RequestServices
+                    .GetRequiredService<GrelhaHubDbContext>();
+
+                var carimboAtual = await db.Usuarios
+                    .AsNoTracking()
+                    .Where(u => u.Id == usuarioId)
+                    .Select(u => u.SecurityStamp)
+                    .FirstOrDefaultAsync(contexto.HttpContext.RequestAborted);
+
+                if (!string.Equals(carimboAtual, carimboDoToken, StringComparison.Ordinal))
+                {
+                    contexto.Fail("RN-GER-041 — sessao invalidada por troca de senha.");
+                }
+            },
+        };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // ADR-0022 §3 / RN-GER-010 — UMA política por permissão, registrada a partir do
+    // CatalogoDeAcesso: a política tem o MESMO nome do código e exige a claim `permissao` com
+    // esse valor. Quem DECLARA a exigência continua sendo o request ([ExigePermissao]); o
+    // PermissaoBehavior resolve a política pelo IAuthorizationService. Permissão nova no
+    // catálogo ganha política sozinha — não há segunda lista a manter.
+    foreach (var permissao in CatalogoDeAcesso.Permissoes)
+    {
+        options.AddPolicy(permissao.Codigo, politica =>
+            politica.RequireClaim(CatalogoDeAcesso.TipoDeClaimDePermissao, permissao.Codigo));
+    }
+});
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

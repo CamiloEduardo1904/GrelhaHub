@@ -531,7 +531,7 @@ public sealed class ImagemTests(AmbienteDeIntegracao ambiente) : TesteDeIntegrac
         Guid perfilId;
         await using (var db = Contexto(restaurante))
         {
-            perfilId = await db.Perfis.Where(p => p.Nome == "Cozinha").Select(p => p.Id).SingleAsync();
+            perfilId = await db.Perfis.Where(p => p.Name == "Cozinha").Select(p => p.Id).SingleAsync();
         }
 
         (await gestao.PostAsJsonAsync(

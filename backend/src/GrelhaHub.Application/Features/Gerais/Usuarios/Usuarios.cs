@@ -213,12 +213,12 @@ public sealed class CriarUsuarioHandler(
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(u => u.Id == contexto.UsuarioId)
-            .Select(u => u.Perfil!.Nome)
+            .Select(u => u.Perfil!.Name)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (!MatrizDeDelegacao.PodeAtribuir(perfilDeQuemCria, perfil.Nome))
+        if (!MatrizDeDelegacao.PodeAtribuir(perfilDeQuemCria, perfil.Name))
         {
-            throw new DelegacaoNegadaException(perfil.Nome);
+            throw new DelegacaoNegadaException(perfil.Name ?? string.Empty);
         }
 
         var usuario = new Usuario(
@@ -249,7 +249,7 @@ public sealed class CriarUsuarioHandler(
         return new UsuarioDto(
             usuario.Id, usuario.UnidadeId, usuario.Nome, usuario.Sobrenome, cpf.Formatado(),
             usuario.Email,
-            perfil.Nome, perfil.Id, usuario.Ativo, true);
+            perfil.Name ?? string.Empty, perfil.Id, usuario.Ativo, true);
     }
 }
 
@@ -327,7 +327,7 @@ public sealed class TrocarSenhaHandler(IAppDbContext db, IContextoDeExecucao con
             .FirstOrDefaultAsync(u => u.Id == usuarioId, cancellationToken)
             ?? throw new NaoAutorizadoException("Sessão inválida.");
 
-        if (!hash.Confere(request.SenhaAtual, usuario.SenhaHash))
+        if (!hash.Confere(request.SenhaAtual, usuario.PasswordHash))
         {
             // ⚠ 422 e NÃO 401, e a diferença é a que fazia a tela parecer quebrada.
             //
@@ -423,10 +423,19 @@ public sealed class ListarPerfisHandler(ILeituraDb leitura, IContextoDeExecucao 
             .OrderBy(p => p.Codigo)
             .ToListAsync(cancellationToken);
 
+        // ADR-0022 §3 — a DESCRIÇÃO vem do CatalogoDeAcesso, não do banco: a claim de papel
+        // guarda só o código concedido, e a lista do que existe (com o texto para gente) é o
+        // catálogo em código. Código órfão — concedido no banco e ausente do catálogo — aparece
+        // com o próprio código como descrição, em vez de derrubar a tela: é dado a corrigir,
+        // não consulta a falhar.
+        var descricoes = CatalogoDeAcesso.Permissoes
+            .ToDictionary(p => p.Codigo, p => p.Descricao, StringComparer.Ordinal);
+
         var porPerfil = permissoes
             .GroupBy(p => p.PerfilId)
             .ToDictionary(g => g.Key, g => g.Select(
-                x => new PermissaoDoPerfilDto(x.Codigo, x.Descricao)).ToList());
+                x => new PermissaoDoPerfilDto(
+                    x.Codigo, descricoes.GetValueOrDefault(x.Codigo, x.Codigo))).ToList());
 
         var eu = contexto.UsuarioId;
 
@@ -522,7 +531,7 @@ public sealed class AlterarUsuarioHandler(IAppDbContext db, IContextoDeExecucao 
 
         return new UsuarioDto(
             usuario.Id, usuario.UnidadeId, usuario.Nome, usuario.Sobrenome, cpf.Formatado(),
-            usuario.Email, usuario.Perfil?.Nome ?? "—", usuario.PerfilId ?? Guid.Empty,
+            usuario.Email, usuario.Perfil?.Name ?? "—", usuario.PerfilId ?? Guid.Empty,
             usuario.Ativo, usuario.DeveTrocarSenha);
     }
 

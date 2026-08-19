@@ -348,11 +348,13 @@ public sealed class AdministracaoTests(AmbienteDeIntegracao ambiente) : TesteDeI
             new { SenhaAtual = Senha, NovaSenha = "escolhida-por-mim-9876" }))
             .EnsureSuccessStatusCode();
 
-        // ⚠ E o token ANTIGO continua bloqueando: o claim `trocar_senha` viaja nele. É por isso que
-        // a tela reautentica em vez de só seguir para o painel.
+        // ⚠ E o token ANTIGO morre de vez — RN-GER-041 (ADR-0022): a troca girou o
+        // SecurityStamp, e a conferência por requisição responde 401 antes de qualquer gate.
+        // Antes desta regra a resposta era 403 (o claim `trocar_senha` seguia no token vivo);
+        // o motivo de a tela reautenticar continua o mesmo, agora com o framework cobrando.
         (await comPendencia.GetAsync(new Uri("/api/v1/pedidos", UriKind.Relative)))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden,
-                "o token na mão não muda porque a senha mudou");
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+                "token emitido antes da troca de senha não é mais sessão (RN-GER-041)");
 
         // Reautenticando com a senha nova: token limpo, pendência encerrada, rotas liberadas.
         var novaEntrada = await TentarLoginAsync("primeiro@loja.teste", "escolhida-por-mim-9876");
@@ -427,7 +429,7 @@ public sealed class AdministracaoTests(AmbienteDeIntegracao ambiente) : TesteDeI
         Guid perfilId;
         await using (var db = Contexto(restaurante))
         {
-            perfilId = await db.Perfis.Where(p => p.Nome == perfil).Select(p => p.Id).SingleAsync();
+            perfilId = await db.Perfis.Where(p => p.Name == perfil).Select(p => p.Id).SingleAsync();
         }
 
         var resposta = await gestao.PostAsJsonAsync(

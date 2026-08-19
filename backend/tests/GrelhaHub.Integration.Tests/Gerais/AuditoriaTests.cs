@@ -239,7 +239,7 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         Guid perfilId;
         await using (var db = Contexto(restaurante))
         {
-            perfilId = await db.Perfis.Where(p => p.Nome == "Cozinha").Select(p => p.Id).SingleAsync();
+            perfilId = await db.Perfis.Where(p => p.Name == "Cozinha").Select(p => p.Id).SingleAsync();
         }
 
         (await gestao.PostAsJsonAsync(
@@ -274,11 +274,22 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
 
             // O hash é substituído por "***": um hash antigo na trilha é um hash a mais em
             // circulação, e a trilha é lida pela gerência.
-            if (Chaves(registro.ValoresNovos).Contains("SenhaHash"))
+            //
+            // ADR-0022 — a propriedade virou a do Identity (PasswordHash); a coluna continua
+            // `senha_hash` e a máscara continua a mesma.
+            if (Chaves(registro.ValoresNovos).Contains("PasswordHash"))
             {
-                Valor(registro.ValoresNovos, "SenhaHash").Should().Be("***");
+                Valor(registro.ValoresNovos, "PasswordHash").Should().Be("***");
             }
         }
+
+        // ⚠ O guarda acima é um `if`: se o rename da propriedade mudar a chave de novo, ele
+        // deixaria de asseverar EM SILÊNCIO. Esta linha é o que o impede — a criação de usuário
+        // sempre grava o hash, então ao menos um registro TEM de carregar a chave mascarada.
+        registros.Should().Contain(
+            r => Chaves(r.ValoresNovos).Contains("PasswordHash"),
+            "a criação grava o hash (mascarado); nenhum registro com a chave significa que a " +
+            "asserção de mascaramento morreu com um rename");
     }
 
     [Fact(DisplayName = "SPEC-GER-005 — a trilha é imutável: alteração é recusada (CA-7)")]
@@ -500,7 +511,7 @@ public sealed class AuditoriaTests(AmbienteDeIntegracao ambiente) : TesteDeInteg
         await using (var db = Contexto(restaurante))
         {
             var perfilId = await db.Perfis
-                .Where(p => p.Nome == "Atendente").Select(p => p.Id).SingleAsync();
+                .Where(p => p.Name == "Atendente").Select(p => p.Id).SingleAsync();
 
             db.Usuarios.Add(new Usuario(
                 restaurante.UnidadeId, "Atendente da Trilha", "atendente@trilha.teste",

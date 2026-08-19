@@ -150,6 +150,18 @@ public sealed partial class TratadorDeExcecoes(
             Extensions = { ["regra"] = "RN-GER-017", ["modulo"] = modulo.Sigla },
         },
 
+        ContaBloqueadaException bloqueio => new ProblemDetails
+        {
+            // 401 como o login recusado — a autenticação falhou. A DIFERENÇA é a mensagem:
+            // RN-GER-040 manda dizer que está bloqueada e por quanto tempo, e a fresta que isso
+            // abre em RN-GER-027 (confirma que a conta existe) é aceita e declarada na
+            // ADR-0022 §4 — o silêncio cobraria o preço do operador legítimo.
+            Status = StatusCodes.Status401Unauthorized,
+            Title = "Conta bloqueada",
+            Detail = bloqueio.Message,
+            Extensions = { ["regra"] = "RN-GER-040" },
+        },
+
         LoginRecusadoException login => new ProblemDetails
         {
             // 401: aqui a autenticação REALMENTE falhou. O código vai na extensão para o suporte

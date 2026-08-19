@@ -277,7 +277,7 @@ public sealed class CriarUsuarioDePlataformaHandler(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                p => p.UnidadeId == request.UnidadeId && p.Nome == request.PerfilNome,
+                p => p.UnidadeId == request.UnidadeId && p.Name == request.PerfilNome,
                 cancellationToken)
             ?? throw new NaoEncontradoException(
                 $"O perfil {request.PerfilNome} não existe nesta unidade.");
@@ -299,7 +299,8 @@ public sealed class CriarUsuarioDePlataformaHandler(
         await convites.EmitirAsync(usuario, TipoDeToken.Convite, cancellationToken);
 
         return new UsuarioDePlataformaDto(
-            usuario.Id, request.UnidadeId, usuario.NomeCompleto, usuario.Email, perfil.Nome);
+            usuario.Id, request.UnidadeId, usuario.NomeCompleto, usuario.Email,
+            perfil.Name ?? string.Empty);
     }
 }
 

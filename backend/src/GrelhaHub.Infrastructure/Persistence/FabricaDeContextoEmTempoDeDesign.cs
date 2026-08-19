@@ -45,6 +45,7 @@ public sealed class FabricaDeContextoEmTempoDeDesign : IDesignTimeDbContextFacto
         public Guid? UsuarioId => null;
         public Guid UnidadeId => Guid.Empty;
         public bool Autenticado => false;
+        public System.Security.Claims.ClaimsPrincipal? Principal => null;
         public bool PodeVerCusto => false;
         public IReadOnlySet<string> Permissoes => new HashSet<string>();
         public bool Pode(string permissao) => false;

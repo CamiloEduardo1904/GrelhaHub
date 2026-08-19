@@ -126,9 +126,14 @@ public sealed record PerfilLeitura(
 
 /// <summary>
 /// <c>vw_perfil_permissao</c> — <c>RN-GER-010</c>, o que cada perfil concede.
+/// <para>
+/// ⚠ Só o <b>código</b> — ADR-0022 §3: a concessão é claim de papel
+/// (<c>perfil_permissao.valor</c>), e a descrição legível vive no <c>CatalogoDeAcesso</c>, em
+/// código. Uma coluna de descrição aqui seria a segunda fonte do mesmo texto.
+/// </para>
 /// </summary>
 public sealed record PerfilPermissaoLeitura(
-    Guid UnidadeId, Guid PerfilId, string Codigo, string Descricao) : IRecortadoPorUnidade;
+    Guid UnidadeId, Guid PerfilId, string Codigo) : IRecortadoPorUnidade;
 
 /// <summary>
 /// <c>vw_usuario</c> — quem opera.

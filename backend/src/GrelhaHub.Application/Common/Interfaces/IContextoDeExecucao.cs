@@ -21,6 +21,17 @@ public interface IContextoDeExecucao
     bool Autenticado { get; }
 
     /// <summary>
+    /// ADR-0022 §3 — o principal autenticado da requisição, para o
+    /// <c>PermissaoBehavior</c> entregar ao <c>IAuthorizationService</c>.
+    /// <para>
+    /// <c>null</c> em rota pública e fora de HTTP. É tipo do BCL
+    /// (<c>System.Security.Claims</c>), não do ASP.NET — a Application continua sem
+    /// referenciar runtime.
+    /// </para>
+    /// </summary>
+    System.Security.Claims.ClaimsPrincipal? Principal { get; }
+
+    /// <summary>
     /// <c>RN-GER-010</c> — permissões do usuário, vindas do token.
     /// <para>
     /// Códigos <c>recurso.acao</c>. Nome de perfil <b>não</b> aparece aqui de propósito: era
