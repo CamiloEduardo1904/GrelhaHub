@@ -17,6 +17,27 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
+
+    <!--
+      Design system §2.1 — o tema ANTES da primeira pintura.
+
+      ⚠ Sem este bloco, quem escolheu claro vê a tela ESCURA por um quadro antes de o React
+      montar — e o inverso na cozinha, que é pior: um lampejo branco no escuro, a meio metro do
+      rosto, no meio do serviço. É o mesmo motivo de a Chapa não usar webfont: o que aparece
+      antes de o pacote carregar também é interface.
+
+      ⚠ O conteúdo é o mesmo de `APLICAR_ANTES_DA_PINTURA`, em `services/tema.ts`. Mexeu num,
+      mexa no outro — este é o único lugar do produto que roda antes do pacote.
+    -->
+    <script>
+      try {
+        var t = localStorage.getItem('grelhahub.tema');
+        if (t === 'claro') document.documentElement.setAttribute('data-theme', 'light');
+        if (t === 'escuro') document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) {
+        /* Modo privado sem storage: cai no tema do sistema, que é o padrão. */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -122,6 +122,7 @@ que falhou. Os exemplos são validações **reais**, e cada um sai com **código
 | `mural.mjs` | O painel de senha no pico (`RN-VEN-054`, `RN-VEN-056`) — rolagem, colunas, tela cheia |
 | `lista.mjs` | Os grupos da lista (`RN-VEN-057`) — colapso, filtro, e quanto ele economiza |
 | `operacao.mjs` | A série de 30 dias (`RN-VEN-050`) — nenhuma barra some |
+| `tema.mjs` | Os três estados do tema, `CHAPA-11` nas superfícies e a ausência de piscada |
 
 Copie o mais próximo do que você mudou.
 
@@ -138,6 +139,22 @@ Copie o mais próximo do que você mudou.
 > ⚠ E a **proporção** importa mais que o número: a primeira versão do `PICO` deixava quase tudo
 > vivo, e com 59 dos 62 na casa o agrupamento não tinha o que economizar. Ele semeia uma noite
 > real — ~60% concluídos, ~30% na casa, ~10% cancelados.
+
+> ### ⚠⚠ A porta 5173 é de TODO projeto Vite da máquina
+>
+> `subir.sh` usa `--strictPort` e **confere o título** da página antes de declarar sucesso. Sem as
+> duas coisas, o Vite encontra a porta ocupada, avisa no log e **sobe em 5174 em silêncio** — e o
+> `curl` recebe 200 de um projeto alheio. O sintoma foi `Timeout waiting for input[type="email"]`
+> numa tela que não tinha campo de e-mail porque não era a nossa.
+>
+> ```bash
+> PORTA_WEB=5174 bash .claude/skills/subir-e-validar/scripts/subir.sh
+> PORTA_WEB=5174 node exemplos/lista.mjs     # o driver lê a mesma variável
+> ```
+>
+> ⚠ **`derrubar.sh` mata pelo PID DA PORTA, nunca por nome de imagem.** A primeira versão fazia
+> `taskkill //F //IM node.exe`, o que derruba **todo processo Node da máquina** — inclusive o
+> servidor de desenvolvimento de outro projeto, que ninguém pediu para encerrar.
 
 > ### ⚠ Caminho do navegador com barra normal
 >

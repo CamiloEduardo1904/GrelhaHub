@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AlternadorDeTema } from '../../components/AlternadorDeTema';
 import { Comanda } from '../../components/Comanda';
 import { Dialogo } from '../../components/Dialogo';
 import { EnvioDeImagem } from '../../components/EnvioDeImagem';
@@ -141,6 +142,10 @@ export function Painel() {
           <strong>{restaurante?.nomeFantasia ?? '…'}</strong>
           {sessao?.nome} · {sessao?.perfil}
         </span>
+
+        {/* Design system §2.1 — escuro é a cozinha, claro é o escritório. Fica ANTES de Sair,
+            no fim da barra: é a coisa que se mexe uma vez e não se procura de novo. */}
+        <AlternadorDeTema />
 
         <button className="btn" onClick={sair} type="button">
           Sair

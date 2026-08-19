@@ -3666,10 +3666,21 @@ button.link-discreto {
 /* ⚠ `<button>` de verdade, e não `div` com `onClick`: teclado e leitor de tela
    ganham o mesmo caminho do mouse. Numa tela de operação isso não é detalhe — é o
    operador com a mão ocupada perdendo o acesso. */
+/* ⚠⚠ `flex-wrap` NÃO É ENFEITE — é o que impede o total de ser CORTADO pela borda do
+   cartão, e a falta dele foi um defeito relatado em 19/08/2026: no grupo "na casa" o
+   cartão fechado media 295 px com 304 px de conteúdo, e "R$ 68,00" sumia sob a moldura.
+   Parecia preço errado; era preço fora da caixa.
+
+   ⚠ A largura da coluna não resolve isto, e tentar resolver por ela foi o erro. Medido: a
+   mesma linha transbordava em "na casa" a 1900 px E em "concluídos" a 1024 px — cada
+   largura de tela corta um grupo diferente. Quebrar a linha é a única saída que vale em
+   TODA largura, e uma segunda linha num cartão fechado ainda é um sexto da comanda aberta. */
 .comanda-abre {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
+  row-gap: 0.25rem;
   width: 100%;
   /* CHAPA-04 — 48 px na operação. */
   min-height: var(--toque);
@@ -3753,16 +3764,16 @@ button.comanda-cab:focus-visible {
   outline-offset: -4px;
 }
 
-/* ⚠⚠ Os grupos que chegam FECHADOS ganham coluna mais larga, e é aritmética, não gosto.
-   A linha fechada tem cinco elementos — régua, número, canal, selo e total — e em 255 px
-   eles somam ~300: o total transbordava para fora do cartão e a PÁGINA passava a rolar na
-   horizontal. Cartão fechado é baixo, então largura é o que ele tem de sobra.
+/* ⚠⚠ UMA largura para os três grupos, e a uniformidade é a correção de um defeito.
+   A versão anterior dava 310 px aos grupos fechados e deixava "na casa" nos 255 px do
+   resto do painel — e foi exatamente ali que o total apareceu cortado, porque QUALQUER
+   pedido pode ser fechado com um clique, inclusive os da casa. Largura de coluna que
+   depende do grupo é largura que erra no grupo em que ninguém olhou.
 
-   ⚠ A regra é por GRUPO e não por estado do cartão: um pedido que o usuário abre continua
-   na coluna larga. Alternar a grade conforme o que está aberto faria a tela inteira se
-   reorganizar a cada clique — que é o oposto do que o colapso existe para dar. */
-.grupo-de-pedidos[data-grupo='concluido'] .grade,
-.grupo-de-pedidos[data-grupo='cancelado'] .grade {
+   310 px porque a linha fechada tem cinco elementos que somam ~300; o `flex-wrap` acima
+   cobre o que sobrar em tela estreita. Comanda ABERTA em coluna de 310 fica melhor do que
+   em 255 — itens e observação ganham linha. */
+.dia-de-pedidos .grade {
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
 }
 
@@ -3771,4 +3782,54 @@ button.comanda-cab:focus-visible {
    só está conferindo comemora o erro (§5). */
 .grupo-de-pedidos[data-grupo='cancelado'] .comanda-fechada {
   border-style: dashed;
+}
+
+/* ============================================================================
+   ALTERNADOR DE TEMA — design system §2.1
+
+   Escuro = cozinha. Claro = administrativo. Os dois temas já existiam na folha;
+   o que faltava era a escolha, e um caminho de volta para "acompanhe o aparelho".
+
+   Reusa `.chips` de propósito: um alternador com vocabulário próprio seria a
+   quarta forma de dizer "escolha uma destas" na mesma tela.
+   ============================================================================ */
+
+.alternador-de-tema {
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+}
+
+/* Na barra escura o chip precisa de contraste próprio: `--surface` ali é a cor da
+   PÁGINA, não da barra, e um chip cor de página sobre carvão some. CHAPA-11 — quem
+   declara `background` declara `color`. */
+.barra-app .alternador-de-tema .chip {
+  min-height: var(--toque-admin);
+  padding: 0 0.55rem;
+  font-size: var(--texto-2xs);
+  background: transparent;
+  color: var(--creme);
+  border-color: var(--cinza-quente);
+  box-shadow: none;
+}
+
+.barra-app .alternador-de-tema .chip:hover {
+  border-color: var(--creme);
+}
+
+.barra-app .alternador-de-tema .chip[aria-pressed='true'] {
+  background: var(--carvao);
+  color: var(--creme);
+  border-color: var(--ambar-chama);
+}
+
+/* Celular: três posições não cabem ao lado de "Sair" numa barra de 390 px. O rótulo
+   sai e fica a barra âmbar — que já é o que distingue a posição ativa (CHAPA-02).
+   ⚠ O nome continua no `aria-label` do grupo e no `aria-pressed` de cada botão: o
+   que some é o texto, não a informação. */
+@media (max-width: 40rem) {
+  .barra-app .alternador-de-tema .chip {
+    font-size: 0;
+    padding: 0 0.35rem;
+    gap: 0;
+  }
 }

@@ -81,6 +81,38 @@ administrativo.
 | `--alerta` | `#9A5B00` | `#FFB020` |
 | `--erro` | `#A3271F` | `#EF6A5E` |
 
+### A escolha do tema — `<AlternadorDeTema />`, 19/08/2026
+
+Os dois temas existiam na folha desde o início; o que faltava era **a escolha**, na barra do
+aplicativo, à esquerda de *Sair*.
+
+| Posição | `data-theme` | O que faz |
+|---------|--------------|-----------|
+| **Sistema** *(padrão)* | *(ausente)* | Acompanha o aparelho, via `prefers-color-scheme` |
+| **Claro** | `light` | Fixa o claro, mesmo com o aparelho no escuro |
+| **Escuro** | `dark` | Fixa o escuro |
+
+⚠ **Três posições, e não duas.** `Sistema` **não é o mesmo que `Claro`**: ele muda sozinho à noite
+em quase todo celular. Um alternador de duas posições obrigaria a escolher para sempre no primeiro
+clique, sem caminho de volta.
+
+⚠ **`Sistema` REMOVE o atributo**, não escreve `data-theme="sistema"`. A folha decide pela ausência,
+e um valor inventado ali deixaria a página presa no claro — o oposto de "acompanhe o aparelho".
+
+⚠⚠ **O tema é aplicado ANTES da primeira pintura**, por um `<script>` inline em `index.html`. Sem
+ele, quem escolheu claro vê a tela **escura por um quadro** antes de o React montar — e o inverso na
+cozinha, que é pior: um lampejo branco no escuro, a meio metro do rosto, no meio do serviço. É o
+mesmo motivo de a Chapa não usar webfont: **o que aparece antes de o pacote carregar também é
+interface.** O conteúdo do script vive em `services/tema.ts` para os dois não divergirem.
+
+⚠ **A preferência é do APARELHO — `localStorage`, não o perfil no banco.** A mesma gerente usa o
+tablet da cozinha no escuro e o computador do escritório no claro; guardar no servidor levaria a
+escolha de um para o outro, que é o contrário do que ela quis.
+
+O controle reusa `.chips` e a `<Grelha>`: `CHAPA-02`, uma barra âmbar no grupo. Um alternador com
+vocabulário próprio seria a quarta forma de dizer "escolha uma destas" na mesma tela. E `CHAPA-06` —
+nada de 🌞/🌙: o estado é **palavra**.
+
 ### CHAPA-10 merece explicação
 
 > **`--muted` é para rótulo e metadado. Frase usa a cor do texto.**

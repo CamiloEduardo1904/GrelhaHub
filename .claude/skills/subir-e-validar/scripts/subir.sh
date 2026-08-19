@@ -10,6 +10,10 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 CONTEINER=grelhahub-dev
+
+# ⚠⚠ A porta é configurável porque 5173 é o padrão do Vite — e portanto a porta de TODO projeto
+# Vite da máquina. Ver o aviso do passo 5.
+PORTA_WEB=${PORTA_WEB:-5173}
 LOGS="${TMPDIR:-/tmp}/grelhahub-validacao"
 mkdir -p "$LOGS"
 
@@ -73,25 +77,48 @@ ASPNETCORE_ENVIRONMENT=Development Serilog__MinimumLevel__Default=Warning \
   nohup dotnet run --project src/GrelhaHub.Api -c Debug --no-build \
   > "$LOGS/api.log" 2>&1 &
 
-echo "── 5/5 · Vite em :5173 ──────────────────────────────────────────────────"
+echo "── 5/5 · Vite em :$PORTA_WEB ────────────────────────────────────────────"
 cd "$RAIZ/frontend"
 # ⚠ `npm ci` primeiro se não houver node_modules: sem ele o `npm run` sai 0 sem rodar nada.
 [ -d node_modules ] || npm ci
-nohup npx vite --port 5173 > "$LOGS/vite.log" 2>&1 &
+
+# ⚠⚠ `--strictPort` NÃO É OPCIONAL, e a falta dele custou uma sessão inteira.
+#
+# 5173 é o padrão do Vite, e portanto a porta de TODO projeto Vite da máquina. Sem
+# `--strictPort` o Vite encontra a porta ocupada, **avisa no log e sobe em 5174 em silêncio** —
+# e o `curl` deste script recebia 200 de um projeto ALHEIO, declarava sucesso, e o navegador
+# abria a aplicação de outra pessoa. O sintoma foi `Timeout waiting for input[type="email"]`
+# numa tela que não tinha campo de e-mail porque não era a nossa.
+nohup npx vite --port "$PORTA_WEB" --strictPort > "$LOGS/vite.log" 2>&1 &
 
 for _ in $(seq 1 60); do
   api=$(curl -s -m 2 http://localhost:5000/api/health 2>/dev/null || true)
-  web=$(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:5173/ 2>/dev/null || true)
-  [ -n "$api" ] && [ "$web" = "200" ] && break
+  web=$(curl -s -m 2 "http://localhost:$PORTA_WEB/" 2>/dev/null || true)
+  [ -n "$api" ] && [ -n "$web" ] && break
   sleep 1
 done
 
-[ -n "${api:-}" ] || { echo "✖ API não respondeu — ver $LOGS/api.log"; exit 1; }
-[ "${web:-}" = "200" ] || { echo "✖ Vite não respondeu — ver $LOGS/vite.log"; exit 1; }
+[ -n "${api:-}" ] || { echo "   ✖ API não respondeu — ver $LOGS/api.log"; exit 1; }
+
+if [ -z "${web:-}" ]; then
+  echo "   ✖ Vite não respondeu — ver $LOGS/vite.log"
+  echo "     Porta ocupada? PORTA_WEB=5174 bash $0"
+  exit 1
+fi
+
+# ⚠⚠ Confere a IDENTIDADE, e não a vivacidade. "Respondeu 200" prova que ALGUMA coisa está
+# naquela porta; o título prova que é a nossa. É a mesma lição do `pg_isready` que respondia
+# ao servidor temporário do `initdb`: o teste tem de perguntar o que importa.
+if ! printf '%s' "$web" | grep -q 'GrelhaHub'; then
+  echo "   ✖ :$PORTA_WEB responde, mas NÃO é o GrelhaHub — outro projeto está na porta."
+  echo "     Título encontrado: $(printf '%s' "$web" | grep -o '<title>[^<]*' | head -1)"
+  echo "     Suba noutra: PORTA_WEB=5174 bash $0"
+  exit 1
+fi
 
 echo
 echo "✔ API   http://localhost:5000/api/health  → $api"
-echo "✔ Web   http://localhost:5173"
+echo "✔ Web   http://localhost:$PORTA_WEB  (título conferido)"
 echo "  logs  $LOGS"
 echo
 echo "Próximo: bash .claude/skills/subir-e-validar/scripts/semear.sh"

@@ -24,7 +24,9 @@ export const CREDENCIAIS = {
   plataforma: { email: 'suporte@grelhahub.local', senha: 'suporte-local-1234' },
 };
 
-const BASE = process.env.BASE ?? 'http://localhost:5173';
+// ⚠ 5173 é o padrão do Vite, e portanto a porta de todo projeto Vite da máquina. Quando `subir.sh`
+// precisar de outra (`PORTA_WEB=5174`), passe `BASE` aqui também — os dois leem do ambiente.
+const BASE = process.env.BASE ?? `http://localhost:${process.env.PORTA_WEB ?? 5173}`;
 const SAIDA = process.env.SAIDA ?? '.';
 
 /**

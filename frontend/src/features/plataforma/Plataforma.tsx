@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { AlternadorDeTema } from '../../components/AlternadorDeTema';
 import { Grelha } from '../../components/Grelha';
 import { encerrarSessao, lerSessao } from '../admin/sessao';
 import { Estabelecimentos } from './Estabelecimentos';
@@ -56,6 +57,8 @@ export function Plataforma() {
           <strong>{sessao.nome}</strong>
           Suporte
         </div>
+
+        <AlternadorDeTema />
 
         <button
           type="button"
