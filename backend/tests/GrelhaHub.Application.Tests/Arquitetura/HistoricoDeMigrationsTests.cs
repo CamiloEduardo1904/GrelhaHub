@@ -71,7 +71,13 @@ public sealed class HistoricoDeMigrationsTests
 
         // As duas saídas, e a advertência de que "tentar de novo" não é uma delas.
         texto.Should().Contain("DROP SCHEMA");
-        texto.Should().Contain("recriarBanco=true");
+        // ⚠ O texto tem de apontar o mecanismo QUE FUNCIONA. A primeira versão mandava
+        // "enfileirar com a variável recriarBanco=true" — e variável declarada no YAML NÃO é
+        // sobrescrevível no enfileiramento: o passo destrutivo nunca rodou, o deploy morreu neste
+        // mesmo guarda, e a mensagem estava mandando fazer algo que não tem efeito. Instrução
+        // errada num erro de infraestrutura custa mais que erro sem instrução.
+        texto.Should().Contain("RECRIAR os tres bancos");
+        texto.Should().Contain("parâmetro de execução");
         texto.Should().Contain("migration de transição");
         texto.Should().Contain("tentar de novo");
 

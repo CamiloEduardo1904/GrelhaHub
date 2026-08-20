@@ -73,7 +73,8 @@ public static class HistoricoDeMigrations
 
               1. Banco SEM dado a preservar — recriar o esquema e deixar a migration criar tudo:
                  DROP SCHEMA public CASCADE; CREATE SCHEMA public;
-                 No pipeline: enfileirar com a variável recriarBanco=true.
+                 No pipeline: marcar "RECRIAR os tres bancos da VPS" ao executar.
+                 (É um parâmetro de execução, com caixa de seleção — não uma variável.)
 
               2. Banco COM dado a preservar — escrever a migration de transição do esquema antigo
                  para o atual. Não existe atalho aqui: baseline sem ajuste deixa o esquema

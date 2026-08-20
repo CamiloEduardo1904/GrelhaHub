@@ -39,6 +39,26 @@ pr:
 # Nenhum Variable Group: os segredos vivem no .env da VPS (RNF-008), e o
 # pipeline não precisa deles — ele constrói a imagem e manda subir. Declarar um
 # grupo que nada usa só criaria mais um passo de configuração para falhar.
+# ────────────────────────────────────────────────────────────────────────────
+# PARAMETROS DE EXECUCAO
+#
+# ⚠⚠ PARAMETRO, e nao variavel — e a diferenca nao e estilo.
+#
+# Variavel declarada no YAML NAO e sobrescrevivel no enfileiramento: o Azure
+# DevOps recusa ("cannot be set at queue time") ou ignora. Isto foi tentado com
+# `variables` em 20/08/2026, o passo destrutivo NUNCA rodou, e o deploy morreu
+# no guarda de ADR-0022 §6 — parecendo que a variavel nao tinha sido informada.
+#
+# `parameters` aparece como CAIXA DE SELECAO na tela de execucao, o que e o
+# desenho certo para um passo que apaga banco: a confirmacao e um clique
+# deliberado, e nao um nome digitado que pode ir errado sem ninguem notar.
+# ────────────────────────────────────────────────────────────────────────────
+parameters:
+  - name: recriarBanco
+    displayName: '⚠ RECRIAR os tres bancos da VPS (APAGA TODO O DADO)'
+    type: boolean
+    default: false
+
 variables:
   # O Docker@2 NAO insere o Docker ID sozinho: o `repository:` vai literal para
   # o `docker build -t`. Sem o namespace, a imagem sai como `grelhahub-api` e o
@@ -53,16 +73,6 @@ variables:
   - name: imageTag
     value: '$(Build.BuildId)'
 
-  # ⚠⚠ RECRIA OS TRES BANCOS DA VPS. Desligada, e so se liga NO ENFILEIRAMENTO.
-  #
-  # Existe porque a ADR-0022 substituiu 18 migrations por uma, e a VPS tinha as 18
-  # antigas no historico: o EF concluiu que o banco estava vazio e o deploy morreu
-  # em `CREATE TABLE arquivo`. Recriar o esquema e a saida 1 daquele erro.
-  #
-  # NUNCA deixe isto em `true` no arquivo. O passo apaga TODO o dado das tres bases
-  # e nao pergunta nada — a confirmacao e o ato de digitar a variavel na fila.
-  - name: recriarBanco
-    value: false
   - name: dotnetVersion
     value: '10.0.x'
 
@@ -243,35 +253,44 @@ stages:
                 # ⚠ Os TRES, sempre juntos. Recriar so o principal deixaria a trilha
                 # e os arquivos apontando para ids que nao existem mais — o pior
                 # estado possivel, porque parece funcionar.
-                - task: SSH@0
-                  displayName: '⚠ RECRIAR OS BANCOS (destrutivo)'
-                  condition: and(succeeded(), eq(variables['recriarBanco'], 'true'))
-                  inputs:
-                    sshEndpoint: 'grelhahub-vps'
-                    runOptions: inline
-                    failOnStdErr: false
-                    inline: |
-                      set -e
-                      exec 2>&1
+                #
+                # ⚠ `${{ if }}` e nao `condition:`: com parametro, a decisao e de
+                # COMPILACAO — o passo nem aparece na execucao quando esta falso.
+                # Passo destrutivo que existe e fica "skipped" e passo que um dia
+                # roda por engano; passo que nao existe, nao.
+                - ${{ if eq(parameters.recriarBanco, true) }}:
+                    - task: SSH@0
+                      displayName: '⚠ RECRIAR OS BANCOS (destrutivo)'
+                      inputs:
+                        sshEndpoint: 'grelhahub-vps'
+                        runOptions: inline
+                        failOnStdErr: false
+                        inline: |
+                          set -e
+                          exec 2>&1
 
-                      cd /opt/grelhahub
+                          cd /opt/grelhahub
 
-                      # ⚠ O nome e o usuario dos bancos vivem no .env da VPS (RNF-008), e o
-                      # `docker compose` o le sozinho — um shell de SSH, nao. Sem esta linha
-                      # `$POSTGRES_DB` sai VAZIO, o psql tenta conectar no banco `_log` e o
-                      # passo falha com "database does not exist" — parecendo problema de
-                      # banco quando e variavel nao carregada.
-                      set -a; . ./.env; set +a
+                          # ⚠ O nome e o usuario dos bancos vivem no .env da VPS (RNF-008), e
+                          # o `docker compose` o le sozinho — um shell de SSH, nao. Sem esta
+                          # linha `$POSTGRES_DB` sai VAZIO, o psql tenta conectar num banco
+                          # chamado `_log` e o passo falha com "database does not exist",
+                          # parecendo problema de banco quando e variavel nao carregada.
+                          set -a; . ./.env; set +a
 
-                      echo '=== RECRIANDO OS TRES BANCOS — TODO O DADO SERA PERDIDO ==='
-                      echo "    alvo: $POSTGRES_DB, ${POSTGRES_DB}_log, ${POSTGRES_DB}_arquivo"
+                          echo '=== RECRIANDO OS TRES BANCOS — TODO O DADO SERA PERDIDO ==='
+                          echo "    alvo: $POSTGRES_DB / ${POSTGRES_DB}_log / ${POSTGRES_DB}_arquivo"
 
-                      for BANCO in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do
-                        echo "--- $BANCO"
-                        docker compose exec -T db psql -U "$POSTGRES_USER" -d "$BANCO"                           -c 'DROP SCHEMA public CASCADE;' -c 'CREATE SCHEMA public;'
-                      done
-
-                      echo '=== esquemas recriados; as migrations vao criar tudo de novo ==='
+                          # ⚠ Comando em UMA linha, sem continuacao. A versao anterior usava
+                          # `\` no fim da linha e o caractere se perdeu numa edicao: o shell
+                          # passaria a ver dois comandos, o segundo comecando com `-c`, e o
+                          # erro seria "-c: command not found" — que nao diz nada sobre o que
+                          # aconteceu. Dentro de um bloco YAML `|`, linha e linha.
+                          for BANCO in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do
+                            echo "--- $BANCO"
+                            docker compose exec -T db psql -U "$POSTGRES_USER" -d "$BANCO" -c 'DROP SCHEMA public CASCADE;' -c 'CREATE SCHEMA public;'
+                          done
+                          echo '=== esquemas recriados; as migrations vao criar tudo de novo ==='
 
                 - task: SSH@0
                   displayName: Migrations EF Core
