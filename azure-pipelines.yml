@@ -271,25 +271,25 @@ stages:
 
                           cd /opt/grelhahub
 
-                          # ⚠ O nome e o usuario dos bancos vivem no .env da VPS (RNF-008), e
-                          # o `docker compose` o le sozinho — um shell de SSH, nao. Sem esta
-                          # linha `$POSTGRES_DB` sai VAZIO, o psql tenta conectar num banco
-                          # chamado `_log` e o passo falha com "database does not exist",
-                          # parecendo problema de banco quando e variavel nao carregada.
-                          set -a; . ./.env; set +a
-
+                          # ⚠⚠ AS VARIAVEIS VEM DE DENTRO DO CONTEINER, e nao do `.env`.
+                          #
+                          # A versao anterior fazia `set -a; . ./.env; set +a`, e quebrou com
+                          # "./.env: line 21: GrelhaHub: command not found". O motivo: o `.env`
+                          # do docker-compose NAO E SCRIPT DE SHELL. Uma linha como
+                          # `PLATAFORMA_NOME=Suporte GrelhaHub` e valida para o compose e, no
+                          # bash, significa "defina PLATAFORMA_NOME=Suporte e execute o comando
+                          # GrelhaHub". Qualquer valor com espaco derruba o `source`.
+                          #
+                          # O conteiner `db` JA recebe POSTGRES_DB e POSTGRES_USER pelo compose,
+                          # que sabe ler o proprio formato. Ler de dentro dele e ler da fonte.
+                          #
+                          # ⚠ O corpo do `sh -c` vai em ASPAS SIMPLES: sem isso o bash de fora
+                          # expandiria as variaveis antes de entrar no conteiner, e elas chegariam
+                          # vazias — o mesmo defeito da primeira versao, por outro caminho.
                           echo '=== RECRIANDO OS TRES BANCOS — TODO O DADO SERA PERDIDO ==='
-                          echo "    alvo: $POSTGRES_DB / ${POSTGRES_DB}_log / ${POSTGRES_DB}_arquivo"
 
-                          # ⚠ Comando em UMA linha, sem continuacao. A versao anterior usava
-                          # `\` no fim da linha e o caractere se perdeu numa edicao: o shell
-                          # passaria a ver dois comandos, o segundo comecando com `-c`, e o
-                          # erro seria "-c: command not found" — que nao diz nada sobre o que
-                          # aconteceu. Dentro de um bloco YAML `|`, linha e linha.
-                          for BANCO in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do
-                            echo "--- $BANCO"
-                            docker compose exec -T db psql -U "$POSTGRES_USER" -d "$BANCO" -c 'DROP SCHEMA public CASCADE;' -c 'CREATE SCHEMA public;'
-                          done
+                          docker compose exec -T db sh -c 'for B in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do echo "--- $B"; psql -U "$POSTGRES_USER" -d "$B" -c "DROP SCHEMA public CASCADE;" -c "CREATE SCHEMA public;"; done'
+
                           echo '=== esquemas recriados; as migrations vao criar tudo de novo ==='
 
                 - task: SSH@0
