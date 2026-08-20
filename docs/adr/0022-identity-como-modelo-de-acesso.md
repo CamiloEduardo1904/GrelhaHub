@@ -114,12 +114,43 @@ produto: o projeto não está em produção.
 
 | Por quê | |
 |---|---|
-| **Retrofit de Identity em 12 migrations** deixaria um histórico que conta uma história que não aconteceu | Quem ler o `Migrations/` em três meses reconstrói um caminho que ninguém percorreu |
+| **Retrofit de Identity em 18 migrations** deixaria um histórico que conta uma história que não aconteceu | Quem ler o `Migrations/` em três meses reconstrói um caminho que ninguém percorreu |
 | O esquema do Identity muda **nomes de coluna** de `usuario` e `perfil` | `ALTER` em cima de `ALTER` para chegar ao mesmo lugar |
-| Não há dado a preservar | O harness recria o banco a cada execução |
 
 ⚠ **Esta é a decisão de maior risco desta ADR**, e o que a torna aceitável é a janela: **é a última
 vez que ela é barata.** A partir do primeiro cliente real, migration se soma — nunca se apaga.
+
+> ### ⚠⚠ CORREÇÃO — 20/08/2026: esta seção tinha um erro factual, e ele quebrou um deploy
+>
+> A tabela acima tinha uma terceira linha: *"Não há dado a preservar — o harness recria o banco a
+> cada execução"*. **Isso era verdade do harness de teste e falso da VPS**, que tem banco
+> persistente. Eu medi o custo de reconstruir o banco em desenvolvimento e **esqueci o ambiente
+> implantado** — que estava no próprio pipeline, com `environment: producao` escrito na linha.
+> Julguei "não estamos em produção" como "não existe banco em pé", e são coisas diferentes.
+>
+> **O que aconteceu no deploy:** a VPS tinha as 18 migrations antigas no `__EFMigrationsHistory`. A
+> `Fundacao` nova tem outro ID, então o EF concluiu que o banco estava vazio — *"Aplicando 1
+> migration(s)"* — e morreu no primeiro `CREATE TABLE arquivo`, porque a tabela existia.
+>
+> ⚠ **O `set -e` do pipeline salvou a instalação:** o deploy parou antes do `up -d`, e a VPS
+> continuou servindo a imagem anterior. Deploy interrompido, não site quebrado.
+>
+> **Duas coisas entraram por causa disso:**
+>
+> | O quê | Onde |
+> |-------|------|
+> | Um **guarda no `--migrate`** que detecta histórico incompatível e explica as saídas — nos três bancos, **antes** de aplicar em qualquer um | `HistoricoDeMigrations` + `Program.cs`, com 6 testes |
+> | Um passo de pipeline que **recria os três bancos**, desligado por padrão e ligado só por `recriarBanco=true` no enfileiramento | `azure-pipelines.yml` |
+>
+> ⚠ O guarda existe pela **mensagem**, não pela detecção: sem ele, o log mostrava um erro de SQL e a
+> informação de verdade — *este banco veio de outro código* — não estava em lugar nenhum. Erro de
+> infraestrutura sem caminho de saída vira tentativa e erro em cima de banco, que é o pior lugar do
+> sistema para experimentar.
+>
+> ⚠ E a pergunta que o guarda faz é **"sobra migration?"**, não "falta?". Faltar é o caso de todo
+> deploy; **sobrar** é o sintoma de que o banco veio de outro caminho, e nada disso se resolve
+> aplicando mais nada. Confundir os dois faria o guarda barrar a primeira instalação de um cliente
+> novo — há um teste só para isso.
 
 ---
 

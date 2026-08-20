@@ -52,6 +52,17 @@ variables:
 
   - name: imageTag
     value: '$(Build.BuildId)'
+
+  # ⚠⚠ RECRIA OS TRES BANCOS DA VPS. Desligada, e so se liga NO ENFILEIRAMENTO.
+  #
+  # Existe porque a ADR-0022 substituiu 18 migrations por uma, e a VPS tinha as 18
+  # antigas no historico: o EF concluiu que o banco estava vazio e o deploy morreu
+  # em `CREATE TABLE arquivo`. Recriar o esquema e a saida 1 daquele erro.
+  #
+  # NUNCA deixe isto em `true` no arquivo. O passo apaga TODO o dado das tres bases
+  # e nao pergunta nada — a confirmacao e o ato de digitar a variavel na fila.
+  - name: recriarBanco
+    value: false
   - name: dotnetVersion
     value: '10.0.x'
 
@@ -219,6 +230,49 @@ stages:
                 # runOptions: inline, e nao commands. Com "commands" a task roda
                 # CADA LINHA como um comando separado — o cd morre com o
                 # processo e o comando seguinte executa em /root.
+                # ---------------------------------------------------------------
+                # ⚠⚠ RECRIAR OS BANCOS — desligado por padrao, ver `recriarBanco`.
+                #
+                # Roda ANTES das migrations porque e a saida 1 do guarda de
+                # ADR-0022 §6: banco cujo historico este codigo nao reconhece.
+                #
+                # `DROP SCHEMA public CASCADE` e nao `DROP DATABASE`: o banco fica,
+                # com dono e permissoes intactos, e a migration recria o conteudo.
+                # Derrubar o banco exigiria reconectar como outro e recriar o dono.
+                #
+                # ⚠ Os TRES, sempre juntos. Recriar so o principal deixaria a trilha
+                # e os arquivos apontando para ids que nao existem mais — o pior
+                # estado possivel, porque parece funcionar.
+                - task: SSH@0
+                  displayName: '⚠ RECRIAR OS BANCOS (destrutivo)'
+                  condition: and(succeeded(), eq(variables['recriarBanco'], 'true'))
+                  inputs:
+                    sshEndpoint: 'grelhahub-vps'
+                    runOptions: inline
+                    failOnStdErr: false
+                    inline: |
+                      set -e
+                      exec 2>&1
+
+                      cd /opt/grelhahub
+
+                      # ⚠ O nome e o usuario dos bancos vivem no .env da VPS (RNF-008), e o
+                      # `docker compose` o le sozinho — um shell de SSH, nao. Sem esta linha
+                      # `$POSTGRES_DB` sai VAZIO, o psql tenta conectar no banco `_log` e o
+                      # passo falha com "database does not exist" — parecendo problema de
+                      # banco quando e variavel nao carregada.
+                      set -a; . ./.env; set +a
+
+                      echo '=== RECRIANDO OS TRES BANCOS — TODO O DADO SERA PERDIDO ==='
+                      echo "    alvo: $POSTGRES_DB, ${POSTGRES_DB}_log, ${POSTGRES_DB}_arquivo"
+
+                      for BANCO in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do
+                        echo "--- $BANCO"
+                        docker compose exec -T db psql -U "$POSTGRES_USER" -d "$BANCO"                           -c 'DROP SCHEMA public CASCADE;' -c 'CREATE SCHEMA public;'
+                      done
+
+                      echo '=== esquemas recriados; as migrations vao criar tudo de novo ==='
+
                 - task: SSH@0
                   displayName: Migrations EF Core
                   inputs:

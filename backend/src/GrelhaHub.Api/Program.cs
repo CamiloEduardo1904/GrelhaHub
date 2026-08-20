@@ -186,6 +186,17 @@ if (modoMigrar || modoSemear)
 
         if (modoMigrar)
         {
+            // ⚠⚠ O GUARDA, antes de qualquer coisa — ADR-0022 §6, 20/08/2026.
+            //
+            // Nasceu de um deploy quebrado: a ADR trocou 18 migrations por uma, e a VPS tinha as 18
+            // antigas no histórico. O EF, não achando nenhum ID conhecido, concluiu que o banco
+            // estava vazio e começou do zero — o log mostrou `CREATE TABLE arquivo` falhando, e a
+            // informação de verdade ("este banco veio de outro código") não estava em lugar nenhum.
+            //
+            // Confere os TRÊS bancos antes de aplicar um só. Falhar no meio deixaria o principal
+            // migrado e os outros dois não, que é o estado mais difícil de diagnosticar depois.
+            await ConferirHistoricoAsync(escopoMigracao.ServiceProvider);
+
             var pendentes = (await banco.Database.GetPendingMigrationsAsync()).ToList();
 
             if (pendentes.Count == 0)
@@ -325,6 +336,64 @@ if (app.Environment.IsDevelopment())
 await app.RunAsync();
 
 return 0;
+
+/// <summary>
+/// <c>ADR-0022</c> §6 — recusa aplicar migration em banco que veio de outro código.
+/// <para>
+/// A decisão de <b>quem</b> está órfã e de <b>como explicar</b> vive em
+/// <see cref="HistoricoDeMigrations"/>, que é função pura e testada. Aqui fica só a ida ao banco e
+/// a interrupção — e é por isso que os três contextos passam pelo mesmo caminho.
+/// </para>
+/// </summary>
+static async Task ConferirHistoricoAsync(IServiceProvider servicos)
+{
+    var contextos = new (string Nome, DbContext Banco)[]
+    {
+        ("grelhahub", servicos.GetRequiredService<GrelhaHubDbContext>()),
+        ("grelhahub_log", servicos.GetRequiredService<GrelhaHubLogDbContext>()),
+        ("grelhahub_arquivo", servicos.GetRequiredService<GrelhaHubArquivoDbContext>()),
+    };
+
+    var problemas = new List<string>();
+
+    foreach (var (nome, banco) in contextos)
+    {
+        // ⚠ Banco que ainda não existe não tem histórico, e isso NÃO é problema — é o primeiro
+        // deploy. `GetAppliedMigrationsAsync` estoura quando a tabela de histórico não existe, e
+        // tratar isso como órfão faria o guarda impedir exatamente a instalação que ele deveria
+        // permitir.
+        IEnumerable<string> aplicadas;
+
+        try
+        {
+            aplicadas = await banco.Database.GetAppliedMigrationsAsync();
+        }
+        catch (Exception)
+        {
+            continue;
+        }
+
+        var orfas = HistoricoDeMigrations.Orfas(aplicadas, banco.Database.GetMigrations());
+
+        if (orfas.Count > 0)
+        {
+            problemas.Add(HistoricoDeMigrations.Explicar(nome, orfas));
+        }
+    }
+
+    if (problemas.Count > 0)
+    {
+        // Uma linha por banco, e o processo para. `Log.Fatal` porque o deploy lê o log e o
+        // `set -e` do pipeline interrompe antes do `up -d`: a instalação anterior fica no ar.
+        foreach (var problema in problemas)
+        {
+            Log.Fatal("{Problema}", problema);
+        }
+
+        throw new InvalidOperationException(
+            "ADR-0022 §6 — histórico de migrations incompatível. Ver o log acima.");
+    }
+}
 
 /// <summary>Exposto para os testes de integração (<c>WebApplicationFactory&lt;Program&gt;</c>).</summary>
 public partial class Program;
