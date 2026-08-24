@@ -256,6 +256,55 @@ docker logs traefik-traefik-1 --tail=40 | grep -i grelhahub
 | Certificado não emite | DNS ainda não propagou, ou a 80 não chega no Traefik |
 | API sobe e morre | Connection string ou `Jwt__Chave` ausente — confira o `.env` |
 | 404 do Traefik | Label `Host()` diferente do domínio acessado |
+| `histórico de migrations incompatível` no step de migrations | O guarda do `--migrate` — o banco tem migrations que este código não conhece. **Não é migration pendente, é o contrário.** Ver a seção abaixo |
+| `CREATE TABLE <x>` falhando com a tabela já existente | O mesmo caso, **antes** do guarda existir: o EF não achou nenhum ID conhecido, concluiu que o banco estava vazio e recomeçou do zero |
+
+---
+
+## Recriar os três bancos — o passo destrutivo, e quando usar
+
+O step **⚠ RECRIAR os tres bancos da VPS (APAGA TODO O DADO)** existe para um caso só: o
+histórico de migrations do banco é incompatível com o código, e **não há dado a preservar**.
+
+Ele é um **`parameters:` de execução, com caixa de seleção** — não uma variável:
+
+1. Pipelines → **Run pipeline**
+2. Marque **⚠ RECRIAR os tres bancos da VPS (APAGA TODO O DADO)**
+3. Run
+
+> ⚠⚠ **`variables:` do YAML não serve para isto, e a diferença já custou um deploy.** Variável
+> declarada no arquivo é constante do arquivo: o campo de sobrescrita no enfileiramento não a
+> alcança, o step nunca rodava, e o deploy morria no guarda — cuja mensagem, na época, mandava
+> justamente "enfileirar com `recriarBanco=true`". Só `parameters:` é decidido no enfileiramento.
+>
+> O step é envolvido em `${{ if eq(parameters.recriarBanco, true) }}`, que é decisão de **compilação**
+> do YAML: desmarcado, ele **não existe** na execução. Um passo que apaga banco não deve estar
+> presente e desligado — deve estar ausente.
+
+Desligado é o padrão, e é por isso que um `git push` nunca recria nada: a execução automática
+valida build, testes e imagem, e não tem autorização para o drop.
+
+**O que ele faz**, e por que assim:
+
+```bash
+docker compose exec -T db sh -c 'for B in "$POSTGRES_DB" "${POSTGRES_DB}_log" "${POSTGRES_DB}_arquivo"; do
+  echo "--- $B"; psql -U "$POSTGRES_USER" -d "$B" -c "DROP SCHEMA public CASCADE;" -c "CREATE SCHEMA public;"; done'
+```
+
+| Decisão | Por quê |
+|---|---|
+| As variáveis vêm **de dentro do contêiner** | ⚠⚠ O `.env` do compose **não é script de shell**. `PLATAFORMA_NOME=Suporte GrelhaHub` é válido para ele e, no bash, significa "defina `PLATAFORMA_NOME=Suporte` e execute o comando `GrelhaHub`" — daí `./.env: line 21: GrelhaHub: command not found`. Qualquer valor com espaço derruba o `source`. O contêiner `db` já recebe as duas variáveis do compose, que sabe ler o próprio formato |
+| O corpo do `sh -c` em **aspas simples** | Com aspas duplas o bash de fora expande antes de entrar no contêiner, e as variáveis chegam **vazias** — o `psql` tenta conectar num banco chamado `_log`, e o erro parece de banco |
+| `DROP SCHEMA public CASCADE` e não `DROP DATABASE` | O banco continua existindo, com dono e permissões intactos. `DROP DATABASE` exigiria derrubar conexões e recriar o que o compose já criou |
+| Tudo numa linha | Continuação com `\` dentro de bloco YAML `\|` se perde numa edição, e o shell passa a ver dois comandos — o segundo começando com `-c`. O erro (`-c: command not found`) não diz nada sobre o que aconteceu |
+
+⚠ **O `set -e` é o que torna o step aceitável.** Ele para no primeiro comando que não entendeu, e
+o deploy morre **antes** do `up -d` — a VPS continua servindo a imagem anterior. Nas três vezes em
+que este step falhou, nenhum banco foi tocado por engano.
+
+**Se houver dado a preservar, não use este step.** Escreva a migration de transição do esquema
+antigo para o atual. Baseline sem ajuste deixa o esquema divergindo do modelo em silêncio, que é
+pior do que o erro que travou o deploy.
 
 ---
 

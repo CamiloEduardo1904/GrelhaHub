@@ -101,11 +101,11 @@
 |------|----------|
 | Regras catalogadas | **190** — GER 41 · VEN 58 · EST 23 · FIN 16 · PRO 13 · LOG 9 · CRM 9 · COM 9 · RH 6 · FIS 6. Nenhuma validada com cliente |
 | Regras validadas com cliente | **0** — a entrevista é o próximo marco. Risco RS5 |
-| ADRs | **22** — 20 aceitos (1 substituída), 4 decisões em aberto. **ADR-0013 revisa o ADR-0005**; **ADR-0018 substitui a ADR-0015** e põe a imagem no banco; ADR-0017 separa os três bancos; ADR-0019 conclui o CQRS; ADR-0020 remove a sessão de suporte |
+| ADRs | **22** — 20 em vigor: a **0015** foi substituída pela 0018 e a **0021** teve a recomendação revertida pela 0022. **6** decisões em aberto. **ADR-0013 revisa o ADR-0005**; **ADR-0018 substitui a ADR-0015** e põe a imagem no banco; ADR-0017 separa os três bancos; ADR-0019 conclui o CQRS; ADR-0020 remove a sessão de suporte |
 | Specs | **14 — todas `ENTREGUE`.** `GER-001` a `009` (onda 0 e horário), `VEN-001` (fatia vertical), `VEN-002` (imagem), `VEN-003` (cadastro do cardápio), `VEN-004` (painel de senha) e `VEN-005` (lista por grupo) |
-| Cobertura de regra por spec | **66 regras com o ID citado no `DisplayName` de um teste**, e **91,1% de cobertura de linha** — `RN-EST-021` a `023` têm regra escrita e código pendente (onda 3) |
+| Cobertura de regra por spec | **67 regras com o ID citado no `DisplayName` de um teste**, e **90,8% de cobertura de linha** — `RN-EST-021` a `023` têm regra escrita e código pendente (onda 3) |
 | Código entregue | Fatia vertical (`SPEC-VEN-001`) + **onda 0 completa**: unidade e convenções, dia operacional, parâmetros com vigência, usuários e permissões, trilha de auditoria, módulos por unidade. Da onda 1, o **cadastro do cardápio**. Fora de onda: **painel de operação** e **fila de monitoramento** |
-| Testes | **366 verdes** — 110 de domínio + 19 de aplicação + 237 de integração contra PostgreSQL real (Testcontainers, exige Docker) |
+| Testes | **372 verdes** — 110 de domínio + 25 de aplicação + 237 de integração contra PostgreSQL real (Testcontainers, exige Docker) |
 | Gates | `dotnet build -c Release`, `dotnet test`, `npm run lint` e `npm run build` — **todos limpos** |
 | Vitrine pública | ✔ `/` em `grelhahub.com` — design system §8, regra `CHAPA-09` |
 | Sprint | 1 & 2 — documentação entregue; falta entrevista e anexos |

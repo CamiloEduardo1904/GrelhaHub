@@ -7,7 +7,7 @@
 > `Fundacao` e do snapshot do mapeamento objeto-relacional.
 
 > ⚠⚠ **Em 19/08/2026 o modelo de acesso migrou para o ASP.NET Core Identity (ADR-0022), e o banco
-> foi reconstruído do zero: 18 migrations viraram uma** — a `Fundacao`, autorizada pelo dono do
+> foi reconstruído do zero: 20 migrations viraram uma** — a `Fundacao`, autorizada pelo dono do
 > produto porque o projeto não está em produção. O que mudou de forma visível: `usuario` e `perfil`
 > ganharam as colunas do Identity (com nome em português — **nenhum `AspNet*` chega ao banco**),
 > a tabela `permissao` **deixou de existir** (a concessão virou claim de papel em

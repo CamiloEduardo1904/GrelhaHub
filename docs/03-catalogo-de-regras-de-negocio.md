@@ -4,8 +4,8 @@
 |-------|-------|
 | Versão | **3.3** |
 | Data | Agosto/2026 |
-| Situação | Em validação — **190 regras**: 164 em hipótese, 26 decididas pelo time |
-| Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + 10 regras descobertas na implementação (`IMP`) + 22 decisões de produto do time (`DEC`) |
+| Situação | Em validação — **190 regras**: 165 em hipótese, 25 decididas pelo time, **nenhuma validada com cliente** |
+| Fontes consolidadas | *Catálogo de Regras v0.1* (117 regras, P3 — Análise de Negócios) + *Documento de Levantamento v1.0* (17 regras complementares) + **31** regras descobertas na implementação (origem `IMP`) + as decisões de produto do time (estado `DEC`) = **190** |
 | Auditoria do cruzamento | [`07-cruzamento-catalogo-x-levantamento.md`](07-cruzamento-catalogo-x-levantamento.md) |
 | Papel no projeto | **Fonte de verdade.** Toda spec de implementação transcreve regras daqui. Nenhuma regra de negócio nasce no código |
 
@@ -51,8 +51,14 @@
 
 ## 1. Estado do catálogo
 
-Das 190 regras, **164 estão em estado de hipótese** — 134 herdadas das fontes e 30 descobertas
-durante a implementação (origem `IMP`) — e as outras 19 são decisões de produto, estado `DEC`.
+Das 190 regras, **165 estão em estado de hipótese** — 134 herdadas das fontes e **31** descobertas
+durante a implementação (origem `IMP`) — e as outras **25** são decisões de produto, estado `DEC`.
+**Nenhuma está em `VAL`.**
+
+> ⚠ **`IMP` é ORIGEM, não estado**, e confundir os dois foi o que desalinhou esta contagem por
+> versões seguidas: regra descoberta na implementação nasce em `HIP` e continua em `HIP` até a
+> entrevista. Para recontar, leia a **coluna de estado** da linha, nunca o marcador ao lado do ID.
+> A conta que tem de fechar é `HIP + DEC + VAL = 190`.
 As herdadas foram derivadas do
 conhecimento do domínio (operação de hamburgueria) e da estrutura dos dez módulos de ERP
 exigidos no trabalho — **e não de entrevista com cliente real**.
@@ -850,12 +856,22 @@ usuário entram com `SPEC-GER-004`.
 > vigência de preço, e as três de `RN-GER-003` são de fato sobre casa decimal de moeda.
 > `grep` por cada ID novo encontra a implementação **e** o teste.
 >
-> **Lacuna aberta pela mesma auditoria.** O código citava `RN-EST-040`, que não existe — o
-> módulo EST vai até `RN-EST-020`. A citação foi corrigida para `RN-VEN-018` e `RN-PRO-008`,
-> que existem e cobrem o gatilho, mas **nenhuma regra do EST enuncia explicitamente que a
-> confirmação do pedido gera a saída por venda dos insumos da ficha técnica**. `RN-EST-002`
-> apenas admite o tipo de movimento; `RN-PRO-008` cobre a ordem de produção, não a baixa.
-> A regra precisa ser escrita quando a onda 3 chegar — e antes do código que a implementa.
+> **Lacuna aberta pela mesma auditoria — e FECHADA em 19/08/2026.** O código citava
+> `RN-EST-040`, que não existe: o módulo EST ia até `RN-EST-020`. A citação foi corrigida para
+> `RN-VEN-018` e `RN-PRO-008`, que existem e cobrem o gatilho, mas **nenhuma regra do EST
+> enunciava explicitamente que a confirmação do pedido gera a saída por venda dos insumos da
+> ficha técnica** — `RN-EST-002` apenas admite o tipo de movimento, e `RN-PRO-008` cobre a ordem
+> de produção, não a baixa.
+>
+> ✔ **`RN-EST-021` a `023` foram escritas, e antes do código** — que é a ordem que este catálogo
+> exige. Elas enunciam o gatilho, a explosão recursiva da ficha, FEFO, a mesma transação, a
+> idempotência e a devolução na janela antes da produção. ⚠ **Mas `RN-EST-023` revisa
+> `RN-EST-019`, e o conflito C10 segue aberto:** se a baixa dispara na Confirmação ou na Produção
+> só a entrevista decide. Regra escrita não é regra validada — nenhuma das 190 está em `VAL`.
+>
+> ⚠ **Este parágrafo é o registro do modo de falha mais caro do projeto**, e ele não é inventar
+> regra: é **citar o ID mais parecido**. `RN-EST-040` era plausível, o comentário era plausível,
+> e um `grep` pelo ID não devolvia nada. Leia o enunciado inteiro antes de citar o número.
 
 **Convenção de ID de spec:** `SPEC-<MOD>-<nnn>-<slug>` — por exemplo
 `SPEC-VEN-001-abrir-pedido`. Cada spec declara no cabeçalho as regras que implementa, e
@@ -928,7 +944,7 @@ esta tabela é o índice inverso. Ver [`06-guia-de-specs.md`](06-guia-de-specs.m
 data e a fonte da validação. Regra nova descoberta em implementação entra aqui antes de
 entrar no código.*
 
-> **As 183 regras seguem em `HIP` ou `DEC`; nenhuma foi validada com o cliente.** Implementar
+> **As 190 regras seguem em `HIP` ou `DEC`; nenhuma foi validada com o cliente.** Implementar
 > uma regra não muda o seu estado — `Entregue` na §16 diz que o código a cumpre, não que ela
 > esteja certa. A fila está em
 > [`05-fila-de-validacao-com-cliente.md`](05-fila-de-validacao-com-cliente.md).

@@ -109,12 +109,12 @@ copiada.**
 
 ### 6. Banco reconstruído do zero — uma migration só
 
-As 12 migrations existentes são substituídas por **uma**, `Fundacao`. Autorizado pelo dono do
+As 20 migrations existentes são substituídas por **uma**, `Fundacao`. Autorizado pelo dono do
 produto: o projeto não está em produção.
 
 | Por quê | |
 |---|---|
-| **Retrofit de Identity em 18 migrations** deixaria um histórico que conta uma história que não aconteceu | Quem ler o `Migrations/` em três meses reconstrói um caminho que ninguém percorreu |
+| **Retrofit de Identity em 20 migrations** deixaria um histórico que conta uma história que não aconteceu | Quem ler o `Migrations/` em três meses reconstrói um caminho que ninguém percorreu |
 | O esquema do Identity muda **nomes de coluna** de `usuario` e `perfil` | `ALTER` em cima de `ALTER` para chegar ao mesmo lugar |
 
 ⚠ **Esta é a decisão de maior risco desta ADR**, e o que a torna aceitável é a janela: **é a última
@@ -128,7 +128,7 @@ vez que ela é barata.** A partir do primeiro cliente real, migration se soma �
 > implantado** — que estava no próprio pipeline, com `environment: producao` escrito na linha.
 > Julguei "não estamos em produção" como "não existe banco em pé", e são coisas diferentes.
 >
-> **O que aconteceu no deploy:** a VPS tinha as 18 migrations antigas no `__EFMigrationsHistory`. A
+> **O que aconteceu no deploy:** a VPS tinha as 20 migrations antigas no `__EFMigrationsHistory`. A
 > `Fundacao` nova tem outro ID, então o EF concluiu que o banco estava vazio — *"Aplicando 1
 > migration(s)"* — e morreu no primeiro `CREATE TABLE arquivo`, porque a tabela existia.
 >
@@ -140,7 +140,7 @@ vez que ela é barata.** A partir do primeiro cliente real, migration se soma �
 > | O quê | Onde |
 > |-------|------|
 > | Um **guarda no `--migrate`** que detecta histórico incompatível e explica as saídas — nos três bancos, **antes** de aplicar em qualquer um | `HistoricoDeMigrations` + `Program.cs`, com 6 testes |
-> | Um passo de pipeline que **recria os três bancos**, desligado por padrão e ligado só por `recriarBanco=true` no enfileiramento | `azure-pipelines.yml` |
+> | Um passo de pipeline que **recria os três bancos**, desligado por padrão e ligado por uma **caixa de seleção no enfileiramento** — `parameters.recriarBanco` | `azure-pipelines.yml` |
 >
 > ⚠ O guarda existe pela **mensagem**, não pela detecção: sem ele, o log mostrava um erro de SQL e a
 > informação de verdade — *este banco veio de outro código* — não estava em lugar nenhum. Erro de
@@ -151,6 +151,28 @@ vez que ela é barata.** A partir do primeiro cliente real, migration se soma �
 > deploy; **sobrar** é o sintoma de que o banco veio de outro caminho, e nada disso se resolve
 > aplicando mais nada. Confundir os dois faria o guarda barrar a primeira instalação de um cliente
 > novo — há um teste só para isso.
+>
+> ### Desfecho — o deploy passou em 20/08/2026, e o passo destrutivo falhou três vezes antes
+>
+> O guarda barrou os três bancos, listou as **20 órfãs** e apontou a saída. Recriados os esquemas, a
+> `Fundacao` criou tudo do zero e o deploy seguiu. **Mas o passo que recria os bancos falhou três
+> vezes, por três motivos diferentes — e dois deles não são sobre banco:**
+>
+> | Tentativa | O que quebrou | A lição |
+> |---|---|---|
+> | 1ª | `$POSTGRES_DB` saía **vazio**: `docker compose` lê o `.env` sozinho, um shell de SSH não. O `psql` tentava conectar num banco chamado `_log` | Variável ausente parece problema de banco |
+> | 2ª | ⚠⚠ **`variables:` do YAML NÃO é sobrescrevível no enfileiramento.** O passo simplesmente não existia na execução, o deploy morreu neste mesmo guarda, **e a mensagem dele mandava fazer algo sem efeito** | Só `parameters:` é de execução. Instrução errada num erro de infraestrutura custa mais do que erro sem instrução |
+> | 3ª | `./.env: line 21: GrelhaHub: command not found` — o `.env` do compose **não é script de shell**: `PLATAFORMA_NOME=Suporte GrelhaHub` é válido para ele e, no bash, significa "defina uma variável e execute um comando" | Qualquer valor com espaço derruba o `source`. As variáveis vêm **de dentro do contêiner**, que é a fonte |
+>
+> ⚠ **O `set -e` segurou as três.** Nenhum banco foi tocado por engano e a VPS continuou servindo a
+> imagem anterior o tempo todo — deploy interrompido, não site quebrado. É a mesma proteção que
+> salvou a instalação no erro que abriu esta correção, e é o que torna aceitável ter um passo
+> destrutivo no pipeline: **ele para no primeiro comando que não entendeu.**
+>
+> ⚠ **A 2ª tentativa é a que vale registrar.** O guarda existe pela mensagem, e por dois deploys a
+> mensagem estava errada — mandava enfileirar com uma variável, e variável declarada no YAML é
+> constante do arquivo. O teste `Mensagem_DizOCaminho` passou a afirmar o texto do **parâmetro**,
+> justamente para o mecanismo e a instrução não voltarem a divergir.
 
 ---
 

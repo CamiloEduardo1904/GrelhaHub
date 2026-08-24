@@ -74,7 +74,7 @@ Sempre, antes de qualquer implementação ou resposta de contexto:
 | `docs/README.md` | Mapa e estado atual do projeto |
 | `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade.** As 190 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | As 22 decisões e as 4 em aberto |
+| `docs/adr/README.md` | As 22 decisões e as **6** em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de tocar em qualquer tela |
@@ -188,7 +188,17 @@ Respeite as **ondas** do guia de specs. A onda 0 (unidade, parâmetros, usuário
 1. Leia a spec inteira. Sem spec `PRONTA`, não implemente — escreva a spec primeiro
 2. Uma feature por caso de uso, em `Features/<Modulo>/<Caso>/`
 3. Validação no `Validator`; regra de agregado no `Domain`; orquestração no `Handler`
-4. Migration com as constraints **e** os triggers declarados na spec, via `migrationBuilder.Sql(...)` quando preciso
+4. Migration com as constraints **e** os triggers declarados na spec, via `migrationBuilder.Sql(...)` quando preciso.
+   ⚠⚠ **Hoje existe UMA migration, a `Fundacao`** (ADR-0022 §6 substituiu as 20 anteriores por ela), e o arquivo
+   gerado pelo EF **precisa chamar `AplicarObjetosDeBanco(migrationBuilder)` no fim do `Up`** — as views, as
+   *seeds*, `dim_tempo` e os `EXCLUDE` vivem no `.Complemento.cs`. Regenerar a migration **apaga essa chamada**, a
+   build continua limpa, e o sintoma aparece só em runtime: 500 dizendo que `PAR-GER-001` está no catálogo e não
+   existe na tabela. ⚠ E o EF grava em `Migrations/`; o lugar é `Persistence/Migrations/`.
+   ⚠⚠ **Apagar ou renomear migration quebra deploy de banco em pé.** O `--migrate` tem um guarda
+   (`HistoricoDeMigrations`) que recusa a partida quando o banco tem migration que o código não conhece — a
+   pergunta é **"sobra?"**, nunca "falta?". Faltar é o caso de todo deploy; sobrar é sintoma de que o banco veio
+   de outro código. Recriar os três bancos da VPS é uma **caixa de seleção no enfileiramento do pipeline**
+   (`parameters.recriarBanco`), nunca uma variável — detalhe em `infra/azure-devops.md`.
 5. Teste com o ID da regra no `DisplayName`:
 
 ```csharp
@@ -321,8 +331,8 @@ não fato, e pode ser derrubada na entrevista.
 | Specs | **14 — todas `ENTREGUE`.** Onda 0 (`GER-001` a `009`) + `VEN-001` a `VEN-005` |
 | Acesso | **ASP.NET Core Identity** (ADR-0022) — claims, roles, lockout. `Usuario : IdentityUser<Guid>`, `Perfil : IdentityRole<Guid>` |
 | Código | **Onda 0 entregue + fatia vertical funcionando** (`SPEC-VEN-001`): cadastro → cardápio público → pedido → painel, sobre unidade/dia operacional/parâmetros/permissões/auditoria/módulos. Da onda 1, o **cadastro do cardápio** (`VEN-003`). Fora de onda: **painel de operação** e **fila de monitoramento** (`VEN-004`). **63 regras com o ID citado em teste** |
-| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**366 testes**: 110 de domínio + 19 de aplicação + 237 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
-| Cobertura | **91,1% de linha, 71,3% de ramo** — só com `cobertura.runsettings` **e** o filtro de classe do relatório. ⚠ Confira que os QUATRO assemblies aparecem no resumo: já houve exclusão que sumiu com a Infrastructure inteira e SUBIU a média |
+| Gates | **Todos limpos.** `dotnet build -c Release`, `dotnet test` (**372 testes**: 110 de domínio + 25 de aplicação + 237 de integração contra PostgreSQL real), `npm run lint` e `npm run build`. Integração exige Docker; frontend exige `npm ci` antes |
+| Cobertura | **90,8% de linha, 70,8% de ramo** — só com `cobertura.runsettings` **e** o filtro de classe do relatório. Application 95,7% · Domain 90,0% · Infrastructure 86,3% · Api 79,9%. ⚠ Confira que os QUATRO assemblies aparecem no resumo: já houve exclusão que sumiu com a Infrastructure inteira e SUBIU a média |
 | Decisões em aberto | 4 — ver `docs/adr/README.md` |
 | ⚠ Gate que **não** existe | **Nenhum runner de frontend.** Comportamento de cliente é verificado à mão, pela skill `subir-e-validar` — e a dívida já cobrou dois defeitos de polling que os quatro gates não viram |
 

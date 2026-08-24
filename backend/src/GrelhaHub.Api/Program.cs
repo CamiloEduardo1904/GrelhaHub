@@ -188,7 +188,7 @@ if (modoMigrar || modoSemear)
         {
             // ⚠⚠ O GUARDA, antes de qualquer coisa — ADR-0022 §6, 20/08/2026.
             //
-            // Nasceu de um deploy quebrado: a ADR trocou 18 migrations por uma, e a VPS tinha as 18
+            // Nasceu de um deploy quebrado: a ADR trocou 20 migrations por uma, e a VPS tinha as 20
             // antigas no histórico. O EF, não achando nenhum ID conhecido, concluiu que o banco
             // estava vazio e começou do zero — o log mostrou `CREATE TABLE arquivo` falhando, e a
             // informação de verdade ("este banco veio de outro código") não estava em lugar nenhum.

@@ -7,7 +7,7 @@ namespace GrelhaHub.Application.Tests.Arquitetura;
 /// O guarda do histórico de migrations — ADR-0022 §6.
 /// <para>
 /// ⚠⚠ <b>Ele existe por causa de um deploy quebrado em 20/08/2026, e o defeito não era o erro de
-/// SQL.</b> A ADR-0022 trocou 18 migrations por uma, e a VPS tinha as 18 antigas no histórico. O EF,
+/// SQL.</b> A ADR-0022 trocou 20 migrations por uma, e a VPS tinha as 20 antigas no histórico. O EF,
 /// não achando nenhum ID conhecido, concluiu que o banco estava vazio e começou do zero: o log
 /// mostrou <c>CREATE TABLE arquivo</c> falhando, e a informação de verdade — <i>este banco veio de
 /// outro código</i> — não estava em lugar nenhum.
@@ -49,7 +49,7 @@ public sealed class HistoricoDeMigrationsTests
     [Fact(DisplayName = "ADR-0022 §6 — migration aplicada que o código não conhece É órfã")]
     public void MigrationDesconhecida_EhOrfa()
     {
-        // O caso real: a VPS tinha as 18 antigas, o código passou a conhecer só a `Fundacao`.
+        // O caso real: a VPS tinha as 20 antigas, o código passou a conhecer só a `Fundacao`.
         var aplicadas = new[] { "20260817051948_Fundacao", "20260818190547_VisoesDeLeitura" };
         var conhecidas = new[] { "20260819222202_Fundacao" };
 

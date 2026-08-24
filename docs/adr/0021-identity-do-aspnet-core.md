@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Situação | **Proposta** — aguarda decisão do time |
+| Situação | ⚠ **Recomendação REVERTIDA pela [ADR-0022](0022-identity-como-modelo-de-acesso.md)** — a análise segue válida, a recomendação não. O dono do produto decidiu migrar, com o argumento que esta ADR não pesou: *a janela em que isso é barato é agora* |
 | Data | 19/08/2026 |
 | Decide sobre | Se o modelo de usuário, perfil e permissão migra para o ASP.NET Core Identity |
 | Relacionada | [ADR-0003](0003-frontend-e-backend-desacoplados.md), [ADR-0009](0009-onde-as-regras-de-negocio-vivem.md), [ADR-0013](0013-acesso-de-plataforma.md), [ADR-0016](0016-envio-de-email-transacional.md), [ADR-0019](0019-cqrs-com-modelo-de-leitura-proprio.md) |

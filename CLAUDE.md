@@ -47,7 +47,7 @@ Não implemente "provisoriamente".
 | `docs/README.md` | Mapa e estado atual |
 | `docs/03-catalogo-de-regras-de-negocio.md` | **Fonte de verdade** — 190 regras |
 | `docs/06-guia-de-specs.md` | Formato da spec, ondas de implementação, definição de pronto |
-| `docs/adr/README.md` | 22 decisões e 4 em aberto |
+| `docs/adr/README.md` | 22 decisões e **6** em aberto |
 | `docs/02-glossario.md` | Vocabulário controlado — use os termos exatos |
 | `docs/04-parametros-do-sistema.md` | Valores configuráveis |
 | `docs/08-design-system.md` | **Base visual obrigatória** — leia antes de qualquer tela |
@@ -192,9 +192,10 @@ cd backend
 dotnet build -c Release      # Release trata warning como erro
 dotnet test -c Release       # integração sobe PostgreSQL efêmero: exige Docker rodando
 
-# Cobertura — a régua honesta (18/08/2026: 90,6% de linha, 70,7% de ramo)
+# Cobertura — a régua honesta (20/08/2026: 90,8% de linha, 70,8% de ramo)
 dotnet test -c Release --settings cobertura.runsettings --results-directory ./TestResults
-reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/relatorio" "-reporttypes:TextSummary" \n  "-classfilters:-Microsoft.AspNetCore.OpenApi.Generated*"   # sem isto o Api mede 54,9% em vez de 80,9%
+reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/relatorio"   "-reporttypes:TextSummary" "-classfilters:-Microsoft.AspNetCore.OpenApi.Generated*"
+# ⚠ sem o filtro de classe o Api mede 54,9% em vez de 79,9% — as 208 linhas do gerador de OpenAPI
 
 # Frontend
 cd frontend
@@ -212,12 +213,31 @@ bash .claude/skills/subir-e-validar/scripts/derrubar.sh
 como servidor: a API responde `/api/health`, e os bancos de log e de arquivo ficam vazios — a trilha
 falha em toda operação e o primeiro upload dá 500. O startup de Development migra **só** o principal.
 
+⚠⚠ **E o `--migrate` pode RECUSAR a partida, de propósito** (ADR-0022 §6, 20/08/2026). Antes de
+aplicar qualquer coisa nos três bancos, `HistoricoDeMigrations` pergunta se o banco tem migration
+que este código **não conhece**. Se tiver, o processo morre com a lista e as duas saídas.
+
+**A pergunta é "sobra?", nunca "falta?"** — faltar é o caso de todo deploy, e confundir os dois faria
+o guarda barrar a primeira instalação de um cliente novo (há um teste só para isso). **Sobrar** é o
+sintoma de que o banco veio de outro código, e nada disso se resolve aplicando mais nada.
+
+⚠ **O guarda existe pela MENSAGEM, não pela detecção.** Sem ele o log mostrava `CREATE TABLE arquivo`
+falhando — erro de SQL plausível — enquanto a informação de verdade, *este banco veio de outro
+código*, não estava em lugar nenhum. Erro de infraestrutura sem caminho de saída vira tentativa e
+erro em cima de banco, que é o pior lugar do sistema para experimentar. Se você mexer na mensagem,
+mexa no `Mensagem_DizOCaminho`: por dois deploys ela mandou enfileirar com uma **variável**, e
+variável declarada no YAML é constante do arquivo — a instrução não tinha efeito. Hoje é caixa de
+seleção (`parameters.recriarBanco`), e o teste afirma o texto. Detalhe em
+[`infra/azure-devops.md`](infra/azure-devops.md).
+
 ---
 
 ## Estado atual
 
-Sprint 1 & 2 — documentação entregue. **190 regras catalogadas: 164 em `HIP`, 26 em `DEC`;
-nenhuma validada com cliente.** A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
+Sprint 1 & 2 — documentação entregue. **190 regras catalogadas: 165 em `HIP`, 25 em `DEC`;
+nenhuma validada com cliente.** ⚠ `IMP` é **origem**, não estado — 31 regras vieram da
+implementação, e todas as 31 seguem em `HIP`. Reconte pela coluna de estado, e a conta que fecha
+é `HIP + DEC + VAL = 190`. A **onda 0 está entregue** — `SPEC-GER-001` a `007`. Da **onda 1**, o cadastro do cardápio
 está entregue (`SPEC-VEN-003`). Em 18/08/2026 a `SPEC-GER-007` ganhou a **equipe da plataforma** (`RN-GER-030`, `RN-GER-031`) e a `SPEC-GER-008` entregou a **recuperação de acesso por e-mail** (`RN-GER-032` a `035`, ADR-0016): link de uso único, convite na criação de usuário e "esqueci minha senha" — o que fecha o beco de quem perdia a senha do acesso de plataforma.
 
 Restam **dois critérios abertos por dependência de onda**, ambos declarados na sua spec:
@@ -275,7 +295,8 @@ não prevê — o que a regra pedia e faltava era recusar o **envio** na tela, n
 ⚠⚠ **19/08/2026 — O ACESSO PASSOU A SER O DO ASP.NET IDENTITY** (ADR-0022), e as duas lacunas
 abaixo — achadas ao avaliar a adoção — **estão FECHADAS**. O texto fica porque o que elas ensinam
 não expira:
-([ADR-0021](docs/adr/0021-identity-do-aspnet-core.md), **proposta, aguarda decisão**):
+([ADR-0021](docs/adr/0021-identity-do-aspnet-core.md) — **revertida pela 0022**: a análise segue
+válida, a recomendação não):
 
 1. **Não havia bloqueio por tentativa no login.** `RN-GER-027` protege contra **enumeração de
    contas** (a resposta é igual para senha errada e conta inexistente) e **não** contra força bruta.
@@ -375,8 +396,9 @@ impedir. Nenhuma barra some.
 - **ADR-0020 — a sessão de suporte foi REMOVIDA.** `RN-GER-015` foi revisada: o controle é a
   trilha, não o portão. Não existe mais `sessao_suporte`, nem behavior, nem tela.
 
-⚠ **Cobertura: 90,8% de linha, 71,4% de ramo** — medida com `cobertura.runsettings` E o filtro de
-classe do relatório. Sem os dois, o número mente: ver o aviso acima.
+⚠ **Cobertura: 90,8% de linha, 70,8% de ramo** — medida com `cobertura.runsettings` E o filtro de
+classe do relatório. Sem os dois, o número mente: ver o aviso acima. Por assembly: Application
+95,7% · Domain 90,0% · Infrastructure 86,3% · Api 79,9%.
 
 ⚠⚠ **Quando a LEITURA precisa de uma regra, extraia a função — não a traduza para SQL.** A conversão
 do ADR-0019 esbarrou em `RN-VEN-048` ("a casa está aberta agora?") e `RN-GER-037` (endereço em uma
@@ -400,7 +422,7 @@ escritos em dois níveis (apresentável ao time, e detalhado para quem mexe).
 | Gate | Estado |
 |------|--------|
 | `dotnet build -c Release` | ✔ 0 avisos |
-| `dotnet test -c Release` | ✔ **366 testes** — 110 de domínio + 19 de aplicação + 237 de integração |
+| `dotnet test -c Release` | ✔ **372 testes** — 110 de domínio + 25 de aplicação + 237 de integração |
 | Testes de integração | ✔ PostgreSQL real via Testcontainers (`postgres:16-alpine`). **Exige Docker rodando** |
 | `npm run lint && npm run build` | ✔ limpo — `npm ci` primeiro (204 pacotes, 0 vulnerabilidades) |
 | **Validação em tela** | ✔ 19/08/2026 — fila, cadência, celular e `CHAPA-02`/`04` conferidos em Chrome real. ⚠⚠ **Não é gate automático:** roda à mão, pela skill `subir-e-validar` |

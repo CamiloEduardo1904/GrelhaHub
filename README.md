@@ -202,11 +202,11 @@ npm run lint && npm run build
 |------|----------|
 | Regras catalogadas | **190** — GER 41 · VEN 58 · EST 23 · FIN 16 · PRO 13 · LOG 9 · CRM 9 · COM 9 · RH 6 · FIS 6 |
 | Regras **validadas com cliente** | **0** — a entrevista é o próximo marco. É o maior risco do projeto |
-| Decisões de arquitetura | **22 ADRs**, 4 decisões em aberto |
+| Decisões de arquitetura | **22 ADRs**, 6 decisões em aberto |
 | Specs | **14**, todas `ENTREGUE` |
 | Regras com o ID citado em teste | **66** |
-| Testes | **366 verdes** — 110 domínio + 19 aplicação + 237 integração, contra PostgreSQL real |
-| Cobertura | **91,1% de linha**, 71,3% de ramo — medida com `cobertura.runsettings` **e** o filtro de classe |
+| Testes | **372 verdes** — 110 domínio + 25 aplicação + 237 integração, contra PostgreSQL real |
+| Cobertura | **90,8% de linha**, 70,8% de ramo — medida com `cobertura.runsettings` **e** o filtro de classe. Application 95,7% · Domain 90,0% · Infrastructure 86,3% · Api 79,9% |
 | Sprint | 1 & 2 entregues — documentação, fatia vertical e onda 0 |
 
 ### O que já funciona

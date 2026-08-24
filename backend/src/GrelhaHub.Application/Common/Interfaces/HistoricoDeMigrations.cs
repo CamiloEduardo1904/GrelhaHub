@@ -3,10 +3,10 @@ namespace GrelhaHub.Application.Common.Interfaces;
 /// <summary>
 /// O guarda que faltava no <c>--migrate</c> — ADR-0022 §6, 20/08/2026.
 /// <para>
-/// <b>Nasceu de um deploy quebrado, e o valor dele é a MENSAGEM.</b> A ADR-0022 substituiu 18
+/// <b>Nasceu de um deploy quebrado, e o valor dele é a MENSAGEM.</b> A ADR-0022 substituiu 20
 /// migrations por uma só, e a tabela dela dizia <i>"não há dado a preservar — o harness recria o
 /// banco a cada execução"</i>. Isso era verdade do harness de teste e <b>falso da VPS</b>, que tem
-/// banco persistente com as 18 antigas no <c>__EFMigrationsHistory</c>.
+/// banco persistente com as 20 antigas no <c>__EFMigrationsHistory</c>.
 /// </para>
 /// <para>
 /// O que o deploy mostrou foi <c>CREATE TABLE arquivo</c> falhando — porque o EF, não achando
@@ -66,7 +66,7 @@ public static class HistoricoDeMigrations
             diferente deste, e aplicar a migration atual em cima dele falharia no primeiro
             CREATE TABLE, como se o banco estivesse vazio.
 
-            Causa mais comum: o histórico de migrations foi reescrito (ADR-0022 §6 substituiu 18
+            Causa mais comum: o histórico de migrations foi reescrito (ADR-0022 §6 substituiu 20
             migrations por uma), e este banco é anterior à troca.
 
             As saídas, e nenhuma delas é "tentar de novo":
