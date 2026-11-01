@@ -1,20 +1,14 @@
-﻿-- =====================================================================================
--- GrelhaHub — DDL do banco de NEGÓCIO (grelhahub) — versão SIMPLES (não-idempotente)
--- Gerado das migrations do EF Core (dotnet ef migrations script), 31/10/2026.
--- Contexto: GrelhaHubDbContext. CREATE TABLE/CONSTRAINT direto, para leitura — roda
--- de uma vez num banco VAZIO (não tem o invólucro DO $EF$ ... IF NOT EXISTS que permite
--- reexecução). Para deploy/reexecução use a versão idempotente: ddl-grelhahub-negocio.sql.
--- Pré-requisito: role, banco e extensão btree_gist — ver scripts/preparar-banco.sql.
+-- =====================================================================================
+-- GrelhaHub — DDL do banco de NEGÓCIO (grelhahub) — versão SIMPLES e LIMPA
+-- Gerado das migrations do EF Core (dotnet ef migrations script), 31/10/2026,
+-- com o rastro do EF removido: sem __EFMigrationsHistory, START TRANSACTION e COMMIT.
+-- É DDL puro — CREATE TABLE/CONSTRAINT/INDEX/VIEW e o seed de catálogo (parametro,
+-- modulo, modulo_dependencia). Roda de uma vez num banco VAZIO (não é idempotente).
+-- Para deploy/reexecução use a versão idempotente: ddl-grelhahub-negocio.sql.
+-- Pre-requisito: role, banco e extensao btree_gist -- ver scripts/preparar-banco.sql.
 -- Trechos comentados (A/B/C/D): docs/entregas/recorte-ddl-A-B-C-D.md.
 -- =====================================================================================
 
-CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
-    migration_id character varying(150) NOT NULL,
-    product_version character varying(32) NOT NULL,
-    CONSTRAINT pk___ef_migrations_history PRIMARY KEY (migration_id)
-);
-
-START TRANSACTION;
 CREATE TABLE arquivo (
     id uuid NOT NULL,
     unidade_id uuid NOT NULL,
@@ -752,12 +746,8 @@ SELECT pv.unidade_id,
   FROM parametro_valor pv
   JOIN parametro p ON p.id = pv.parametro_id
 
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
-VALUES ('20260819222202_Fundacao', '10.0.4');
 
-COMMIT;
 
-START TRANSACTION;
 CREATE TABLE conta_receber (
     id uuid NOT NULL,
     unidade_id uuid NOT NULL,
@@ -856,8 +846,5 @@ SELECT r.unidade_id,
   FROM recebimento r
  GROUP BY r.unidade_id, r.data_operacional
 
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
-VALUES ('20261025232207_Financeiro', '10.0.4');
 
-COMMIT;
 

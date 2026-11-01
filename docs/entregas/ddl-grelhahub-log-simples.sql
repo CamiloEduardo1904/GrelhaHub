@@ -1,10 +1,9 @@
-﻿CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
-    migration_id character varying(150) NOT NULL,
-    product_version character varying(32) NOT NULL,
-    CONSTRAINT pk___ef_migrations_history PRIMARY KEY (migration_id)
-);
+-- =====================================================================================
+-- GrelhaHub — DDL do banco de LOG (grelhahub_log) — versão SIMPLES e LIMPA (ADR-0017)
+-- Trilha de auditoria + log de excecoes. Rastro do EF removido. DDL puro.
+-- Inclui os gatilhos de imutabilidade da trilha (recusam UPDATE/DELETE/TRUNCATE).
+-- =====================================================================================
 
-START TRANSACTION;
 CREATE TABLE log_auditoria (
     id uuid NOT NULL,
     unidade_id uuid,
@@ -43,12 +42,8 @@ CREATE INDEX ix_log_excecao_correlacao ON log_excecao (correlacao);
 
 CREATE INDEX ix_log_excecao_tipo ON log_excecao (tipo, dh_ocorrencia);
 
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
-VALUES ('20260818211529_EsquemaDeLog', '10.0.4');
 
-COMMIT;
 
-START TRANSACTION;
 CREATE OR REPLACE FUNCTION fn_log_auditoria_imutavel()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -71,8 +66,5 @@ BEFORE TRUNCATE ON log_auditoria
 FOR EACH STATEMENT
 EXECUTE FUNCTION fn_log_auditoria_imutavel()
 
-INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
-VALUES ('20260818213000_ImutabilidadeDaTrilha', '10.0.4');
 
-COMMIT;
 
